@@ -1,0 +1,7 @@
+defaults:
+  - e2d2@_here_
+  - _self_
+
+_target_: src.denoiser.diffusion.E2D
+config:
+  _target_: src.denoiser.diffusion.E2DConfig
