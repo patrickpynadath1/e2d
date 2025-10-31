@@ -16,7 +16,7 @@ N_DECODER_LAYERS=8
 LR=3e-4
 WARMUP_DURATION="1000ba"
 BATCH_SIZE=128
-MAX_DURATION="500000ba"
+MAX_DURATION="50000ba"
 
 PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-0.6B-Base
 
@@ -55,8 +55,8 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   model.config.backbone_config.num_encoder_layers=${N_ENCODER_LAYERS} \
   model.config.backbone_config.num_decoder_layers=${N_DECODER_LAYERS} \
   model.config.backbone_config.tie_encoder_decoder_weights=false \
-  model.config.backbone_config.reinit_decoder=true \
-  model.config.backbone_config.reinit_encoder=true \
+  model.config.backbone_config.reinit_decoder=false \
+  model.config.backbone_config.reinit_encoder=false \
   model.config.backbone_config.keep_top_decoder_layers=false \
   model.config.backbone_config.keep_top_encoder_layers=false \
   +model.config.backbone_config.hidden_size=${HIDDEN_SIZE} \
