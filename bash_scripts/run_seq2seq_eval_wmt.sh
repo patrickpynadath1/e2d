@@ -27,9 +27,17 @@ source setup_env.sh
 #MODEL_PATH="outputs/<PATH_TO_BD3LM_SAVED_MODEL_DIR>"
 
 ######### E2D2
+# PROMPT_TEXT=null
+# BLOCK_SIZE=4
+# # MODEL_PATH="kuleshov-group/e2d2-wmt"
+# MODEL_PATH="outputs/wmt_block4_lr3e-4_bsz128_warm1000ba_enc28_dec4_hidden512_inter1536_e2d2"
+# KV_CACHING=true
+# ALIGN_INPUTS_TO_BLOCKS=false
+
+######### E2D
 PROMPT_TEXT=null
 BLOCK_SIZE=4
-MODEL_PATH="kuleshov-group/e2d2-wmt"
+MODEL_PATH="outputs/wmt_block4_lr3e-4_bsz128_warm1000ba_enc28_dec4_hidden512_inter1536_e2d_20251107_195313"
 # MODEL_PATH="outputs/<PATH_TO_MDLM_SAVED_MODEL_DIR>"
 KV_CACHING=true
 ALIGN_INPUTS_TO_BLOCKS=false
@@ -47,6 +55,7 @@ CONFIDENCE_BASED_NOISING=true
 MAX_LENGTH=1024
 CKPT="best"
 USE_EMA=true
+NUM_VISIBLE_DEVICES=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 OUTPUT_PATH="${OUTPUT_DIR}/L-${L}-block_size-${BLOCK_SIZE}-T${T}-do_sample-${DO_SAMPLE}-sampling_strategy-${SAMPLING_STRATEGY}-first_hitting-${FIRST_HITTING}-confidence_based_noising-${CONFIDENCE_BASED_NOISING}-align_inputs_to_blocks${ALIGN_INPUTS_TO_BLOCKS}-ckpt${CKPT}-ema${USE_EMA}"
 PORT=29502

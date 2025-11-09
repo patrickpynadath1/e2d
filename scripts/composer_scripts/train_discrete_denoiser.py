@@ -126,6 +126,9 @@ def main(cfg: DictConfig) -> None:
     else:
         logger = None
 
+    # for debug: set logger to None
+    # logger = None
+
     # Callbacks
     callbacks = hydra.utils.instantiate(cfg.composer.callbacks)
 

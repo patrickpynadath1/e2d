@@ -20,10 +20,12 @@ MAX_DURATION="500000ba"
 
 PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-0.6B-Base
 
-TAG="e2d2"
+TAG="e2d"
 ENC_LAYERS="enc${N_ENCODER_LAYERS}"
 DEC_LAYERS="dec${N_DECODER_LAYERS}"
-RUN_NAME=wmt_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_${ENC_LAYERS}_${DEC_LAYERS}_hidden${HIDDEN_SIZE}_inter${INTERMEDIATE_SIZE}_${TAG}
+# get time stamp
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+RUN_NAME=wmt_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_${ENC_LAYERS}_${DEC_LAYERS}_hidden${HIDDEN_SIZE}_inter${INTERMEDIATE_SIZE}_${TAG}_${TIMESTAMP}
 
 GPU_TYPE=$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -E 's/.*(A[0-9]+|H100|A6000).*/\1/' | head -n 1)
 if [[ "$GPU_TYPE" == "A100" || "$GPU_TYPE" == "H100" ]]; then
@@ -48,7 +50,7 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   composer.trainer.save_num_checkpoints_to_keep=1 \
   composer/lr_scheduler=constant_with_warmup \
   composer.lr_scheduler.t_warmup=${WARMUP_DURATION} \
-  model=e2d2 \
+  model=e2d \
   model.config.attn_backend="sdpa" \
   training.compile_backbone=true \
   model.config.length=256 \

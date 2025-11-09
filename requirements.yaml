@@ -1,4 +1,4 @@
-name: e2d2-env
+name: e2d-env
 channels:
   - pytorch
   - anaconda
