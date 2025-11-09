@@ -303,7 +303,7 @@ class D3PM(Denoiser):
             attention_mask=attention_mask,
             past_key_values=past_key_values,
             context_mask=context_mask,
-            backbone_kwargs=backbone_kwargs | {"use_cache": False},
+            backbone_kwargs=backbone_kwargs,
         ), cache
 
     def _forward(
@@ -1199,23 +1199,35 @@ class E2D2(BD3LM):
             context_mask = context_mask.to(torch.int)
 
         if t is None:
+            # the first part torch.rand(...) generates one random t per block
+            # the repeat_interleave expands it to every token in the block
+            # (ensuring that each token in the block has the same t)
             t = torch.rand(
-                input_ids.shape[0],
-                input_ids.shape[1] // self.config.block_size
+                input_ids.shape[0],                                # batch size
+                input_ids.shape[1] // self.config.block_size       # number of blocks
                 if self.training
                 else self.config.eval_block_size,
                 device=input_ids.device,
             ).repeat_interleave(
-                self.config.block_size
+                self.config.block_size                             # repeat = block size
                 if self.training
                 else self.config.eval_block_size,
                 dim=-1,
             )
+
+        # alpha_t: the probability that a token from the original sequence survives the noising process at time t
+        # alpha_t_prime: the speed at which noise is being added
         alpha_t, alpha_t_prime = self.noise_schedule(t)
+
+        # enable the comparison `move_indices = torch.rand(*x0.shape, ...) < (1.0 - alpha_t)` in _sample_q_xt
         while alpha_t.ndim < 2:
-            alpha_t = alpha_t[..., None]
-            alpha_t_prime = alpha_t_prime[..., None]
+            alpha_t = alpha_t[..., None]  # equivalent to torch.unsqueeze(alpha_t, dim=-1)
+            alpha_t_prime = alpha_t_prime[..., None] # equivalent to torch.unsqueeze(alpha_t_prime, dim=-1)
+
+        # perform the noising process to get xt from x0
+        # context_mask ensures context tokens are not noised
         xt = self._sample_q_xt(x0=input_ids, alpha_t=alpha_t, context_mask=context_mask)
+
         # Ensure each block has at least 1 masked token
         if self.training:
             xt = self._ensure_no_unmasked_blocks(
@@ -1223,20 +1235,30 @@ class E2D2(BD3LM):
                 xt,
                 context_mask,
             )
+
+        # handle attention masks
         if self.config.attn_backend == "sdpa":
             decoder_attention_mask = (
+                # static_attention_mask (L, 2L) is the offset block-causal mask + block-diagonal mask for the decoder
                 self.static_attention_mask[None, ...]
-                & attention_mask.repeat(1, 2)[:, None, :]
+                # attention_mask zeros out rows and cols corresponding to padding tokens
+                & attention_mask.repeat(1, 2)[:, None, :] # repeats padding mask to cover 2L
                 & attention_mask[..., None]
             )[:, None, ...]  # Make attention mask 4D
             encoder_attention_mask = (
                 (
+                    # encoder_static_attention_mask (L, L) is just the block-causal encoder mask
                     self.encoder_static_attention_mask[None, ...]
+                    # context_mask (L, L) sets the positions corresponding to context (prompt) tokens to 1
                     | context_mask[:, None, :]
                 )
+                # attention_mask zeros out rows and cols corresponding to padding tokens
                 & attention_mask[:, None, :]
                 & attention_mask[..., None]
             )[:, None, ...]  # Make attention mask 4D
+
+            # convert binary attention masks (composed of 1s and 0s)
+            # into additive attention masks (composed of 0.0 and a very large negative number)
             encoder_attention_mask = self._preprocess_attention_mask(
                 encoder_attention_mask, dtype=torch.float
             )
@@ -1290,11 +1312,14 @@ class E2D2(BD3LM):
                 decoder_attention_mask = self.static_attention_mask
         else:
             raise ValueError("Unknown backbone backend")
+        
+        # create a tensor [[0, 1, 2, ..., L-1]]
         position_ids = torch.arange(input_ids.shape[1]).to(input_ids.device)[None, :]
+
         if self.training and self.config.train_on_context:
             tokens_mask = attention_mask
         else:
-            tokens_mask = attention_mask * (1 - context_mask)
+            tokens_mask = attention_mask * (1 - context_mask) # only compute loss on non-context tokens
         return DenoiserInput(
             xt=xt,
             x0=input_ids,
@@ -1304,7 +1329,7 @@ class E2D2(BD3LM):
             alpha_t=alpha_t,
             alpha_t_prime=alpha_t_prime,
             backbone_kwargs={
-                "encoder_input_ids": input_ids,
+                "encoder_input_ids": input_ids, # encoder uses clean sequence as input
                 "encoder_attention_mask": encoder_attention_mask,
                 "encoder_position_ids": position_ids,
                 "encoder_cache_position": position_ids[0],
@@ -1326,17 +1351,24 @@ class E2D2(BD3LM):
         assert input_ids is not None or context is not None, (
             "Must provide either input_ids or context."
         )
-        if return_updated_cache:  # Indicates this is a cache update step
+        # Indicates this is a cache update step for the encoder
+        if return_updated_cache:
+            # re-label the clean tokens as context (because they'll serve as context for the next block's generation)
             context = input_ids
             input_ids = None
+        # otherwise we're running a denoising step of the decoder, input_ids remains the noisy block xt
+
         position_ids, encoder_position_ids = None, None
+
         if cache is not None:
-            past_key_values = cache.pop("past_key_values", DynamicCache())
+            past_key_values = cache.pop("past_key_values", DynamicCache()) # decoder's cache
             encoder_past_key_values = cache.pop(
                 "encoder_past_key_values", DynamicCache()
             )
             encoder_last_hidden_state = cache.pop("encoder_last_hidden_state", None)
-            if input_ids is not None:  # Skip enc: nothing new to cache
+            # decoder's run
+            if input_ids is not None:
+                # check how many tokens the decoder has seen before
                 cache_length = self._get_past_key_values_seq_length(past_key_values)
                 if encoder_last_hidden_state is not None:
                     full_seq_length = (
@@ -1350,10 +1382,11 @@ class E2D2(BD3LM):
                 position_ids = torch.arange(
                     cache_length, full_seq_length, device=device
                 )[None, :]
-            else:  # Caching new tokens in the enc
+            # encoder's run
+            else:
                 encoder_cache_length = self._get_past_key_values_seq_length(
                     encoder_past_key_values
-                    if len(encoder_past_key_values) > 0
+                    if encoder_past_key_values is not None and len(encoder_past_key_values) > 0
                     else past_key_values
                 )
                 encoder_full_seq_length = encoder_cache_length + context.shape[-1]
@@ -1395,7 +1428,10 @@ class E2D2(BD3LM):
             position_ids = torch.arange(context_len, full_seq_length).to(device)[
                 None, :
             ]
+        
+        # decoder's run
         if input_ids is not None:
+            # can attend to all the tokens
             decoder_attention_mask = torch.ones(
                 (batch_size, 1, input_ids.shape[1], full_seq_length),
                 device=device,
@@ -1403,8 +1439,15 @@ class E2D2(BD3LM):
             decoder_attention_mask = self._preprocess_attention_mask(
                 decoder_attention_mask, dtype=torch.float
             )
+        # encoder's run
         else:
             decoder_attention_mask = None
+
+        # for encoder:
+        # xt is None
+        # attention_mask is None
+        # context_mask is still just passed
+        # past_key_values is the decoder's cache
         return DenoiserInput(
             xt=input_ids,
             attention_mask=decoder_attention_mask,
@@ -1434,7 +1477,6 @@ class E2D2(BD3LM):
             **kwargs,
         )
 
-
 class E2DConfig(E2D2Config):
     """Configuration class for E2D models (autoregressive variant)."""
     
@@ -1447,7 +1489,6 @@ class E2DConfig(E2D2Config):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
 
 class E2D(E2D2):
     """Autoregressive variant of E2D2 using block causal attention."""
@@ -1475,12 +1516,13 @@ class E2D(E2D2):
     def _decoder_block_mask(
         b,
         h,
-        q_idx,
-        kv_idx,
+        q_idx,    # tensor [1, L]
+        kv_idx,   # tensor [1, 2L]
         block_size: Optional[int] = None,
-        seq_length: Optional[int] = None,
+        seq_length: Optional[int] = None, # L
     ) -> torch.Tensor:
         """Decoder uses block causal attention for AR generation."""
+
         # Indicate whether token belongs to xt or x0:
         xt_flag_kv = (kv_idx >= seq_length).bool()
 
@@ -1489,19 +1531,16 @@ class E2D(E2D2):
         block_kv = torch.where(
             xt_flag_kv, (kv_idx - seq_length) // block_size, kv_idx // block_size
         )
-        
-        # **1. Cross-attention: decoder can attend to all encoder tokens**
-        cross_attention = ~xt_flag_kv
-        
+        # **1. Offset Block-Causal Mask **
+        offset_block_causal = (block_q > block_kv) & ~xt_flag_kv
+
         # **2. Causal self-attention within decoder blocks**
-        # Block causal: can attend to previous blocks + causal within current block
+        # Block causal: causal within current block
         same_block = (block_q == block_kv) & xt_flag_kv
-        prev_blocks = (block_q > block_kv) & xt_flag_kv
-        
-        # Within same block: causal attention (token can see previous tokens in block)
-        within_block_causal = same_block & (q_idx >= kv_idx)
-        
-        return cross_attention | prev_blocks | within_block_causal
+        within_block_causal = same_block & (q_idx >= (kv_idx - seq_length))
+
+        # **3. Combine Masks **
+        return offset_block_causal | within_block_causal
 
     def _prepare_inputs(
         self,
@@ -1739,68 +1778,78 @@ class E2D(E2D2):
         )
         for block_id in block_pbar:
             start_idx = inputs_offset + (block_id * block_size)
-            end_idx = inputs_offset + ((block_id + 1) * block_size)
-            
-            context = (
-                accumulated_samples[:, :start_idx]
-                if not generation_config.use_cache
-                else None
-            )
-            
-            # Single forward pass for the block (no iterative diffusion)
-            denoiser_inputs, cache = self._prepare_inputs_inference(
-                input_ids=accumulated_samples[:, start_idx:end_idx],
-                context=context,
-                cache=cache if generation_config.use_cache else None,
-            )
-            
-            # Forward pass
-            backbone_output = self._backbone_forward(
-                denoiser_inputs,
-                fix_cache_length=True,
-                **cache if cache is not None else {},
-                **kwargs,
-            )
-            logits = backbone_output["logits"]
-            cache = {k: v for k, v in backbone_output.items() if k != "logits"}
-            
-            # Apply logits processors (keep same as D3PM)
-            if logits_processor is not None:
-                for token_idx in range(logits.shape[1]):
-                    logits[:, token_idx] = logits_processor(
-                        input_ids=accumulated_samples[:, :start_idx + token_idx + 1],
-                        scores=logits[:, token_idx],
-                    )
-            
-            # Sample from logits for the current block
-            if generation_config.do_sample:
-                # Sample with temperature
-                probs = torch.softmax(logits, dim=-1)
-                next_tokens = self._sample_categorical(probs, do_sample=True)
-            else:
-                # Greedy sampling
-                next_tokens = logits.argmax(dim=-1)
-            
-            # Update accumulated samples
-            accumulated_samples[:, start_idx:end_idx] = next_tokens
-            
-            if tokenizer is not None:  # Useful for debugging
-                print(tokenizer.batch_decode(accumulated_samples))
-            
-            # Check stopping criteria (keep same as D3PM)
-            if stopping_criteria is not None:
-                is_done = stopping_criteria(
-                    input_ids=accumulated_samples[:, :end_idx],
-                    scores=None,
-                )
-                if torch.any(is_done):
-                    accumulated_samples = accumulated_samples[:, :end_idx]
+
+            # ---- Modification: autoregressively generate tokens within the block ----
+            for step in range(block_size):
+                cur_pos = start_idx + step
+                if cur_pos >= accumulated_samples.shape[1]:
+                    # Stop Criteria is met
                     break
-            
-            if generation_config.use_cache:
-                cache = self.update_cache(
-                    inputs=next_tokens,
-                    cache=cache,
+                
+                # Decoder input token: use previous token
+                dec_inp = accumulated_samples[:, cur_pos - 1:cur_pos]
+                
+                context = (
+                    accumulated_samples[:, :start_idx]
+                    if not generation_config.use_cache
+                    else None
                 )
-        
+
+
+                denoiser_inputs, _ = self._prepare_inputs_inference(
+                    input_ids=dec_inp,
+                    context=context,
+                    cache=cache if generation_config.use_cache else None,
+                )
+
+                backbone_output = self._backbone_forward(
+                    denoiser_inputs,
+                    fix_cache_length=True,
+                    **(cache if cache is not None else {}),
+                    **kwargs,
+                )
+                logits = backbone_output["logits"][:, -1, :]
+                if generation_config.use_cache:
+                    cache = {k: v for k, v in backbone_output.items() if k != "logits"}
+                
+
+                # Apply logits processors (keep same as D3PM)
+                if logits_processor is not None:
+                    logits = logits_processor(
+                        input_ids=accumulated_samples[:, :cur_pos+1],
+                        scores=logits,
+                    )
+
+                # Sample from logits for the current block
+                if generation_config.do_sample:
+                    # Sample with temperature
+                    probs = torch.softmax(logits, dim=-1)
+                    next_tok = self._sample_categorical(probs, do_sample=True)[:, 0]
+                else:
+                    # Greedy sampling
+                    next_tok = logits.argmax(dim=-1)
+
+                # Update accumulated samples
+                accumulated_samples[:, cur_pos:cur_pos+1] = next_tok.unsqueeze(-1)
+
+                # Update encoder cache
+                if generation_config.use_cache:
+                    cache = self.update_cache(
+                        inputs=next_tok.unsqueeze(-1),
+                        cache=cache,
+                    )
+
+                if tokenizer is not None:  # Useful for debugging
+                    print(tokenizer.batch_decode(accumulated_samples))
+
+                # Check stopping criteria (keep same as D3PM)
+                if stopping_criteria is not None:
+                    is_done = stopping_criteria(
+                        input_ids=accumulated_samples[:, :cur_pos+1],
+                        scores=None,
+                    )
+                    if torch.any(is_done):
+                        accumulated_samples = accumulated_samples[:, :cur_pos+1]
+                        break 
+                
         return accumulated_samples
