@@ -517,8 +517,11 @@ class D3PM(Denoiser):
                 "Generation config must be provided if not present in the model."
             )
             generation_config = self.generation_config
+
+        # handle unconditional generation when inputs is None
         if inputs is None:
-            inputs = torch.ones((batch_size, 1), device=device) * self.bos_token_id
+            inputs = torch.ones((batch_size, 1), device=device) * self.bos_token_id # create a starting tensor with bos_tokens
+
         if max_length is None:
             if hasattr(generation_config, "max_length"):
                 max_length = generation_config.max_length
@@ -536,7 +539,7 @@ class D3PM(Denoiser):
         block_size = generation_config.block_size
         max_blocks = max_new_tokens // block_size
 
-        # Sample max generation length tensor from prior
+        # create a tensor filled with [MASK]s
         accumulated_samples = self._sample_prior(
             device=device,
             batch_size=batch_size,
@@ -546,13 +549,14 @@ class D3PM(Denoiser):
         if generation_config.use_cache and inputs.numel() > 0:
             cache = self.update_cache(
                 inputs=inputs[:, : block_size * (inputs.shape[-1] // block_size)]
-                if generation_config.align_inputs_to_blocks
+                if generation_config.align_inputs_to_blocks # ensure the prompt length is a multiple of the block size for cleaner processing
                 else inputs,
                 cache={},
             )
         else:
             cache = None
 
+        # mark the index where the masked region (the generation) begins
         if generation_config.align_inputs_to_blocks:
             inputs_offset = (
                 block_size * (inputs.shape[-1] // block_size)
@@ -563,10 +567,14 @@ class D3PM(Denoiser):
             inputs_offset = inputs.shape[-1] if inputs.numel() > 0 else 0
 
         total_NFEs = 0
+
+        # create the noise schedule timesteps (a sequence of t values decreasing from 1.0 to 0.0)
         timesteps = self._sample_generation_timesteps(  # Re-use in every block
             generation_config, max_length=block_size, device=device
         )
         dt = (1 - generation_config.min_t) / len(timesteps)
+
+        # block by block generation
         block_pbar = tqdm(
             range(max_blocks),
             desc="Blocks",
@@ -575,11 +583,13 @@ class D3PM(Denoiser):
         )
         for block_id in block_pbar:
             block_NFEs = 0
+
+            # slice the current block to be denoised
             xt = accumulated_samples[
                 :,
-                inputs_offset + (block_id * block_size) : inputs_offset
-                + ((block_id + 1) * block_size),
+                inputs_offset + (block_id * block_size) : inputs_offset + ((block_id + 1) * block_size),
             ]
+
             if self.mask_token_id not in xt:
                 continue
             step_pbar = tqdm(
@@ -600,10 +610,12 @@ class D3PM(Denoiser):
                 :,
                 inputs_offset : inputs_offset + (block_id * block_size),
             ]
+
             for t in step_pbar:
                 if model_output_cache is None:
                     block_NFEs += 1
                     total_NFEs += 1
+                # a single denoising step
                 # t is 0-dim tensor, reshape to (1, 1, 1) for broadcasting
                 alpha_t, _ = self.noise_schedule(t)
                 alpha_s, _ = self.noise_schedule(t - dt)
@@ -640,10 +652,9 @@ class D3PM(Denoiser):
                     xt[..., -block_size:] = xs[..., -block_size:]
                 else:
                     xt = xs
-                if (
-                    xt == self.mask_token_id
-                ).sum().item() == 0 and self.config.diffusion_type == "absorbing":
+                if (xt == self.mask_token_id).sum().item() == 0 and self.config.diffusion_type == "absorbing":
                     break
+
             accumulated_samples[
                 :,
                 inputs_offset + (block_id * block_size) : inputs_offset
@@ -1779,7 +1790,7 @@ class E2D(E2D2):
         for block_id in block_pbar:
             start_idx = inputs_offset + (block_id * block_size)
 
-            # ---- Modification: autoregressively generate tokens within the block ----
+            # autoregressively generate tokens within the block
             for step in range(block_size):
                 cur_pos = start_idx + step
                 if cur_pos >= accumulated_samples.shape[1]:
@@ -1795,13 +1806,16 @@ class E2D(E2D2):
                     else None
                 )
 
-
-                denoiser_inputs, _ = self._prepare_inputs_inference(
+                # -------- Modification 2: update cache here --------
+                denoiser_inputs, cache = self._prepare_inputs_inference(    # <--- the old implementation should also be fine
                     input_ids=dec_inp,
                     context=context,
                     cache=cache if generation_config.use_cache else None,
                 )
+                # ----------------------------------------------------
 
+                # -------- Modification 3: call backbone with the same design as D3PM --------
+                '''
                 backbone_output = self._backbone_forward(
                     denoiser_inputs,
                     fix_cache_length=True,
@@ -1811,7 +1825,17 @@ class E2D(E2D2):
                 logits = backbone_output["logits"][:, -1, :]
                 if generation_config.use_cache:
                     cache = {k: v for k, v in backbone_output.items() if k != "logits"}
-                
+                '''
+                backbone_output = self._backbone_forward(
+                    denoiser_inputs,
+                    fix_cache_length=True,  # Do not let kv cache grow on each forward call
+                    **cache,
+                    **kwargs,
+                )
+                backbone_output = {k: v for k, v in backbone_output.items()}
+                logits = backbone_output.pop("logits")
+                cache = cache | backbone_output
+                # ------------------------------------------------------------------------------
 
                 # Apply logits processors (keep same as D3PM)
                 if logits_processor is not None:
@@ -1832,24 +1856,27 @@ class E2D(E2D2):
                 # Update accumulated samples
                 accumulated_samples[:, cur_pos:cur_pos+1] = next_tok.unsqueeze(-1)
 
-                # Update encoder cache
-                if generation_config.use_cache:
-                    cache = self.update_cache(
-                        inputs=next_tok.unsqueeze(-1),
-                        cache=cache,
-                    )
+            # -------- Modification 1: Moving the update cache outside the inner loop --------
+            # Update encoder cache
+            if generation_config.use_cache:
+                cache = self.update_cache(
+                    # inputs=next_tok.unsqueeze(-1),
+                    inputs=accumulated_samples[:, start_idx:start_idx + block_size],
+                    cache=cache,
+                )
 
-                if tokenizer is not None:  # Useful for debugging
-                    print(tokenizer.batch_decode(accumulated_samples))
+            if tokenizer is not None:  # Useful for debugging
+                print(tokenizer.batch_decode(accumulated_samples))
 
-                # Check stopping criteria (keep same as D3PM)
-                if stopping_criteria is not None:
-                    is_done = stopping_criteria(
-                        input_ids=accumulated_samples[:, :cur_pos+1],
-                        scores=None,
-                    )
-                    if torch.any(is_done):
-                        accumulated_samples = accumulated_samples[:, :cur_pos+1]
-                        break 
+            # Check stopping criteria (keep same as D3PM)
+            if stopping_criteria is not None:
+                is_done = stopping_criteria(
+                    input_ids=accumulated_samples[:, :cur_pos+1],
+                    scores=None,
+                )
+                if torch.any(is_done):
+                    accumulated_samples = accumulated_samples[:, :cur_pos+1]
+                    break 
+            # ------------------------------------------------------------------------------
                 
         return accumulated_samples
