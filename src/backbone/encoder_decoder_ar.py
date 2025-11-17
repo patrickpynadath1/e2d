@@ -418,6 +418,7 @@ class LLMasEncoderDecoderDual(nn.Module):
         decoder_attention_mask_amortized: Optional[Union[torch.FloatTensor, BlockMask]] = None,
         decoder_attention_mask_e2e: Optional[Union[torch.FloatTensor, BlockMask]] = None,
         # Additional args
+        use_e2e_decoder: bool = False,  # For inference: which decoder to use when use_dual_decoder=True
         fix_cache_length: bool = True,  # Not used; compatibility with other backbones
         return_updated_cache: bool = False,
         **flash_attn_kwargs: Unpack[FlashAttentionKwargs],
@@ -493,8 +494,13 @@ class LLMasEncoderDecoderDual(nn.Module):
                 encoder_past_key_values=encoder_past_key_values,
             )
         else:
-            # Single decoder mode (use amortized if dual decoder model, else self.decoder)
-            decoder = self.decoder_amortized if self.use_dual_decoder else self.decoder
+            # Single decoder mode (inference or non-dual-decoder)
+            if self.use_dual_decoder:
+                # Choose decoder based on use_e2e_decoder flag
+                decoder = self.decoder_e2e if use_e2e_decoder else self.decoder_amortized
+            else:
+                decoder = self.decoder
+
             logits, past_key_values = self._run_single_decoder(
                 decoder=decoder,
                 input_ids=input_ids,

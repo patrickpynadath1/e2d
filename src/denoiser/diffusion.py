@@ -1940,6 +1940,12 @@ class E2D(E2D2):
         block_size = generation_config.block_size
         max_blocks = max_new_tokens // block_size
 
+        # Determine which decoder to use for dual decoder models
+        # Block size 1 = fully autoregressive, use E2E decoder
+        # Block size > 1 = amortized inference, use amortized decoder
+        if hasattr(self.backbone, 'use_dual_decoder') and self.backbone.use_dual_decoder:
+            kwargs['use_e2e_decoder'] = (block_size == 1)
+
         # Initialize accumulated samples (similar to D3PM)
         accumulated_samples = torch.cat([inputs, torch.full(
             (batch_size, max_blocks * block_size),
@@ -1954,6 +1960,7 @@ class E2D(E2D2):
                 if generation_config.align_inputs_to_blocks
                 else inputs,
                 cache={},
+                **kwargs,
             )
         else:
             cache = None
@@ -2050,6 +2057,7 @@ class E2D(E2D2):
                     # inputs=next_tok.unsqueeze(-1),
                     inputs=accumulated_samples[:, start_idx:start_idx + block_size],
                     cache=cache,
+                    **kwargs,
                 )
 
             if tokenizer is not None:  # Useful for debugging
