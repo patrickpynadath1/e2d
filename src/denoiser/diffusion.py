@@ -1562,21 +1562,25 @@ class E2D(E2D2):
         block_size: Optional[int] = None,
         seq_length: Optional[int] = None, # L
     ) -> torch.Tensor:
-        """Decoder mask for E2E variant: only cross-attention to encoder, no self-attention."""
+        """Decoder mask for E2E variant: fully causal cross-attention to encoder, no self-attention.
+
+        Unlike the amortized decoder which uses block-causal attention, the E2E decoder
+        uses fully causal attention to all encoder positions, not restricted by blocks.
+        This ensures each decoder token attends to ALL available encoder context.
+        """
 
         # Indicate whether token belongs to xt or x0:
         xt_flag_kv = (kv_idx >= seq_length).bool()
 
-        # Compute block indices
-        block_q = q_idx // block_size
-        block_kv = torch.where(
-            xt_flag_kv, (kv_idx - seq_length) // block_size, kv_idx // block_size
-        )
-        # **Only Offset Block-Causal Mask (cross-attention to encoder)**
-        # NO within_block_causal (no self-attention within decoder blocks)
-        offset_block_causal = (block_q > block_kv) & ~xt_flag_kv
+        # Fully causal cross-attention: decoder position i can attend to ALL encoder positions 0:i
+        # Not restricted by block structure (that's the key difference from amortized)
+        # q_idx is in range [0, L) representing decoder positions
+        # kv_idx is in range [0, 2L) representing [encoder | decoder] positions
+        # We want: decoder[i] can attend to encoder[0:i+1], but NOT to any decoder positions
 
-        return offset_block_causal
+        fully_causal_cross_attn = (q_idx >= kv_idx) & ~xt_flag_kv
+
+        return fully_causal_cross_attn
 
     def _prepare_inputs(
         self,
@@ -1794,36 +1798,96 @@ class E2D(E2D2):
         denoiser_inputs: DenoiserInput,
         **kwargs: Any,
     ) -> LossAndNllOutput:
-        """Standard autoregressive cross-entropy loss."""
-        # Shift targets: predict next token
-        targets = denoiser_inputs.x0[:, 1:]  # Remove first token (typically BOS)
-        logits = model_output[:, :-1, :]     # Remove last prediction
-        
-        # Flatten for cross-entropy
-        flat_logits = logits.contiguous().view(-1, logits.size(-1))
-        flat_targets = targets.contiguous().view(-1)
-        
-        # Apply token mask if needed
-        if denoiser_inputs.tokens_mask is not None:
-            mask = denoiser_inputs.tokens_mask[:, 1:].contiguous().view(-1)
-            flat_logits = flat_logits[mask.bool()]
-            flat_targets = flat_targets[mask.bool()]
-        
-        # Compute cross-entropy loss
-        loss = torch.nn.functional.cross_entropy(flat_logits, flat_targets)
-        
-        # Compute per-token NLLs for compatibility
-        with torch.no_grad():
-            log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
-            token_nlls = -log_probs.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
+        """Standard autoregressive cross-entropy loss.
+
+        Handles both single decoder and dual decoder outputs.
+        """
+        # Import here to avoid circular dependency
+        from src.backbone.encoder_decoder_ar import DualDecoderCausalLMOutputWithPast
+
+        # Check if we have dual decoder output
+        if isinstance(model_output, DualDecoderCausalLMOutputWithPast):
+            # Dual decoder mode: compute loss for both decoders
+            targets = denoiser_inputs.x0[:, 1:]  # Remove first token (typically BOS)
+
+            # Compute loss for amortized decoder
+            logits_amortized = model_output.logits_amortized[:, :-1, :]
+            flat_logits_amortized = logits_amortized.contiguous().view(-1, logits_amortized.size(-1))
+            flat_targets = targets.contiguous().view(-1)
+
             if denoiser_inputs.tokens_mask is not None:
-                token_nlls = token_nlls * denoiser_inputs.tokens_mask[:, 1:]
-        
-        return LossAndNllOutput(
-            loss=loss,
-            nlls=token_nlls,
-            other_loss_terms={},
-        )
+                mask = denoiser_inputs.tokens_mask[:, 1:].contiguous().view(-1)
+                flat_logits_amortized_masked = flat_logits_amortized[mask.bool()]
+                flat_targets_masked = flat_targets[mask.bool()]
+            else:
+                flat_logits_amortized_masked = flat_logits_amortized
+                flat_targets_masked = flat_targets
+
+            loss_amortized = torch.nn.functional.cross_entropy(
+                flat_logits_amortized_masked, flat_targets_masked
+            )
+
+            # Compute loss for e2e decoder
+            logits_e2e = model_output.logits_e2e[:, :-1, :]
+            flat_logits_e2e = logits_e2e.contiguous().view(-1, logits_e2e.size(-1))
+
+            if denoiser_inputs.tokens_mask is not None:
+                flat_logits_e2e_masked = flat_logits_e2e[mask.bool()]
+            else:
+                flat_logits_e2e_masked = flat_logits_e2e
+
+            loss_e2e = torch.nn.functional.cross_entropy(
+                flat_logits_e2e_masked, flat_targets_masked
+            )
+
+            # Combined loss (equal weighting)
+            loss = 0.5 * loss_amortized + 0.5 * loss_e2e
+
+            # Compute per-token NLLs for compatibility (using amortized decoder)
+            with torch.no_grad():
+                log_probs = torch.nn.functional.log_softmax(logits_amortized, dim=-1)
+                token_nlls = -log_probs.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
+                if denoiser_inputs.tokens_mask is not None:
+                    token_nlls = token_nlls * denoiser_inputs.tokens_mask[:, 1:]
+
+            return LossAndNllOutput(
+                loss=loss,
+                nlls=token_nlls,
+                other_loss_terms={
+                    "loss_amortized": loss_amortized.detach(),
+                    "loss_e2e": loss_e2e.detach(),
+                },
+            )
+        else:
+            # Single decoder mode: standard AR loss
+            targets = denoiser_inputs.x0[:, 1:]  # Remove first token (typically BOS)
+            logits = model_output[:, :-1, :]     # Remove last prediction
+
+            # Flatten for cross-entropy
+            flat_logits = logits.contiguous().view(-1, logits.size(-1))
+            flat_targets = targets.contiguous().view(-1)
+
+            # Apply token mask if needed
+            if denoiser_inputs.tokens_mask is not None:
+                mask = denoiser_inputs.tokens_mask[:, 1:].contiguous().view(-1)
+                flat_logits = flat_logits[mask.bool()]
+                flat_targets = flat_targets[mask.bool()]
+
+            # Compute cross-entropy loss
+            loss = torch.nn.functional.cross_entropy(flat_logits, flat_targets)
+
+            # Compute per-token NLLs for compatibility
+            with torch.no_grad():
+                log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
+                token_nlls = -log_probs.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
+                if denoiser_inputs.tokens_mask is not None:
+                    token_nlls = token_nlls * denoiser_inputs.tokens_mask[:, 1:]
+
+            return LossAndNllOutput(
+                loss=loss,
+                nlls=token_nlls,
+                other_loss_terms={},
+            )
 
     def _forward(
         self,
