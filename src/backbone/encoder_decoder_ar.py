@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import copy
 from functools import partial
 from typing import Optional, Tuple, Union
 
@@ -56,7 +57,178 @@ class DecoderCausalLMOutputWithPast(ModelOutput):
     ] = None
 
 
-class LLMasEncoderDecoder(nn.Module):
+@dataclass
+class DualDecoderCausalLMOutputWithPast(ModelOutput):
+    """Output when using dual decoders during training.
+    Returns logits from both amortized and e2e decoders.
+    """
+
+    logits_amortized: Optional[torch.FloatTensor] = None
+    logits_e2e: Optional[torch.FloatTensor] = None
+    past_key_values_amortized: Optional[
+        Union[Tuple[Tuple[torch.FloatTensor]], DynamicCache]
+    ] = None
+    past_key_values_e2e: Optional[
+        Union[Tuple[Tuple[torch.FloatTensor]], DynamicCache]
+    ] = None
+    encoder_past_key_values: Optional[
+        Union[Tuple[Tuple[torch.FloatTensor]], DynamicCache]
+    ] = None
+
+
+class LLMasEncoderDecoderDual(nn.Module):
+    def _run_single_decoder(
+        self,
+        decoder: nn.Module,
+        input_ids: torch.LongTensor,
+        attention_mask: Optional[Union[torch.FloatTensor, BlockMask]],
+        position_ids: Optional[torch.LongTensor],
+        cache_position: Optional[torch.LongTensor],
+        past_key_values: Optional[DynamicCache],
+        encoder_last_hidden_state: Optional[torch.FloatTensor],
+        new_seen_tokens: int,
+        **flash_attn_kwargs,
+    ) -> Tuple[torch.FloatTensor, Optional[DynamicCache]]:
+        """Helper method to run a single decoder forward pass."""
+        # Run decoder with xattn to clean token hidden states
+        if encoder_last_hidden_state is None:  # No new encoder tokens
+            q_start_idx = 0
+            decoder_hidden_states = self.encoder.model.embed_tokens(input_ids)
+            if cache_position is None:
+                if position_ids is not None:
+                    cache_position = position_ids[0]
+                else:
+                    past_seen_tokens = (
+                        past_key_values.get_seq_length()
+                        if past_key_values is not None
+                        else 0
+                    )
+                    cache_position = torch.arange(
+                        past_seen_tokens,
+                        past_seen_tokens + decoder_hidden_states.shape[1],
+                        device=decoder_hidden_states.device,
+                    )
+            if position_ids is None:
+                position_ids = cache_position.unsqueeze(0)
+            decoder_position_embeddings = decoder.model.rotary_emb(
+                decoder_hidden_states, position_ids
+            )
+        else:
+            q_start_idx = encoder_last_hidden_state.shape[1]
+            decoder_hidden_states = self.encoder.model.embed_tokens(input_ids)
+            decoder_hidden_states = torch.cat(
+                [
+                    encoder_last_hidden_state,
+                    decoder_hidden_states,
+                ],
+                dim=1,
+            )
+            if cache_position is None:
+                if position_ids is not None:
+                    cache_position = position_ids[0]
+                else:
+                    past_seen_tokens = (
+                        past_key_values.get_seq_length()
+                        if past_key_values is not None
+                        else 0
+                    )
+                    cache_position = torch.cat(
+                        [
+                            torch.arange(  # clean token position ids
+                                past_seen_tokens,
+                                past_seen_tokens + encoder_last_hidden_state.shape[1],
+                                device=decoder_hidden_states.device,
+                            ),
+                            torch.arange(  # noisy position ids
+                                past_seen_tokens + new_seen_tokens,
+                                past_seen_tokens + new_seen_tokens + input_ids.shape[1],
+                                device=decoder_hidden_states.device,
+                            ),
+                        ],
+                        dim=-1,
+                    )
+            if position_ids is None:
+                position_ids = cache_position.unsqueeze(0)
+            decoder_position_embeddings = decoder.model.rotary_emb(
+                decoder_hidden_states, position_ids
+            )
+
+        if hasattr(decoder.model, "_update_causal_mask"):  # bc on transformers
+            # noinspection PyProtectedMember
+            attention_mask = decoder.model._update_causal_mask(
+                attention_mask=attention_mask,
+                input_tensor=decoder_hidden_states,
+                cache_position=cache_position,
+                past_key_values=past_key_values,
+                output_attentions=False,
+            )
+        for decoder_layer in decoder.model.layers:
+            layer_idx = decoder_layer.self_attn.layer_idx
+            if (
+                self.tie_encoder_decoder_weights
+                and layer_idx not in self.decoder_layer_idxs
+            ):
+                continue
+            # past_key_values gets updated in-place.
+            # Record previous length to re-truncate after each layer forward
+            if past_key_values is not None and len(past_key_values) > layer_idx:
+                prev_cache_len = past_key_values[layer_idx][0].shape[-2]  # type: ignore
+            else:
+                prev_cache_len = 0
+            cache_len = prev_cache_len + new_seen_tokens
+
+            if decoder.model.gradient_checkpointing and self.training:
+                # noinspection PyProtectedMember
+                decoder_hidden_states = decoder._gradient_checkpointing_func(
+                    partial(decoder_layer.__call__, **flash_attn_kwargs),
+                    decoder_hidden_states,  # hidden_states=,
+                    attention_mask,  # attention_mask=,
+                    position_ids,  # position_ids=,
+                    past_key_values,  # past_key_value=,
+                    False,  # output_attentions=,
+                    True,  # use_cache=,
+                    cache_position,  # cache_position=,
+                    decoder_position_embeddings,  # position_embeddings=,
+                    q_start_idx,  # q_start_idx=
+                )[0]  # Shape: (input_ids.shape[0], input_ids.shape[1], hidden_dim)
+            else:
+                decoder_hidden_states = decoder_layer(
+                    hidden_states=decoder_hidden_states,
+                    attention_mask=attention_mask,
+                    position_ids=position_ids,
+                    past_key_value=past_key_values,
+                    output_attentions=False,
+                    use_cache=True,
+                    cache_position=cache_position,
+                    position_embeddings=decoder_position_embeddings,
+                    q_start_idx=q_start_idx,  # Indicates where to slice output
+                    **flash_attn_kwargs,
+                )[0]  # Shape: (input_ids.shape[0], input_ids.shape[1], hidden_dim)
+            # Update decoder_hidden_states
+            if q_start_idx > 0:
+                decoder_hidden_states = torch.cat(
+                    [
+                        encoder_last_hidden_state,
+                        decoder_hidden_states,
+                    ],
+                    dim=1,
+                )
+
+            if past_key_values is not None:
+                # DynamicCache extends along sequence dimension by default;
+                # truncate back to original cache len + encoder output length
+                past_key_values.key_cache[layer_idx] = past_key_values.key_cache[
+                    layer_idx
+                ][..., :cache_len, :]
+                past_key_values.value_cache[layer_idx] = past_key_values.value_cache[
+                    layer_idx
+                ][..., :cache_len, :]
+        decoder_hidden_states = decoder.model.norm(
+            decoder_hidden_states[:, q_start_idx:, :]
+        )
+        logits = decoder.lm_head(decoder_hidden_states)
+        return logits, past_key_values
+
     def __init__(
         self,
         pretrained_model_name_or_path: str,
@@ -72,6 +244,7 @@ class LLMasEncoderDecoder(nn.Module):
         keep_top_encoder_layers: bool = False,
         keep_top_decoder_layers: bool = False,
         use_gradient_checkpointing: bool = False,
+        use_dual_decoder: bool = False,
         **llm_init_kwargs,
     ):
         assert not (tie_encoder_decoder_weights and reinit_decoder), (
@@ -80,9 +253,13 @@ class LLMasEncoderDecoder(nn.Module):
         assert not (tie_encoder_decoder_weights and freeze_encoder), (
             "Cannot freeze encoder weights when tying encoder-decoder weights."
         )
+        assert not (use_dual_decoder and tie_encoder_decoder_weights), (
+            "Dual decoder mode not compatible with tied encoder-decoder weights."
+        )
         super().__init__()
         self.use_encoder_causal_mask = use_encoder_causal_mask
         self.tie_encoder_decoder_weights = tie_encoder_decoder_weights
+        self.use_dual_decoder = use_dual_decoder
 
         if reinit_encoder:
             assert num_encoder_layers > 0
@@ -182,10 +359,35 @@ class LLMasEncoderDecoder(nn.Module):
                 self.decoder.lm_head = self.encoder.lm_head
             else:
                 del self.encoder.lm_head
-            if use_gradient_checkpointing:
+            if use_gradient_checkpointing and not use_dual_decoder:
                 self.decoder.gradient_checkpointing_enable()
+
+        # Create dual decoders if requested
+        if use_dual_decoder:
+            # Check if lm_head was tied to encoder embedding
+            lm_head_is_tied = (
+                self.decoder.lm_head.weight.data_ptr()
+                == self.encoder.lm_head.weight.data_ptr()
+            )
+
+            # Create two decoders
+            self.decoder_amortized = self.decoder
+            self.decoder_e2e = copy.deepcopy(self.decoder)
+
+            # Re-establish lm_head reference if it was tied
+            if lm_head_is_tied:
+                self.decoder_e2e.lm_head = self.encoder.lm_head
+
+            # Enable gradient checkpointing for both if requested
+            if use_gradient_checkpointing:
+                self.decoder_amortized.gradient_checkpointing_enable()
+                self.decoder_e2e.gradient_checkpointing_enable()
+
+            # Remove the temporary single decoder reference
+            del self.decoder
+
         self.max_length = max_length
-        self.use_dual_decoders = use_dual_decoders
+
 
 
     def freeze_encoder(self):
@@ -212,11 +414,14 @@ class LLMasEncoderDecoder(nn.Module):
         encoder_position_ids: Optional[torch.LongTensor] = None,
         encoder_cache_position: Optional[torch.LongTensor] = None,
         encoder_past_key_values: Optional[DynamicCache] = None,
+        # Dual decoder attention masks (used when use_dual_decoder=True and training=True)
+        decoder_attention_mask_amortized: Optional[Union[torch.FloatTensor, BlockMask]] = None,
+        decoder_attention_mask_e2e: Optional[Union[torch.FloatTensor, BlockMask]] = None,
         # Additional args
         fix_cache_length: bool = True,  # Not used; compatibility with other backbones
         return_updated_cache: bool = False,
         **flash_attn_kwargs: Unpack[FlashAttentionKwargs],
-    ) -> Union[DecoderCausalLMOutputWithPast, EncoderBaseModelOutputWithPast]:
+    ) -> Union[DecoderCausalLMOutputWithPast, DualDecoderCausalLMOutputWithPast, EncoderBaseModelOutputWithPast]:
         # During training/eval encoder_last_hidden_state is None.
         # During generation encoder_last_hidden_state can be not None.
         new_seen_tokens = (
@@ -247,150 +452,66 @@ class LLMasEncoderDecoder(nn.Module):
                 )
             encoder_last_hidden_state = encoder_output.last_hidden_state
 
-        # Run decoder with xattn to clean token hidden states
-        if encoder_last_hidden_state is None:  # No new encoder tokens
-            q_start_idx = 0
-            decoder_hidden_states = self.encoder.model.embed_tokens(input_ids)
-            if cache_position is None:
-                if position_ids is not None:
-                    cache_position = position_ids[0]
-                else:
-                    past_seen_tokens = (
-                        past_key_values.get_seq_length()
-                        if past_key_values is not None
-                        else 0
-                    )
-                    cache_position = torch.arange(
-                        past_seen_tokens,
-                        past_seen_tokens + decoder_hidden_states.shape[1],
-                        device=decoder_hidden_states.device,
-                    )
-            if position_ids is None:
-                position_ids = cache_position.unsqueeze(0)
-            decoder_position_embeddings = self.decoder.model.rotary_emb(
-                decoder_hidden_states, position_ids
+        # Run decoder(s)
+        if self.use_dual_decoder and self.training:
+            # Dual decoder mode: run both decoders with their respective masks
+            # Use separate cache for each decoder
+            past_key_values_amortized = DynamicCache() if past_key_values is None else past_key_values
+            past_key_values_e2e = DynamicCache() if past_key_values is None else copy.deepcopy(past_key_values)
+
+            # Run amortized decoder (with self-attention within decoder blocks)
+            logits_amortized, past_key_values_amortized = self._run_single_decoder(
+                decoder=self.decoder_amortized,
+                input_ids=input_ids,
+                attention_mask=decoder_attention_mask_amortized if decoder_attention_mask_amortized is not None else attention_mask,
+                position_ids=position_ids,
+                cache_position=cache_position,
+                past_key_values=past_key_values_amortized,
+                encoder_last_hidden_state=encoder_last_hidden_state,
+                new_seen_tokens=new_seen_tokens,
+                **flash_attn_kwargs,
+            )
+
+            # Run e2e decoder (without self-attention within decoder blocks)
+            logits_e2e, past_key_values_e2e = self._run_single_decoder(
+                decoder=self.decoder_e2e,
+                input_ids=input_ids,
+                attention_mask=decoder_attention_mask_e2e if decoder_attention_mask_e2e is not None else attention_mask,
+                position_ids=position_ids,
+                cache_position=cache_position,
+                past_key_values=past_key_values_e2e,
+                encoder_last_hidden_state=encoder_last_hidden_state,
+                new_seen_tokens=new_seen_tokens,
+                **flash_attn_kwargs,
+            )
+
+            return DualDecoderCausalLMOutputWithPast(
+                logits_amortized=logits_amortized,
+                logits_e2e=logits_e2e,
+                past_key_values_amortized=past_key_values_amortized,
+                past_key_values_e2e=past_key_values_e2e,
+                encoder_past_key_values=encoder_past_key_values,
             )
         else:
-            q_start_idx = encoder_last_hidden_state.shape[1]
-            decoder_hidden_states = self.encoder.model.embed_tokens(input_ids)
-            decoder_hidden_states = torch.cat(
-                [
-                    encoder_last_hidden_state,
-                    decoder_hidden_states,
-                ],
-                dim=1,
-            )
-            if cache_position is None:
-                if position_ids is not None:
-                    cache_position = position_ids[0]
-                else:
-                    past_seen_tokens = (
-                        past_key_values.get_seq_length()
-                        if past_key_values is not None
-                        else 0
-                    )
-                    cache_position = torch.cat(
-                        [
-                            torch.arange(  # clean token position ids
-                                past_seen_tokens,
-                                past_seen_tokens + encoder_last_hidden_state.shape[1],
-                                device=decoder_hidden_states.device,
-                            ),
-                            torch.arange(  # noisy position ids
-                                past_seen_tokens + new_seen_tokens,
-                                past_seen_tokens + new_seen_tokens + input_ids.shape[1],
-                                device=decoder_hidden_states.device,
-                            ),
-                        ],
-                        dim=-1,
-                    )
-            if position_ids is None:
-                position_ids = cache_position.unsqueeze(0)
-            decoder_position_embeddings = self.decoder.model.rotary_emb(
-                decoder_hidden_states, position_ids
-            )
-
-        if hasattr(self.decoder.model, "_update_causal_mask"):  # bc on transformers
-            # noinspection PyProtectedMember
-            attention_mask = self.decoder.model._update_causal_mask(
+            # Single decoder mode (use amortized if dual decoder model, else self.decoder)
+            decoder = self.decoder_amortized if self.use_dual_decoder else self.decoder
+            logits, past_key_values = self._run_single_decoder(
+                decoder=decoder,
+                input_ids=input_ids,
                 attention_mask=attention_mask,
-                input_tensor=decoder_hidden_states,
+                position_ids=position_ids,
                 cache_position=cache_position,
                 past_key_values=past_key_values,
-                output_attentions=False,
+                encoder_last_hidden_state=encoder_last_hidden_state,
+                new_seen_tokens=new_seen_tokens,
+                **flash_attn_kwargs,
             )
-        for decoder_layer in self.decoder.model.layers:
-            layer_idx = decoder_layer.self_attn.layer_idx
-            if (
-                self.tie_encoder_decoder_weights
-                and layer_idx not in self.decoder_layer_idxs
-            ):
-                continue
-            # past_key_values gets updated in-place.
-            # Record previous length to re-truncate after each layer forward
-            if past_key_values is not None and len(past_key_values) > layer_idx:
-                prev_cache_len = past_key_values[layer_idx][0].shape[-2]  # type: ignore
-            else:
-                prev_cache_len = 0
-            cache_len = prev_cache_len + new_seen_tokens
 
-            if self.decoder.model.gradient_checkpointing and self.training:
-                # noinspection PyProtectedMember
-                decoder_hidden_states = self.decoder._gradient_checkpointing_func(
-                    partial(decoder_layer.__call__, **flash_attn_kwargs),
-                    decoder_hidden_states,  # hidden_states=,
-                    attention_mask,  # attention_mask=,
-                    position_ids,  # position_ids=,
-                    past_key_values,  # past_key_value=,
-                    False,  # output_attentions=,
-                    True,  # use_cache=,
-                    cache_position,  # cache_position=,
-                    decoder_position_embeddings,  # position_embeddings=,
-                    q_start_idx,  # q_start_idx=
-                )[0]  # Shape: (input_ids.shape[0], input_ids.shape[1], hidden_dim)
-            else:
-                decoder_hidden_states = decoder_layer(
-                    hidden_states=decoder_hidden_states,
-                    attention_mask=attention_mask,
-                    position_ids=position_ids,
-                    past_key_value=past_key_values,
-                    output_attentions=False,
-                    use_cache=True,
-                    cache_position=cache_position,
-                    position_embeddings=decoder_position_embeddings,
-                    q_start_idx=q_start_idx,  # Indicates where to slice output
-                    **flash_attn_kwargs,
-                )[0]  # Shape: (input_ids.shape[0], input_ids.shape[1], hidden_dim)
-            # Update decoder_hidden_states
-            if q_start_idx > 0:
-                decoder_hidden_states = torch.cat(
-                    [
-                        encoder_last_hidden_state,
-                        decoder_hidden_states,
-                    ],
-                    dim=1,
-                )
-
-            if past_key_values is not None:
-                # DynamicCache extends along sequence dimension by default;
-                # truncate back to original cache len + encoder output length
-                past_key_values.key_cache[layer_idx] = past_key_values.key_cache[
-                    layer_idx
-                ][..., :cache_len, :]
-                past_key_values.value_cache[layer_idx] = past_key_values.value_cache[
-                    layer_idx
-                ][..., :cache_len, :]
-        decoder_hidden_states = self.decoder.model.norm(
-            decoder_hidden_states[:, q_start_idx:, :]
-        )
-        logits = self.decoder.lm_head(decoder_hidden_states)
-        return DecoderCausalLMOutputWithPast(
-            logits=logits,
-            past_key_values=past_key_values,
-            encoder_past_key_values=encoder_past_key_values,
-            # Do not need to store encoder_last_hidden_state.
-            # If it was passed in, then it has become part of the past_key_values cache.
-        )
+            return DecoderCausalLMOutputWithPast(
+                logits=logits,
+                past_key_values=past_key_values,
+                encoder_past_key_values=encoder_past_key_values,
+            )
 
 
 class LLMasEncoderDecoderShareKV(nn.Module):

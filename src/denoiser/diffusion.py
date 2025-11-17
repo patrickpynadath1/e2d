@@ -1532,7 +1532,7 @@ class E2D(E2D2):
         block_size: Optional[int] = None,
         seq_length: Optional[int] = None, # L
     ) -> torch.Tensor:
-        """Decoder uses block causal attention for AR generation."""
+        """Decoder uses block causal attention for AR generation (amortized version)."""
 
         # Indicate whether token belongs to xt or x0:
         xt_flag_kv = (kv_idx >= seq_length).bool()
@@ -1552,6 +1552,31 @@ class E2D(E2D2):
 
         # **3. Combine Masks **
         return offset_block_causal | within_block_causal
+
+    @staticmethod
+    def _decoder_block_mask_e2e(
+        b,
+        h,
+        q_idx,    # tensor [1, L]
+        kv_idx,   # tensor [1, 2L]
+        block_size: Optional[int] = None,
+        seq_length: Optional[int] = None, # L
+    ) -> torch.Tensor:
+        """Decoder mask for E2E variant: only cross-attention to encoder, no self-attention."""
+
+        # Indicate whether token belongs to xt or x0:
+        xt_flag_kv = (kv_idx >= seq_length).bool()
+
+        # Compute block indices
+        block_q = q_idx // block_size
+        block_kv = torch.where(
+            xt_flag_kv, (kv_idx - seq_length) // block_size, kv_idx // block_size
+        )
+        # **Only Offset Block-Causal Mask (cross-attention to encoder)**
+        # NO within_block_causal (no self-attention within decoder blocks)
+        offset_block_causal = (block_q > block_kv) & ~xt_flag_kv
+
+        return offset_block_causal
 
     def _prepare_inputs(
         self,
@@ -1574,13 +1599,12 @@ class E2D(E2D2):
         # For AR: no noise sampling, just use the input as is
         xt = input_ids  # No diffusion noise for autoregressive
         
+        # Check if using dual decoder mode
+        use_dual_decoder = hasattr(self.backbone, 'use_dual_decoder') and self.backbone.use_dual_decoder and self.training
+
         # Create attention masks
         if self.config.attn_backend == "sdpa":
-            decoder_attention_mask = (
-                self.static_attention_mask[None, ...]
-                & attention_mask.repeat(1, 2)[:, None, :]
-                & attention_mask[..., None]
-            )[:, None, ...]  # Make attention mask 4D
+            # Create encoder attention mask (same for both decoders)
             encoder_attention_mask = (
                 (
                     self.encoder_static_attention_mask[None, ...]
@@ -1592,9 +1616,48 @@ class E2D(E2D2):
             encoder_attention_mask = self._preprocess_attention_mask(
                 encoder_attention_mask, dtype=torch.float
             )
-            decoder_attention_mask = self._preprocess_attention_mask(
-                decoder_attention_mask, dtype=torch.float
-            )
+
+            if use_dual_decoder:
+                # Create amortized decoder mask (with self-attention)
+                decoder_attention_mask_amortized = (
+                    self.static_attention_mask[None, ...]
+                    & attention_mask.repeat(1, 2)[:, None, :]
+                    & attention_mask[..., None]
+                )[:, None, ...]  # Make attention mask 4D
+                decoder_attention_mask_amortized = self._preprocess_attention_mask(
+                    decoder_attention_mask_amortized, dtype=torch.float
+                )
+
+                # Create e2e decoder mask (without self-attention)
+                # Need to create a static mask using _decoder_block_mask_e2e
+                static_mask_e2e = self._decoder_block_mask_e2e(
+                    b=None,
+                    h=None,
+                    q_idx=torch.arange(input_ids.shape[1])[:, None],
+                    kv_idx=torch.arange(input_ids.shape[1] * 2)[None, :],
+                    block_size=self.config.block_size
+                    if self.training
+                    else self.config.eval_block_size,
+                    seq_length=input_ids.shape[1],
+                )
+                decoder_attention_mask_e2e = (
+                    static_mask_e2e[None, ...]
+                    & attention_mask.repeat(1, 2)[:, None, :]
+                    & attention_mask[..., None]
+                )[:, None, ...]  # Make attention mask 4D
+                decoder_attention_mask_e2e = self._preprocess_attention_mask(
+                    decoder_attention_mask_e2e, dtype=torch.float
+                )
+            else:
+                # Single decoder mask
+                decoder_attention_mask = (
+                    self.static_attention_mask[None, ...]
+                    & attention_mask.repeat(1, 2)[:, None, :]
+                    & attention_mask[..., None]
+                )[:, None, ...]  # Make attention mask 4D
+                decoder_attention_mask = self._preprocess_attention_mask(
+                    decoder_attention_mask, dtype=torch.float
+                )
         elif self.config.attn_backend == "flex_attention":
             if context_mask.any():
                 raise NotImplementedError(
@@ -1619,50 +1682,110 @@ class E2D(E2D2):
                     Q_LEN=input_ids.shape[1],
                     KV_LEN=input_ids.shape[1],
                 )
-                dec_masks = [
-                    partial(
-                        self._decoder_block_mask,
-                        block_size=self.config.block_size
-                        if self.training
-                        else self.config.eval_block_size,
-                        seq_length=input_ids.shape[1],
-                    ),
-                    dec_padding_mask,
-                ]
-                decoder_attention_mask = create_block_mask(
-                    and_masks(*dec_masks),
-                    B=input_ids.shape[0],
-                    H=None,
-                    Q_LEN=input_ids.shape[1],
-                    KV_LEN=input_ids.shape[1] * 2,
-                )
+
+                if use_dual_decoder:
+                    # Create amortized decoder mask
+                    dec_masks_amortized = [
+                        partial(
+                            self._decoder_block_mask,
+                            block_size=self.config.block_size
+                            if self.training
+                            else self.config.eval_block_size,
+                            seq_length=input_ids.shape[1],
+                        ),
+                        dec_padding_mask,
+                    ]
+                    decoder_attention_mask_amortized = create_block_mask(
+                        and_masks(*dec_masks_amortized),
+                        B=input_ids.shape[0],
+                        H=None,
+                        Q_LEN=input_ids.shape[1],
+                        KV_LEN=input_ids.shape[1] * 2,
+                    )
+
+                    # Create e2e decoder mask
+                    dec_masks_e2e = [
+                        partial(
+                            self._decoder_block_mask_e2e,
+                            block_size=self.config.block_size
+                            if self.training
+                            else self.config.eval_block_size,
+                            seq_length=input_ids.shape[1],
+                        ),
+                        dec_padding_mask,
+                    ]
+                    decoder_attention_mask_e2e = create_block_mask(
+                        and_masks(*dec_masks_e2e),
+                        B=input_ids.shape[0],
+                        H=None,
+                        Q_LEN=input_ids.shape[1],
+                        KV_LEN=input_ids.shape[1] * 2,
+                    )
+                else:
+                    # Single decoder mask
+                    dec_masks = [
+                        partial(
+                            self._decoder_block_mask,
+                            block_size=self.config.block_size
+                            if self.training
+                            else self.config.eval_block_size,
+                            seq_length=input_ids.shape[1],
+                        ),
+                        dec_padding_mask,
+                    ]
+                    decoder_attention_mask = create_block_mask(
+                        and_masks(*dec_masks),
+                        B=input_ids.shape[0],
+                        H=None,
+                        Q_LEN=input_ids.shape[1],
+                        KV_LEN=input_ids.shape[1] * 2,
+                    )
             else:
                 encoder_attention_mask = self.encoder_static_attention_mask
-                decoder_attention_mask = self.static_attention_mask
+                if use_dual_decoder:
+                    # Would need to create static masks for dual decoder
+                    # For now, raise an error
+                    raise NotImplementedError(
+                        "Dual decoder with flex_attention and no padding not implemented yet."
+                    )
+                else:
+                    decoder_attention_mask = self.static_attention_mask
         else:
             raise ValueError("Unknown backbone backend")
-            
+
         position_ids = torch.arange(input_ids.shape[1]).to(input_ids.device)[None, :]
-        
+
         if self.training and self.config.train_on_context:
             tokens_mask = attention_mask
         else:
             tokens_mask = attention_mask * (1 - context_mask)
-            
+
+        # Prepare backbone kwargs with appropriate masks
+        backbone_kwargs = {
+            "encoder_input_ids": input_ids,
+            "encoder_attention_mask": encoder_attention_mask,
+            "encoder_position_ids": position_ids,
+            "encoder_cache_position": position_ids[0],
+        }
+
+        if use_dual_decoder:
+            backbone_kwargs["decoder_attention_mask_amortized"] = decoder_attention_mask_amortized
+            backbone_kwargs["decoder_attention_mask_e2e"] = decoder_attention_mask_e2e
+            # Don't pass attention_mask in dual decoder mode
+            decoder_attention_mask_for_output = None
+        else:
+            # Single decoder mode - pass attention_mask as usual
+            decoder_attention_mask_for_output = decoder_attention_mask
+
         return DenoiserInput(
             xt=xt,
             x0=input_ids,
-            attention_mask=decoder_attention_mask,
+            attention_mask=decoder_attention_mask_for_output,
             tokens_mask=tokens_mask,
             t=None,  # No time for AR
             alpha_t=None,  # No noise schedule
             alpha_t_prime=None,  # No noise schedule
-            backbone_kwargs={
-                "encoder_input_ids": input_ids,
-                "encoder_attention_mask": encoder_attention_mask,
-                "encoder_position_ids": position_ids,
-                "encoder_cache_position": position_ids[0],
-            },
+            backbone_kwargs=backbone_kwargs,
         )
 
     def _compute_loss(
