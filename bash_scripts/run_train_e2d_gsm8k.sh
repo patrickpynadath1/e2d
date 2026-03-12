@@ -9,13 +9,14 @@ BLOCK_SIZE=4
 EVAL_BLOCK_SIZE=4
 N_ENCODER_LAYERS=28
 ENCODER_TOP_LAYERS=false
-N_DECODER_LAYERS=14
+N_DECODER_LAYERS=2
 DECODER_TOP_LAYERS=true
 REINIT_ENCODER=false
 REINIT_DECODER=false
 TIE_WEIGHTS=true
 FREEZE_ENCODER=false
 ENCODER_CAUSAL_MASK=false
+NULLIFY_SELF_ATTN=false
 
 # Hyperparameters
 LR=1e-5
@@ -40,7 +41,11 @@ if [ "${DECODER_TOP_LAYERS}" == "true" ]; then
 else
   DEC_LAYERS="dec${N_DECODER_LAYERS}"
 fi
-RUN_NAME=gsm8k-${NUM_SHOT}shot_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_alphaf${ALPHA_F}_max-dur${MAX_DURATION}_${PRECISION}_${ENC_LAYERS}_${DEC_LAYERS}_${TAG}
+
+# get time stamp
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+
+RUN_NAME=gsm8k-${NUM_SHOT}shot_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_alphaf${ALPHA_F}_max-dur${MAX_DURATION}_${PRECISION}_${ENC_LAYERS}_${DEC_LAYERS}_${TAG}_${TIMESTAMP}
 if [ "${TIE_WEIGHTS}" == "true" ]; then
   RUN_NAME="${RUN_NAME}_tie-weights"
 fi
@@ -53,6 +58,8 @@ fi
 
 MICRO_BATCH_SIZE=1
 NUM_WORKERS=0
+
+NUM_VISIBLE_DEVICES=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoiser.py \
   run_name=${RUN_NAME} \
@@ -72,7 +79,7 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   model.config.attn_backend="sdpa" \
   training.compile_backbone=false \
   model.config.length=768 \
-  model/backbone@model.config.backbone_config=llm_as_encoder_decoder_share_kv \
+  model/backbone@model.config.backbone_config=llm_as_encoder_decoder_share_kv_encoder_gen \
   model.config.backbone_config.use_encoder_causal_mask=${ENCODER_CAUSAL_MASK} \
   model.config.backbone_config.num_encoder_layers=${N_ENCODER_LAYERS} \
   model.config.backbone_config.num_decoder_layers=${N_DECODER_LAYERS} \
@@ -88,11 +95,12 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   block_size=${BLOCK_SIZE} \
   eval_block_size=${EVAL_BLOCK_SIZE} \
   training.antithetic_sampling=false \
-  hydra.run.dir=outputs/${RUN_NAME} \
+  hydra.run.dir=/data/shared_data/hankun/outputs/${RUN_NAME} \
   composer.trainer.save_interval="1000ba" \
   composer.loggers.name=${RUN_NAME} \
   train_dataloader.num_workers=${NUM_WORKERS} \
   composer.callbacks.hf_compatible_checkpointing.disable_hf=true \
   composer.callbacks.save_best_checkpointing.save_local=false \
-  eval_dataloader.batch_size=8 \
-  model.config.train_on_context=${TRAIN_ON_CONTEXT}
+  eval_dataloader.batch_size=2 \
+  model.config.train_on_context=${TRAIN_ON_CONTEXT} \
+  +model.config.nullify_self_attn=${NULLIFY_SELF_ATTN} \

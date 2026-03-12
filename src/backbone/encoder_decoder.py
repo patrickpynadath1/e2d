@@ -212,6 +212,7 @@ class LLMasEncoderDecoder(nn.Module):
         encoder_past_key_values: Optional[DynamicCache] = None,
         # Additional args
         fix_cache_length: bool = True,  # Not used; compatibility with other backbones
+        truncate_cache: bool = True,
         return_updated_cache: bool = False,
         **flash_attn_kwargs: Unpack[FlashAttentionKwargs],
     ) -> Union[DecoderCausalLMOutputWithPast, EncoderBaseModelOutputWithPast]:
@@ -368,8 +369,7 @@ class LLMasEncoderDecoder(nn.Module):
                     ],
                     dim=1,
                 )
-
-            if past_key_values is not None:
+            if truncate_cache and past_key_values is not None:
                 # DynamicCache extends along sequence dimension by default;
                 # truncate back to original cache len + encoder output length
                 past_key_values.key_cache[layer_idx] = past_key_values.key_cache[
@@ -563,23 +563,180 @@ class LLMasEncoderDecoderShareKV(nn.Module):
         encoder_past_key_values: Optional[DynamicCache] = None,  # Not used
         # Additional args
         fix_cache_length: bool = True,  # Not used; compatibility with other backbones
+        truncate_cache: bool = True,
+        enforce_causal_mask: bool = False,
+        return_last_hidden_state: bool = False,
         return_updated_cache: bool = False,
         **flash_attn_kwargs: Unpack[FlashAttentionKwargs],
     ) -> Union[CausalLMOutputWithPast, BaseModelOutputWithPast]:
         # Encode clean tokens
         if encoder_input_ids is not None:
-            if self.use_encoder_causal_mask:
+            if self.use_encoder_causal_mask or enforce_causal_mask:
                 encoder_attention_mask = None  # None --> enforces use of causal mask
             if encoder_cache_position is None and encoder_position_ids is not None:
                 encoder_cache_position = encoder_position_ids[0]
-            past_key_values = self.encoder.model(
+            if return_last_hidden_state:
+                encoder_output = self.encoder.model(
+                    input_ids=encoder_input_ids,
+                    attention_mask=encoder_attention_mask,
+                    position_ids=encoder_position_ids,
+                    use_cache=True,
+                    past_key_values=past_key_values,
+                    cache_position=encoder_cache_position,
+                )
+                past_key_values = encoder_output.past_key_values
+                if return_updated_cache:
+                    # encoder_output.past_key_values now contains latest encoder input
+                    return BaseModelOutputWithPast(
+                        last_hidden_state=encoder_output.last_hidden_state,
+                        past_key_values=past_key_values,
+                    )
+            else:
+                past_key_values = self.encoder.model(
+                    input_ids=encoder_input_ids,
+                    attention_mask=encoder_attention_mask,
+                    position_ids=encoder_position_ids,
+                    use_cache=True,
+                    past_key_values=past_key_values,
+                    cache_position=encoder_cache_position,
+                ).past_key_values
+                if return_updated_cache:
+                    # encoder_output.past_key_values now contains latest encoder input
+                    return BaseModelOutputWithPast(
+                        past_key_values=past_key_values,
+                    )
+
+        # Run decoder with xattn to clean token hidden states
+        decoder_hidden_states = self.encoder.model.embed_tokens(input_ids)
+        if cache_position is None:
+            if position_ids is not None:
+                cache_position = position_ids[0]
+            else:  # During training / validation position_ids are not provided
+                cache_position = torch.arange(
+                    decoder_hidden_states.shape[1],
+                    device=decoder_hidden_states.device,
+                )
+        if position_ids is None:
+            position_ids = cache_position.unsqueeze(0)
+        decoder_position_embeddings = self.decoder.model.rotary_emb(
+            decoder_hidden_states, position_ids
+        )
+
+        if hasattr(self.decoder.model, "_update_causal_mask"):  # bc on transformers
+            # noinspection PyProtectedMember
+            attention_mask = self.decoder.model._update_causal_mask(
+                attention_mask=attention_mask,
+                input_tensor=decoder_hidden_states,
+                cache_position=cache_position,
+                past_key_values=past_key_values,
+                output_attentions=False,
+            )
+        for decoder_layer in self.decoder.model.layers:
+            layer_idx = decoder_layer.self_attn.layer_idx
+            if (
+                self.tie_encoder_decoder_weights
+                and layer_idx not in self.decoder_layer_idxs
+            ):
+                continue
+            # past_key_values gets updated in-place.
+            # Record previous length to truncate after each layer forward
+            if past_key_values is not None and len(past_key_values) > layer_idx:
+                prev_cache_len = past_key_values[layer_idx][0].shape[-2]  # type: ignore
+            else:
+                prev_cache_len = 0
+
+            decoder_hidden_states = decoder_layer(
+                hidden_states=decoder_hidden_states,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_value=past_key_values,
+                output_attentions=False,
+                use_cache=True,
+                cache_position=position_ids[0],
+                position_embeddings=decoder_position_embeddings,
+                **flash_attn_kwargs,
+            )[0]  # Shape: (input_ids.shape[0], input_ids.shape[1], hidden_dim)
+
+            if truncate_cache and past_key_values is not None:
+                # DynamicCache extends along sequence dimension by default;
+                # truncate back to original cache len + encoder output length
+                past_key_values.key_cache[layer_idx] = past_key_values.key_cache[
+                    layer_idx
+                ][..., :prev_cache_len, :]
+                past_key_values.value_cache[layer_idx] = past_key_values.value_cache[
+                    layer_idx
+                ][..., :prev_cache_len, :]
+        decoder_hidden_states = self.decoder.model.norm(decoder_hidden_states)
+        logits = self.decoder.lm_head(decoder_hidden_states)
+        return CausalLMOutputWithPast(
+            logits=logits,
+            past_key_values=past_key_values,
+        )
+
+
+class LLMasEncoderDecoderShareKVEncoderGen(LLMasEncoderDecoderShareKV):
+    """
+    Same as LLMasEncoderDecoderShareKV, but also computes and returns encoder logits
+    concatenated with decoder logits, enabling joint training of encoder (next-token prediction)
+    and decoder (denoising/generation) so that during inference, we could use the larger encoder
+    as verifier and perform speculative decoding.
+    """
+    # noinspection PyUnusedLocal
+    def forward(
+        self,
+        # Decoder inputs
+        input_ids: torch.LongTensor,
+        attention_mask: Optional[Union[torch.FloatTensor, BlockMask]] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        cache_position: Optional[torch.LongTensor] = None,
+        past_key_values: Optional[DynamicCache] = None,
+        encoder_last_hidden_state: Optional[torch.FloatTensor] = None,  # Not used
+        # Encoder inputs
+        encoder_input_ids: Optional[torch.LongTensor] = None,
+        encoder_attention_mask: Optional[Union[torch.FloatTensor, BlockMask]] = None,
+        encoder_position_ids: Optional[torch.LongTensor] = None,
+        encoder_cache_position: Optional[torch.LongTensor] = None,
+        encoder_past_key_values: Optional[DynamicCache] = None,  # Not used
+        # Additional args
+        fix_cache_length: bool = True,  # Not used; compatibility with other backbones
+        truncate_cache: bool = True,
+        enforce_causal_mask: bool = False,
+        return_last_hidden_state: bool = False,
+        return_updated_cache: bool = False,
+        **flash_attn_kwargs: Unpack[FlashAttentionKwargs],
+    ) -> Union[CausalLMOutputWithPast, BaseModelOutputWithPast]:
+        
+        encoder_logits = None
+
+        # Encode clean tokens
+        if encoder_input_ids is not None:
+            if self.use_encoder_causal_mask or enforce_causal_mask:
+                encoder_attention_mask = None  # None --> enforces use of causal mask
+            if encoder_cache_position is None and encoder_position_ids is not None:
+                encoder_cache_position = encoder_position_ids[0]
+            
+            # Always compute last_hidden_state to get logits
+            encoder_output = self.encoder.model(
                 input_ids=encoder_input_ids,
                 attention_mask=encoder_attention_mask,
                 position_ids=encoder_position_ids,
                 use_cache=True,
                 past_key_values=past_key_values,
                 cache_position=encoder_cache_position,
-            ).past_key_values
+            )
+            past_key_values = encoder_output.past_key_values
+            
+            # Compute encoder logits
+            encoder_logits = self.encoder.lm_head(encoder_output.last_hidden_state)
+
+            if return_last_hidden_state:
+                if return_updated_cache:
+                    # encoder_output.past_key_values now contains latest encoder input
+                    return BaseModelOutputWithPast(
+                        last_hidden_state=encoder_output.last_hidden_state,
+                        past_key_values=past_key_values,
+                    )
+            
             if return_updated_cache:
                 # encoder_output.past_key_values now contains latest encoder input
                 return BaseModelOutputWithPast(
@@ -637,7 +794,192 @@ class LLMasEncoderDecoderShareKV(nn.Module):
                 **flash_attn_kwargs,
             )[0]  # Shape: (input_ids.shape[0], input_ids.shape[1], hidden_dim)
 
-            if past_key_values is not None:
+            if truncate_cache and past_key_values is not None:
+                # DynamicCache extends along sequence dimension by default;
+                # truncate back to original cache len + encoder output length
+                past_key_values.key_cache[layer_idx] = past_key_values.key_cache[
+                    layer_idx
+                ][..., :prev_cache_len, :]
+                past_key_values.value_cache[layer_idx] = past_key_values.value_cache[
+                    layer_idx
+                ][..., :prev_cache_len, :]
+        decoder_hidden_states = self.decoder.model.norm(decoder_hidden_states)
+        logits = self.decoder.lm_head(decoder_hidden_states)
+        
+        if encoder_logits is not None:
+            logits = torch.cat([encoder_logits, logits], dim=1)
+
+        return CausalLMOutputWithPast(
+            logits=logits,
+            past_key_values=past_key_values,
+        )
+
+''' -------- Things We Tried But Failed --------
+# Keep the entire model frozen, only train a lightweight adapter module
+class LLMasEncoderDecoderShareKVAdapter(LLMasEncoderDecoderShareKV):
+    def __init__(
+        self,
+        *args, 
+        **kwargs
+    ):  
+        # Initialize Parent
+        super().__init__(*args, **kwargs)
+
+        # MANUAL FREEZE:
+        # Since we passed freeze_encoder=False, the model is currently trainable.
+        # We iterate over every parameter in the loaded LLM and freeze it.
+        for param in self.parameters():
+            param.requires_grad = False
+            
+        # Double check: explicitly ensure embed_tokens is frozen 
+        # (The parent class has complex logic regarding this layer, so we overwrite it)
+        if hasattr(self.encoder, 'model') and hasattr(self.encoder.model, 'embed_tokens'):
+             self.encoder.model.embed_tokens.requires_grad_(False)
+        if hasattr(self, 'decoder') and hasattr(self.decoder, 'model') and hasattr(self.decoder.model, 'embed_tokens'):
+             self.decoder.model.embed_tokens.requires_grad_(False)
+
+        # Define the Adapter
+        # Get model dimension
+        model_dim = self.encoder.config.hidden_size
+        inter_dim = self.encoder.config.intermediate_size
+
+        # 2-layer MLP: Linear -> Activation -> Linear
+        self.adapter = nn.Sequential(
+            nn.Linear(model_dim, inter_dim),
+            nn.GELU(),
+            nn.Linear(inter_dim, model_dim) 
+        )
+
+        # 5. Enable Gradients for Adapter ONLY
+        for param in self.adapter.parameters():
+            param.requires_grad = True
+            
+        # Optional: Initialize adapter weights
+        self._init_adapter_weights()
+
+    def _init_adapter_weights(self):
+        for module in self.adapter.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.kaiming_normal_(module.weight)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+    
+    # noinspection PyUnusedLocal
+    def forward(
+        self,
+        # Decoder inputs
+        input_ids: torch.LongTensor,
+        attention_mask: Optional[Union[torch.FloatTensor, BlockMask]] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        cache_position: Optional[torch.LongTensor] = None,
+        past_key_values: Optional[DynamicCache] = None,
+        encoder_last_hidden_state: Optional[torch.FloatTensor] = None,  # Not used
+        # Encoder inputs
+        encoder_input_ids: Optional[torch.LongTensor] = None,
+        encoder_attention_mask: Optional[Union[torch.FloatTensor, BlockMask]] = None,
+        encoder_position_ids: Optional[torch.LongTensor] = None,
+        encoder_cache_position: Optional[torch.LongTensor] = None,
+        encoder_past_key_values: Optional[DynamicCache] = None,  # Not used
+        # Additional args
+        fix_cache_length: bool = True,  # Not used; compatibility with other backbones
+        truncate_cache: bool = True,
+        enforce_causal_mask: bool = False,
+        return_last_hidden_state: bool = False,
+        return_updated_cache: bool = False,
+        **flash_attn_kwargs: Unpack[FlashAttentionKwargs],
+    ) -> Union[CausalLMOutputWithPast, BaseModelOutputWithPast]:
+        # Encode clean tokens
+        if encoder_input_ids is not None:
+            if self.use_encoder_causal_mask or enforce_causal_mask:
+                encoder_attention_mask = None  # None --> enforces use of causal mask
+            if encoder_cache_position is None and encoder_position_ids is not None:
+                encoder_cache_position = encoder_position_ids[0]
+            if return_last_hidden_state:
+                encoder_output = self.encoder.model(
+                    input_ids=encoder_input_ids,
+                    attention_mask=encoder_attention_mask,
+                    position_ids=encoder_position_ids,
+                    use_cache=True,
+                    past_key_values=past_key_values,
+                    cache_position=encoder_cache_position,
+                )
+                past_key_values = encoder_output.past_key_values
+                if return_updated_cache:
+                    # encoder_output.past_key_values now contains latest encoder input
+                    return BaseModelOutputWithPast(
+                        last_hidden_state=encoder_output.last_hidden_state,
+                        past_key_values=past_key_values,
+                    )
+            else:
+                past_key_values = self.encoder.model(
+                    input_ids=encoder_input_ids,
+                    attention_mask=encoder_attention_mask,
+                    position_ids=encoder_position_ids,
+                    use_cache=True,
+                    past_key_values=past_key_values,
+                    cache_position=encoder_cache_position,
+                ).past_key_values
+                if return_updated_cache:
+                    # encoder_output.past_key_values now contains latest encoder input
+                    return BaseModelOutputWithPast(
+                        past_key_values=past_key_values,
+                    )
+
+        # Run decoder with xattn to clean token hidden states
+        # First run the adapter to get adapted (contextualized) embeddings
+        decoder_hidden_states = self.encoder.model.embed_tokens(input_ids)
+        decoder_hidden_states = self.adapter(decoder_hidden_states)
+
+        if cache_position is None:
+            if position_ids is not None:
+                cache_position = position_ids[0]
+            else:  # During training / validation position_ids are not provided
+                cache_position = torch.arange(
+                    decoder_hidden_states.shape[1],
+                    device=decoder_hidden_states.device,
+                )
+        if position_ids is None:
+            position_ids = cache_position.unsqueeze(0)
+        decoder_position_embeddings = self.decoder.model.rotary_emb(
+            decoder_hidden_states, position_ids
+        )
+
+        if hasattr(self.decoder.model, "_update_causal_mask"):  # bc on transformers
+            # noinspection PyProtectedMember
+            attention_mask = self.decoder.model._update_causal_mask(
+                attention_mask=attention_mask,
+                input_tensor=decoder_hidden_states,
+                cache_position=cache_position,
+                past_key_values=past_key_values,
+                output_attentions=False,
+            )
+        for decoder_layer in self.decoder.model.layers:
+            layer_idx = decoder_layer.self_attn.layer_idx
+            if (
+                self.tie_encoder_decoder_weights
+                and layer_idx not in self.decoder_layer_idxs
+            ):
+                continue
+            # past_key_values gets updated in-place.
+            # Record previous length to truncate after each layer forward
+            if past_key_values is not None and len(past_key_values) > layer_idx:
+                prev_cache_len = past_key_values[layer_idx][0].shape[-2]  # type: ignore
+            else:
+                prev_cache_len = 0
+
+            decoder_hidden_states = decoder_layer(
+                hidden_states=decoder_hidden_states,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_value=past_key_values,
+                output_attentions=False,
+                use_cache=True,
+                cache_position=position_ids[0],
+                position_embeddings=decoder_position_embeddings,
+                **flash_attn_kwargs,
+            )[0]  # Shape: (input_ids.shape[0], input_ids.shape[1], hidden_dim)
+
+            if truncate_cache and past_key_values is not None:
                 # DynamicCache extends along sequence dimension by default;
                 # truncate back to original cache len + encoder output length
                 past_key_values.key_cache[layer_idx] = past_key_values.key_cache[
@@ -652,3 +994,118 @@ class LLMasEncoderDecoderShareKV(nn.Module):
             logits=logits,
             past_key_values=past_key_values,
         )
+'''
+
+# Keep the bottom encoder layers frozen, only train top layers (decoder)
+class LLMasEncoderDecoderShareKVEncoderGenFrozenBottom(LLMasEncoderDecoderShareKVEncoderGen):
+    def __init__(self, *args, **kwargs):
+        # 1. Initialize the model using the parent class logic
+        # This sets up self.encoder, self.decoder, and self.decoder_layer_idxs
+        super().__init__(*args, **kwargs)
+
+        # We want to freeze: 
+        #   - Embeddings (usually considered bottom)
+        #   - Layers that are NOT in the decoder_layer_idxs list
+        # We want to keep trainable:
+        #   - Layers that ARE in the decoder_layer_idxs list
+        #   - The Final LayerNorm (self.encoder.model.norm)
+        #   - The LM Head (self.encoder.lm_head)
+
+        # A. Freeze Embeddings
+        if hasattr(self.encoder.model, "embed_tokens"):
+            self.encoder.model.embed_tokens.requires_grad_(False)
+
+        # B. Freeze Bottom Layers (Encoder-only layers)
+        # Convert list to set for O(1) lookups
+        decoder_layer_indices = set(self.decoder_layer_idxs)
+
+        for i, layer in enumerate(self.encoder.model.layers):
+            if i not in decoder_layer_indices:
+                # This layer is used ONLY by the encoder, so we freeze it
+                layer.requires_grad_(False)
+            else:
+                # This layer is used by the decoder (and encoder), keep it trainable.
+                # (Explicitly setting True is safer in case default changed elsewhere)
+                layer.requires_grad_(True)
+
+        # C. Ensure Head and Norm are trainable (required for Decoder generation)
+        if hasattr(self.encoder.model, "norm"):
+            self.encoder.model.norm.requires_grad_(True)
+            
+        if hasattr(self.encoder, "lm_head"):
+            self.encoder.lm_head.requires_grad_(True)
+
+try:
+    from peft import get_peft_model, LoraConfig, TaskType
+    PEFT_AVAILABLE = True
+except ImportError:
+    PEFT_AVAILABLE = False
+    logger.warning("PEFT not installed. LoRA functionality will fail if initialized.")
+
+class LLMasEncoderDecoderShareKVEncoderGenLoRA(LLMasEncoderDecoderShareKVEncoderGen):
+    """
+    Same as LLMasEncoderDecoderShareKVEncoderGen, but wraps the underlying 
+    encoder (and decoder) with LoRA adapters for parameter-efficient fine-tuning.
+    """
+    def __init__(
+        self,
+        lora_r: int = 16,
+        lora_alpha: int = 32,
+        lora_dropout: float = 0.0,
+        lora_target_modules: Optional[list] = None,
+        *args, 
+        **kwargs
+    ):
+        if not PEFT_AVAILABLE:
+            raise ImportError("Please install 'peft' to use LLMasEncoderDecoderShareKVEncoderGenLoRA.")
+
+        # 1. Initialize the base model (loads weights, sets up encoder/decoder refs)
+        super().__init__(*args, **kwargs)
+
+        # 2. Define LoRA Config
+        if lora_target_modules is None:
+            lora_target_modules = [
+                "q_proj", "k_proj", "v_proj", "o_proj",
+                "gate_proj", "up_proj", "down_proj"
+            ]
+
+        peft_config = LoraConfig(
+            task_type=TaskType.CAUSAL_LM, 
+            inference_mode=False, 
+            r=lora_r, 
+            lora_alpha=lora_alpha, 
+            lora_dropout=lora_dropout,
+            target_modules=lora_target_modules,
+            bias="none",
+        )
+
+        # 3. Apply LoRA to the Encoder
+        # Capture the original backbone before wrapping (e.g. LlamaModel)
+        # We need this because PeftModel's attribute delegation makes .model point to the CausalLM,
+        # breaking the parent class's forward method.
+        original_backbone = self.encoder.model
+
+        # Wrap encoder
+        self.encoder = get_peft_model(self.encoder, peft_config)
+
+        # FIX: Manually set .model on the PeftModel wrapper to point to the backbone.
+        # We use object.__setattr__ to avoid registering it as a PyTorch submodule (which would duplicate params).
+        object.__setattr__(self.encoder, "model", original_backbone)
+
+        # 4. Handle the Decoder
+        self.decoder = self.encoder
+
+        # 5. Logging
+        logger.info("LoRA initialized. Trainable parameters:")
+        self.encoder.print_trainable_parameters()
+
+    def save_pretrained(self, save_directory, **kwargs):
+        """
+        Custom save method to ensure we save the PeftModel adapters correctly.
+        """
+        # Because self.encoder is a PeftModel, calling save_pretrained on it 
+        # will save the `adapter_model.bin` and `adapter_config.json`.
+        self.encoder.save_pretrained(save_directory, **kwargs)
+        
+        if not self.tie_encoder_decoder_weights:
+            logger.warning("Encoder and Decoder are not tied. Saving only Encoder adapters to root.")

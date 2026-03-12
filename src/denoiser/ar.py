@@ -75,18 +75,19 @@ class AR(Denoiser):
             attention_mask = attention_mask[..., :-1]
         if context_mask is None:
             context_mask = torch.zeros_like(input_ids)
-        elif (
-            context_mask.sum() == 0
-            and attention_mask is None
-            or (attention_mask == 1).all()
-        ):
-            attention_mask = None
         else:
             context_mask = context_mask[..., :-1]
+            if attention_mask is not None and (attention_mask == 1).all() and (
+                context_mask == 0
+            ).all():
+                attention_mask = None
+        effective_attention_mask = (
+            attention_mask if attention_mask is not None else torch.ones_like(input_ids)
+        )
         if self.training and self.config.train_on_context:
-            tokens_mask = attention_mask
+            tokens_mask = effective_attention_mask
         else:
-            tokens_mask = attention_mask * (1 - context_mask)
+            tokens_mask = effective_attention_mask * (1 - context_mask)
         return DenoiserInput(
             xt=input_ids,  # type: ignore
             x0=labels,  # type: ignore

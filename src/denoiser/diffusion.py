@@ -9,6 +9,7 @@ from transformers import (
     PreTrainedTokenizer,
     StoppingCriteriaList,
 )
+import transformers
 from transformers.cache_utils import Cache, DynamicCache
 
 try:
@@ -1162,35 +1163,99 @@ class E2D2(BD3LM):
             self.encoder_static_attention_mask = encoder_attention_mask
             self.static_attention_mask = decoder_attention_mask
         else:
-            encoder_static_mask = self._encoder_block_mask(
-                b=None,  # type: ignore
-                h=None,  # type: ignore
-                q_idx=torch.arange(self.config.length)[:, None],
-                kv_idx=torch.arange(self.config.length)[None, :],
-                block_size=self.config.block_size
-                if self.training
-                else self.config.eval_block_size,
-            )
-            decoder_static_mask = self._decoder_block_mask(
-                b=None,
-                h=None,
-                q_idx=torch.arange(self.config.length)[:, None],
-                kv_idx=torch.arange(self.config.length * 2)[None, :],
-                block_size=self.config.block_size
-                if self.training
-                else self.config.eval_block_size,
-                seq_length=self.config.length,
-            )
-            self.register_buffer(
-                "encoder_static_attention_mask",
-                encoder_static_mask,
-            )
-            self.register_buffer(
-                "static_attention_mask",
-                decoder_static_mask,
-            )
-            self.skip_params_for_push.append("encoder_static_attention_mask")
-            self.skip_params_for_push.append("static_attention_mask")
+            if self.config.block_size != "random":
+                encoder_static_mask = self._encoder_block_mask(
+                    b=None,  # type: ignore
+                    h=None,  # type: ignore
+                    q_idx=torch.arange(self.config.length)[:, None],
+                    kv_idx=torch.arange(self.config.length)[None, :],
+                    block_size=self.config.block_size
+                    if self.training
+                    else self.config.eval_block_size,
+                )
+                decoder_static_mask = self._decoder_block_mask(
+                    b=None,
+                    h=None,
+                    q_idx=torch.arange(self.config.length)[:, None],
+                    kv_idx=torch.arange(self.config.length * 2)[None, :],
+                    block_size=self.config.block_size
+                    if self.training
+                    else self.config.eval_block_size,
+                    seq_length=self.config.length,
+                )
+                self.register_buffer(
+                    "encoder_static_attention_mask",
+                    encoder_static_mask,
+                )
+                self.register_buffer(
+                    "static_attention_mask",
+                    decoder_static_mask,
+                )
+            else:
+                # ---- Modification (11.20): create two static masks for block_size=1 and block_size=4 ----
+                encoder_static_mask_1 = self._encoder_block_mask(
+                    b=None,  # type: ignore
+                    h=None,  # type: ignore
+                    q_idx=torch.arange(self.config.length)[:, None],
+                    kv_idx=torch.arange(self.config.length)[None, :],
+                    # block_size=self.config.block_size
+                    block_size=1
+                    if self.training
+                    else self.config.eval_block_size,
+                )
+                decoder_static_mask_1 = self._decoder_block_mask(
+                    b=None,
+                    h=None,
+                    q_idx=torch.arange(self.config.length)[:, None],
+                    kv_idx=torch.arange(self.config.length * 2)[None, :],
+                    # block_size=self.config.block_size
+                    block_size=1
+                    if self.training
+                    else self.config.eval_block_size,
+                    seq_length=self.config.length,
+                )
+                self.register_buffer(
+                    "encoder_static_attention_mask_1",
+                    encoder_static_mask_1,
+                )
+                self.register_buffer(
+                    "static_attention_mask_1",
+                    decoder_static_mask_1,
+                )
+                self.skip_params_for_push.append("encoder_static_attention_mask_1")
+                self.skip_params_for_push.append("static_attention_mask_1")
+                encoder_static_mask_4 = self._encoder_block_mask(
+                    b=None,  # type: ignore
+                    h=None,  # type: ignore
+                    q_idx=torch.arange(self.config.length)[:, None],
+                    kv_idx=torch.arange(self.config.length)[None, :],
+                    # block_size=self.config.block_size
+                    block_size=4
+                    if self.training
+                    else self.config.eval_block_size,
+                )
+                decoder_static_mask_4 = self._decoder_block_mask(
+                    b=None,
+                    h=None,
+                    q_idx=torch.arange(self.config.length)[:, None],
+                    kv_idx=torch.arange(self.config.length * 2)[None, :],
+                    # block_size=self.config.block_size
+                    block_size=4
+                    if self.training
+                    else self.config.eval_block_size,
+                    seq_length=self.config.length,
+                )
+                self.register_buffer(
+                    "encoder_static_attention_mask_4",
+                    encoder_static_mask_4,
+                )
+                self.register_buffer(
+                    "static_attention_mask_4",
+                    decoder_static_mask_4,
+                )
+                self.skip_params_for_push.append("encoder_static_attention_mask_4")
+                self.skip_params_for_push.append("static_attention_mask_4")
+            # ---- Modification ends ----
 
     def _prepare_inputs(
         self,
@@ -1414,7 +1479,7 @@ class E2D2(BD3LM):
                     encoder_cache_length, encoder_full_seq_length
                 ).to(device)[None, :]
                 encoder_attention_mask = self._preprocess_attention_mask(
-                    encoder_attention_mask, dtype=torch.float
+                    encoder_attention_mask, dtype=self.backbone.encoder.dtype
                 )
                 full_seq_length = -1  # Not used
         else:  # Not using kv-cache
@@ -1426,7 +1491,7 @@ class E2D2(BD3LM):
                     (1, 1, context_len, context_len), device=context.device
                 )
                 encoder_attention_mask = self._preprocess_attention_mask(
-                    encoder_attention_mask, dtype=torch.float
+                    encoder_attention_mask, dtype=self.backbone.encoder.dtype
                 )
                 encoder_position_ids = torch.arange(context_len).to(device)[None, :]
             else:
@@ -1448,7 +1513,7 @@ class E2D2(BD3LM):
                 device=device,
             )  # Make attention mask 4D
             decoder_attention_mask = self._preprocess_attention_mask(
-                decoder_attention_mask, dtype=torch.float
+                decoder_attention_mask, dtype=self.backbone.encoder.dtype
             )
         # encoder's run
         else:
@@ -1519,12 +1584,14 @@ class E2D(E2D2):
     ) -> torch.Tensor:
         """Encoder uses block causal masking (same as E2D2)."""
         # Keep the same encoder masking as E2D2
-        block_q = q_idx // block_size
-        block_kv = kv_idx // block_size
-        return block_q >= block_kv
+        # block_q = q_idx // block_size
+        # block_kv = kv_idx // block_size
+        # return block_q >= block_kv
+        return q_idx >= kv_idx
 
-    @staticmethod
+    # @staticmethod  <-- Removed staticmethod
     def _decoder_block_mask(
+        self,
         b,
         h,
         q_idx,    # tensor [1, L]
@@ -1576,25 +1643,76 @@ class E2D(E2D2):
         
         # Create attention masks
         if self.config.attn_backend == "sdpa":
-            decoder_attention_mask = (
-                self.static_attention_mask[None, ...]
-                & attention_mask.repeat(1, 2)[:, None, :]
-                & attention_mask[..., None]
-            )[:, None, ...]  # Make attention mask 4D
-            encoder_attention_mask = (
-                (
-                    self.encoder_static_attention_mask[None, ...]
-                    | context_mask[:, None, :]
+            if self.config.block_size == "random":
+                # ---- Modification (11.20): select static masks based on randomly sampled block_size ----
+                if torch.rand(1).item() < 0.5:
+                    decoder_attention_mask = (
+                        self.static_attention_mask_1[None, ...]
+                        & attention_mask.repeat(1, 2)[:, None, :]
+                        & attention_mask[..., None]
+                    )[:, None, ...]  # Make attention mask 4D
+                    encoder_attention_mask = (
+                        (
+                            self.encoder_static_attention_mask_1[None, ...]
+                            | context_mask[:, None, :]
+                        )
+                        & attention_mask[:, None, :]
+                        & attention_mask[..., None]
+                    )[:, None, ...]  # Make attention mask 4D
+                    encoder_attention_mask = self._preprocess_attention_mask(
+                        encoder_attention_mask, dtype=torch.float
+                    )
+                    decoder_attention_mask = self._preprocess_attention_mask(
+                        decoder_attention_mask, dtype=torch.float
+                    )
+                else:
+                    decoder_attention_mask = (
+                        self.static_attention_mask_4[None, ...]
+                        & attention_mask.repeat(1, 2)[:, None, :]
+                        & attention_mask[..., None]
+                    )[:, None, ...]  # Make attention mask 4D
+                    encoder_attention_mask = (
+                        (
+                            self.encoder_static_attention_mask_4[None, ...]
+                            | context_mask[:, None, :]
+                        )
+                        & attention_mask[:, None, :]
+                        & attention_mask[..., None]
+                    )[:, None, ...]  # Make attention mask 4D
+                    encoder_attention_mask = self._preprocess_attention_mask(
+                        encoder_attention_mask, dtype=torch.float
+                    )
+                    decoder_attention_mask = self._preprocess_attention_mask(
+                        decoder_attention_mask, dtype=torch.float
+                    )
+                # ---- Modification ends ----
+            else:
+                decoder_attention_mask = (
+                    self.static_attention_mask[None, ...]
+                    & attention_mask.repeat(1, 2)[:, None, :]
+                    & attention_mask[..., None]
+                )[:, None, ...]  # Make attention mask 4D
+
+                # Set the last context token (EOS) to not be attended to
+                row = context_mask[0]
+                last_one_idx = (row == 1).nonzero()[-1]
+                context_mask[0, last_one_idx] = 0
+                
+                encoder_attention_mask = (
+                    (
+                        self.encoder_static_attention_mask[None, ...]
+                        | context_mask[:, None, :]
+                    )
+                    # self.encoder_static_attention_mask[None, ...]  # used for strictly causal encoder masking
+                    & attention_mask[:, None, :]
+                    & attention_mask[..., None]
+                )[:, None, ...]  # Make attention mask 4D
+                encoder_attention_mask = self._preprocess_attention_mask(
+                    encoder_attention_mask, dtype=torch.float
                 )
-                & attention_mask[:, None, :]
-                & attention_mask[..., None]
-            )[:, None, ...]  # Make attention mask 4D
-            encoder_attention_mask = self._preprocess_attention_mask(
-                encoder_attention_mask, dtype=torch.float
-            )
-            decoder_attention_mask = self._preprocess_attention_mask(
-                decoder_attention_mask, dtype=torch.float
-            )
+                decoder_attention_mask = self._preprocess_attention_mask(
+                    decoder_attention_mask, dtype=torch.float
+                )
         elif self.config.attn_backend == "flex_attention":
             if context_mask.any():
                 raise NotImplementedError(
@@ -1674,17 +1792,49 @@ class E2D(E2D2):
         """Standard autoregressive cross-entropy loss."""
         # Shift targets: predict next token
         targets = denoiser_inputs.x0[:, 1:]  # Remove first token (typically BOS)
-        logits = model_output[:, :-1, :]     # Remove last prediction
+        
+        seq_len = denoiser_inputs.x0.shape[1]
+        
+        # Check if we have encoder logits as well
+        if model_output.shape[1] == 2 * seq_len:
+            # Encoder logits: first seq_len tokens
+            # Decoder logits: last seq_len tokens
+            enc_logits = model_output[:, :seq_len-1, :]
+            dec_logits = model_output[:, seq_len:-1, :]
+            logits = torch.cat([enc_logits, dec_logits], dim=1)
+            
+            # Duplicate targets
+            targets = torch.cat([targets, targets], dim=1)
+            
+            # Duplicate mask if exists
+            if denoiser_inputs.tokens_mask is not None:
+                M = denoiser_inputs.tokens_mask
+                M_loss = torch.cat([M[:, 1:], M[:, 1:]], dim=1)
+                
+                # Update denoiser_inputs.tokens_mask for metrics.py
+                # Prepend dummy to match the slicing logic in metrics.py
+                dummy = torch.zeros((M.shape[0], 1), device=M.device, dtype=M.dtype)
+                denoiser_inputs.tokens_mask = torch.cat([dummy, M_loss], dim=1)
+                
+                mask = M_loss
+            else:
+                mask = None
+        else:
+            logits = model_output[:, :-1, :]     # Remove last prediction
+            if denoiser_inputs.tokens_mask is not None:
+                mask = denoiser_inputs.tokens_mask[:, 1:]
+            else:
+                mask = None
         
         # Flatten for cross-entropy
         flat_logits = logits.contiguous().view(-1, logits.size(-1))
         flat_targets = targets.contiguous().view(-1)
         
         # Apply token mask if needed
-        if denoiser_inputs.tokens_mask is not None:
-            mask = denoiser_inputs.tokens_mask[:, 1:].contiguous().view(-1)
-            flat_logits = flat_logits[mask.bool()]
-            flat_targets = flat_targets[mask.bool()]
+        if mask is not None:
+            flat_mask = mask.contiguous().view(-1)
+            flat_logits = flat_logits[flat_mask.bool()]
+            flat_targets = flat_targets[flat_mask.bool()]
         
         # Compute cross-entropy loss
         loss = torch.nn.functional.cross_entropy(flat_logits, flat_targets)
@@ -1693,8 +1843,8 @@ class E2D(E2D2):
         with torch.no_grad():
             log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
             token_nlls = -log_probs.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
-            if denoiser_inputs.tokens_mask is not None:
-                token_nlls = token_nlls * denoiser_inputs.tokens_mask[:, 1:]
+            if mask is not None:
+                token_nlls = token_nlls * mask
         
         return LossAndNllOutput(
             loss=loss,
@@ -1724,159 +1874,496 @@ class E2D(E2D2):
         device: Optional[str] = None,
         tokenizer: Optional[PreTrainedTokenizer] = None,
         disable_pbar: bool = False,
+        conf_seg: bool = True,             # dynamically decide block size based on confidence
+        track_acc_rate: bool = False,      # dynamically decide block size based on acceptance rate (estimated by EMA)
+        tree_attn: bool = True,            # tree attention for drafting
         **kwargs: Any,
     ) -> torch.LongTensor:
-        """Generates samples using block autoregressive generation."""
-        
-        # Setup sampling variables (keep same as D3PM)
+        assert not (conf_seg and track_acc_rate), "conf_seg and track_acc_rate cannot both be True."
+
         if generation_config is None:
-            assert getattr(self, "generation_config", None) is not None, (
-                "Generation config must be provided if not present in the model."
-            )
+            assert getattr(self, "generation_config", None) is not None, "Generation config must be provided."
             generation_config = self.generation_config
         if inputs is None:
             inputs = torch.ones((batch_size, 1), device=device) * self.bos_token_id
         if max_length is None:
-            if hasattr(generation_config, "max_length"):
-                max_length = generation_config.max_length
-            else:
-                max_length = self.max_length
+            max_length = generation_config.max_length if hasattr(generation_config, "max_length") else self.max_length
         if max_new_tokens is None:
-            if hasattr(generation_config, "max_new_tokens"):
-                max_new_tokens = generation_config.max_new_tokens
-            else:
-                max_new_tokens = max_length - inputs.shape[-1]
+            max_new_tokens = generation_config.max_new_tokens if hasattr(generation_config, "max_new_tokens") else max_length - inputs.shape[-1]
+        
         batch_size = batch_size if batch_size is not None else inputs.shape[0]
         assert batch_size == 1, "Batched sampling not supported yet"
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
+        
         block_size = generation_config.block_size
         max_blocks = max_new_tokens // block_size
 
-        # Initialize accumulated samples (similar to D3PM)
         accumulated_samples = torch.cat([inputs, torch.full(
-            (batch_size, max_blocks * block_size),
+            (batch_size, 2 * max_new_tokens), # max_new_tokens would be enough, but we still need some buffer in case draft tokens exceeds that length
             self.mask_token_id,
             device=device,
             dtype=torch.long,
         )], dim=-1)
+
+        if generation_config.align_inputs_to_blocks:
+            inputs_offset = block_size * (inputs.shape[-1] // block_size) if inputs.numel() > 0 else 0
+        else:
+            inputs_offset = inputs.shape[-1] if inputs.numel() > 0 else 0
+
+        block_pbar = tqdm(range(max_blocks), desc="Blocks", leave=True, disable=disable_pbar)
+        total_generated_tokens = 0
+        total_accepted_tokens = 0
+        total_accepted_lengths = []
+        accept_counts = 0
         
         if generation_config.use_cache and inputs.numel() > 0:
             cache = self.update_cache(
                 inputs=inputs[:, : block_size * (inputs.shape[-1] // block_size)]
                 if generation_config.align_inputs_to_blocks
-                else inputs,
+                else inputs[:, :-1],
                 cache={},
             )
         else:
             cache = None
 
-        if generation_config.align_inputs_to_blocks:
-            inputs_offset = (
-                block_size * (inputs.shape[-1] // block_size)
-                if inputs.numel() > 0
-                else 0
-            )
+        current_idx = inputs_offset
+        pbar = tqdm(total=max_new_tokens, desc="Tokens", leave=True, disable=disable_pbar)
+
+        # Debug: Print input prompt
+        if tokenizer is not None:
+            print("\n" + "="*60)
+            print("[DEBUG] Generation started")
+            print("="*60)
+            print(f"[INPUT] Prompt: {tokenizer.decode(inputs[0])}")
+            print(f"[CONFIG] max_new_tokens={max_new_tokens}")
+            print(f"[CONFIG] conf_seg={conf_seg}, track_acc_rate={track_acc_rate}, tree_attn={tree_attn}")
+            print("="*60 + "\n")
+
+        # Confidence-based Segmentation Configuration
+        if conf_seg:
+            max_draft_len = 100
+            conf_threshold = 0.7
         else:
-            inputs_offset = inputs.shape[-1] if inputs.numel() > 0 else 0
+            max_draft_len = block_size
+        
+        # Tracking Acceptance Rate Configuration
+        if track_acc_rate:
+            acc_rate_history = []
+            ema_acc_rate = 0.8
+            ema_alpha = 0.3
+            min_draft_len = 1
+            max_draft_len_dynamic = 10
+            current_draft_len = min(block_size, max_draft_len_dynamic)
 
-        # **KEY DIFFERENCE: Block autoregressive generation (not iterative diffusion)**
-        block_pbar = tqdm(
-            range(max_blocks),
-            desc="Blocks",
-            leave=True,
-            disable=disable_pbar,
-        )
-        for block_id in block_pbar:
-            start_idx = inputs_offset + (block_id * block_size)
-
-            # autoregressively generate tokens within the block
-            for step in range(block_size):
+        # Flag indicating whether stopping criteria has been met on drafted tokens
+        # (so we need to stop and verify these tokens)
+        stopped_and_ready_to_verify = False
+        while current_idx < inputs_offset + max_new_tokens:
+            start_idx = current_idx
+            if track_acc_rate:
+                actual_max_draft_len = current_draft_len
+            else:
+                actual_max_draft_len = max_draft_len
+                
+            # --- DRAFTING PHASE ---
+            draft_tree_candidates = [] 
+            actual_draft_len = 0
+            for step in range(actual_max_draft_len):
                 cur_pos = start_idx + step
-                if cur_pos >= accumulated_samples.shape[1]:
-                    # Stop Criteria is met
-                    break
-                
-                # Decoder input token: use previous token
-                dec_inp = accumulated_samples[:, cur_pos - 1:cur_pos]
-                
-                context = (
-                    accumulated_samples[:, :start_idx]
-                    if not generation_config.use_cache
-                    else None
-                )
 
-                # -------- Modification 2: update cache here --------
-                denoiser_inputs, cache = self._prepare_inputs_inference(    # <--- the old implementation should also be fine
+                # Decoder input token: use previous token
+                dec_inp = accumulated_samples[:, cur_pos - 1 : cur_pos]
+                context = accumulated_samples[:, :start_idx] if not generation_config.use_cache else None
+
+                if tokenizer is not None:
+                    print(f"[DRAFT] Input Token: '{tokenizer.decode(dec_inp[0].tolist())}' at position {cur_pos}")
+
+                denoiser_inputs, _ = self._prepare_inputs_inference(
                     input_ids=dec_inp,
                     context=context,
                     cache=cache if generation_config.use_cache else None,
                 )
-                # ----------------------------------------------------
-
-                # -------- Modification 3: call backbone with the same design as D3PM --------
-                '''
+                    
                 backbone_output = self._backbone_forward(
                     denoiser_inputs,
                     fix_cache_length=True,
-                    **(cache if cache is not None else {}),
-                    **kwargs,
-                )
-                logits = backbone_output["logits"][:, -1, :]
-                if generation_config.use_cache:
-                    cache = {k: v for k, v in backbone_output.items() if k != "logits"}
-                '''
-                backbone_output = self._backbone_forward(
-                    denoiser_inputs,
-                    fix_cache_length=True,  # Do not let kv cache grow on each forward call
+                    truncate_cache=False,
                     **cache,
                     **kwargs,
                 )
+                total_generated_tokens += 1
                 backbone_output = {k: v for k, v in backbone_output.items()}
                 logits = backbone_output.pop("logits")
                 cache = cache | backbone_output
-                # ------------------------------------------------------------------------------
 
-                # Apply logits processors (keep same as D3PM)
-                if logits_processor is not None:
-                    logits = logits_processor(
-                        input_ids=accumulated_samples[:, :cur_pos+1],
-                        scores=logits,
-                    )
-
-                # Sample from logits for the current block
-                if generation_config.do_sample:
-                    # Sample with temperature
-                    probs = torch.softmax(logits, dim=-1)
-                    next_tok = self._sample_categorical(probs, do_sample=True)[:, 0]
+                if logits.ndim == 3:
+                    step_logits = logits[:, -1, :]
                 else:
-                    # Greedy sampling
-                    next_tok = logits.argmax(dim=-1)
+                    step_logits = logits
 
-                # Update accumulated samples
-                accumulated_samples[:, cur_pos:cur_pos+1] = next_tok.unsqueeze(-1)
+                if logits_processor is not None:
+                    step_logits = logits_processor(input_ids=accumulated_samples[:, :cur_pos], scores=step_logits)
 
-            # -------- Modification 1: Moving the update cache outside the inner loop --------
-            # Update encoder cache
+                probs = torch.softmax(step_logits, dim=-1)
+                top1_prob = probs.max(dim=-1).values.item()
+                
+                next_tok = step_logits.argmax(dim=-1)
+                accumulated_samples[:, cur_pos:cur_pos+1] = next_tok.reshape(batch_size, 1)
+                actual_draft_len += 1
+
+                if tokenizer is not None:  # Useful for debugging
+                    drafted_token = tokenizer.decode([next_tok.item()])
+                    print(f"[DRAFT] Step {step}: token='{drafted_token}' (conf={top1_prob:.3f})")
+
+                if tree_attn:
+                    # choose the top-k draft tokens we want to keep for current step
+                    if top1_prob > 0.95:
+                        k_dynamic = 1
+                    elif top1_prob > 0.8:
+                        k_dynamic = 3
+                    elif top1_prob > 0.5:
+                        k_dynamic = 5
+                    else:
+                        k_dynamic = 10
+                    
+                    if k_dynamic > 1:
+                        _, topk_indices = torch.topk(step_logits, k_dynamic, dim=-1) 
+                        topk_ids = topk_indices.flatten().tolist()
+                        greedy_id = next_tok.item()
+                        
+                        if tokenizer is not None:
+                            topk_decoded = [tokenizer.decode([tid]) for tid in topk_ids if tid != greedy_id]
+                            print(f"[DRAFT]   -> Tree candidates at step {step}: {topk_decoded}")
+                        
+                        for tid in topk_ids:
+                            if tid != greedy_id:
+                                draft_tree_candidates.append({
+                                    "step": step, 
+                                    "token_id": tid,
+                                    "pos_id": cur_pos
+                                })
+
+                if stopping_criteria is not None:
+                    is_done = stopping_criteria(
+                        input_ids=accumulated_samples[:, inputs_offset : cur_pos + 1],
+                        scores=None,
+                    )
+                    if torch.any(is_done):
+                        stopped_and_ready_to_verify = True
+                        break
+                
+                if conf_seg and top1_prob < conf_threshold:
+                    break
+            
+            # Debug: Print draft summary
+            if tokenizer is not None:
+                drafted_tokens = accumulated_samples[0, start_idx:start_idx + actual_draft_len]
+                drafted_text = tokenizer.decode(drafted_tokens)
+                print(f"\n[DRAFT COMPLETE] Drafted {actual_draft_len} tokens: '{drafted_text}'")
+                if tree_attn and len(draft_tree_candidates) > 0:
+                    print(f"[DRAFT TREE] {len(draft_tree_candidates)} alternative candidates in tree")
+                print("-" * 40)
+
+            # --- PRE-VERIFICATION CACHE TRUNCATION ---
+            draft_len_to_truncate = actual_draft_len if (conf_seg or track_acc_rate) else block_size
+            num_layers = len(cache['past_key_values'].key_cache)
+            is_share_kv = (self.backbone.encoder == self.backbone.decoder)
+            for layer in range(num_layers):
+                if not is_share_kv or layer >= self.backbone.decoder_layer_idxs[0]:
+                    cache['past_key_values'].key_cache[layer] = cache['past_key_values'].key_cache[layer][..., :-draft_len_to_truncate, :]
+                    cache['past_key_values'].value_cache[layer] = cache['past_key_values'].value_cache[layer][..., :-draft_len_to_truncate, :]
+
+            # --- VERIFICATION PHASE ---
             if generation_config.use_cache:
+                num_generated = actual_draft_len
+                
+                greedy_inputs = accumulated_samples[:, start_idx - 1 : start_idx + num_generated]
+                greedy_len = greedy_inputs.shape[1]
+                
+                if tree_attn and len(draft_tree_candidates) > 0:
+                    extra_tokens_list = [c["token_id"] for c in draft_tree_candidates]
+                    extra_inputs = torch.tensor([extra_tokens_list], device=device, dtype=torch.long)
+                    encoder_inputs = torch.cat([greedy_inputs, extra_inputs], dim=1)
+                    
+                    past_len = cache['past_key_values'].key_cache[0].shape[-2]
+                    start_pos = past_len 
+                    greedy_pos_ids = torch.arange(start_pos, start_pos + greedy_len, device=device).unsqueeze(0)
+                    extra_pos_ids = torch.tensor([[start_pos + 1 + c["step"] for c in draft_tree_candidates]], device=device)
+                    position_ids = torch.cat([greedy_pos_ids, extra_pos_ids], dim=1)
+
+                    # Attention Mask
+                    total_len = encoder_inputs.shape[1]
+                    total_past = past_len
+                    mask = torch.full((1, 1, total_len, total_past + total_len), torch.finfo(torch.float32).min, device=device)
+                    mask[:, :, :, :total_past] = 0.0
+                    
+                    causal_mask = torch.triu(torch.full((greedy_len, greedy_len), float('-inf'), device=device), diagonal=1)
+                    mask[:, :, :greedy_len, total_past:total_past+greedy_len] = causal_mask.unsqueeze(0).unsqueeze(0)
+                    mask[:, :, :greedy_len, total_past:total_past+greedy_len].masked_fill_(
+                        torch.tril(torch.ones((greedy_len, greedy_len), device=device)).bool(), 0.0
+                    )
+                    
+                    for idx, cand in enumerate(draft_tree_candidates):
+                        row_idx = greedy_len + idx
+                        step = cand["step"]
+                        mask[:, :, row_idx, total_past + row_idx] = 0.0
+                        mask[:, :, row_idx, total_past : total_past + 1 + step] = 0.0
+                    
+                    mask = mask.to(self.backbone.encoder.dtype)
+                else:
+                    encoder_inputs = greedy_inputs
+                    position_ids = None
+                    mask = None
+
+                # --- FIX: Handling Argument Collision ---
+                
+                # 1. Clean kwargs of explicit overrides
+                safe_kwargs = kwargs.copy()
+                if position_ids is not None: safe_kwargs.pop("position_ids", None)
+                if mask is not None: safe_kwargs.pop("attention_mask", None)
+
+                # 2. Create a temporary cache dict to pass to _prepare_inputs_inference.
+                #    This is crucial because _prepare will POP 'past_key_values'.
+                #    We want it to pop from this temp object, so when we pass **temp_cache to forward,
+                #    it is empty of KVs, preventing collision.
+                temp_cache = cache.copy() if cache is not None else {}
+                if position_ids is not None: temp_cache.pop("position_ids", None)
+                if mask is not None: temp_cache.pop("attention_mask", None)
+
+                # 3. Prepare Overrides
+                prepare_overrides = {}
+                if position_ids is not None: prepare_overrides["encoder_position_ids"] = position_ids
+                if mask is not None: prepare_overrides["encoder_attention_mask"] = mask
+
+                # 4. Prepare inputs (Consumes KVs from temp_cache)
+                context_input, _ = self._prepare_inputs_inference(
+                    input_ids=encoder_inputs,
+                    cache=temp_cache, 
+                    return_updated_cache=True,
+                    **prepare_overrides, 
+                    **safe_kwargs
+                )
+
+                backbone_args = {
+                    "return_updated_cache": True,
+                    "return_last_hidden_state": True,
+                    "enforce_causal_mask": (mask is None), 
+                }
+                
+                # 5. Forward Pass (Uses temp_cache which no longer has KVs)
+                backbone_output = self._backbone_forward(
+                    context_input,
+                    **backbone_args,
+                    **temp_cache, 
+                    **safe_kwargs
+                )
+                
+                # ... (Rest of logic remains identical) ...
+                encoder_hidden = backbone_output['last_hidden_state']
+                encoder_logits = self.backbone.encoder.lm_head(encoder_hidden)
+                
+                greedy_logits = encoder_logits[:, :greedy_len]
+                draft_tokens = greedy_inputs[:, 1:] 
+                pred_logits = greedy_logits[:, :-1]
+                pred_tokens = pred_logits.argmax(dim=-1)
+                
+                matches = (draft_tokens == pred_tokens)
+                valid_mask = matches.cumprod(dim=1)
+                min_accepted = valid_mask.sum(dim=1).min().item()
+                
+                # Debug: Print verification results
+                if tokenizer is not None:
+                    print(f"[VERIFY] Checking {draft_tokens.shape[1]} drafted tokens...")
+                    for i in range(draft_tokens.shape[1]):
+                        draft_tok = tokenizer.decode([draft_tokens[0, i].item()])
+                        pred_tok = tokenizer.decode([pred_tokens[0, i].item()])
+                        match_status = "✓" if matches[0, i].item() else "✗"
+                        print(f"[VERIFY]   Position {i}: drafted='{draft_tok}' vs verified='{pred_tok}' [{match_status}]")
+                    print(f"[VERIFY] Accepted {min_accepted}/{draft_tokens.shape[1]} tokens")
+                
+                switched_to_branch = False
+                branch_correction_token = None
+                branch_index_in_extra = -1
+                
+                if tree_attn and min_accepted < actual_draft_len and len(draft_tree_candidates) > 0:
+                    target_token_at_mismatch = pred_tokens[0, min_accepted].item()
+                    step_of_mismatch = min_accepted 
+                    
+                    for i, cand in enumerate(draft_tree_candidates):
+                        if cand["step"] == step_of_mismatch and cand["token_id"] == target_token_at_mismatch:
+                            switched_to_branch = True
+                            branch_index_in_extra = i
+                            branch_logits = encoder_logits[0, greedy_len + i]
+                            branch_correction_token = branch_logits.argmax().item()
+                            break
+                
+                if switched_to_branch:
+                    mismatch_pos = start_idx + min_accepted
+                    accumulated_samples[:, mismatch_pos] = draft_tree_candidates[branch_index_in_extra]["token_id"]
+                    
+                    # Debug: Print branch switch info
+                    if tokenizer is not None:
+                        branch_tok = tokenizer.decode([draft_tree_candidates[branch_index_in_extra]["token_id"]])
+                        correction_tok = tokenizer.decode([branch_correction_token])
+                        print(f"[TREE BRANCH] Switched to tree branch at position {min_accepted}!")
+                        print(f"[TREE BRANCH]   Branch token: '{branch_tok}'")
+                        print(f"[TREE BRANCH]   Correction (next) token: '{correction_tok}'")
+
+                    if stopping_criteria is not None:
+                        is_done = stopping_criteria(input_ids=accumulated_samples[:, inputs_offset : mismatch_pos + 1], scores=None)
+                        if torch.any(is_done):
+                            accumulated_samples = accumulated_samples[:, : mismatch_pos + 1]
+                            break
+
+                    accumulated_samples[:, mismatch_pos + 1] = branch_correction_token
+
+                    if stopping_criteria is not None:
+                        is_done = stopping_criteria(
+                            input_ids=accumulated_samples[
+                                :, inputs_offset : mismatch_pos + 2
+                            ],
+                            scores=None,
+                        )
+                        if torch.any(is_done):
+                            accumulated_samples = accumulated_samples[
+                                :, : mismatch_pos + 2
+                            ]
+                            break
+                    
+                    total_accepted_tokens += (min_accepted + 1)
+                    final_accepted_len = min_accepted + 1
+                    total_accepted_lengths.append(final_accepted_len)
+                    accept_counts += 1
+                    
+                    indices_to_keep = list(range(min_accepted + 1)) 
+                    indices_to_keep.append(greedy_len + branch_index_in_extra)
+                    indices_tensor = torch.tensor(indices_to_keep, device=device)
+                    
+                    new_kv = backbone_output['past_key_values']
+                    for layer in range(len(new_kv)):
+                        k = new_kv.key_cache[layer]
+                        v = new_kv.value_cache[layer]
+                        
+                        total_hist_len = k.shape[-2]
+                        new_len = encoder_inputs.shape[1]
+                        past_len_val = total_hist_len - new_len
+                        
+                        k_past = k[..., :past_len_val, :]
+                        v_past = v[..., :past_len_val, :]
+                        
+                        k_new = k[..., past_len_val:, :].index_select(-2, indices_tensor)
+                        v_new = v[..., past_len_val:, :].index_select(-2, indices_tensor)
+                        
+                        new_kv.key_cache[layer] = torch.cat([k_past, k_new], dim=-2)
+                        new_kv.value_cache[layer] = torch.cat([v_past, v_new], dim=-2)
+                    
+                    cache['past_key_values'] = new_kv
+
+                else:
+                    total_accepted_tokens += min_accepted
+                    total_accepted_lengths.append(min_accepted)
+                    accept_counts += 1
+                    correction_token = greedy_logits[:, min_accepted].argmax(dim=-1)
+                    
+                    # Debug: Print correction token info
+                    if tokenizer is not None:
+                        correction_tok = tokenizer.decode([correction_token.item()])
+                        print(f"[GREEDY PATH] Accepted {min_accepted} tokens, correction token: '{correction_tok}'")
+
+                    if stopped_and_ready_to_verify and stopping_criteria is not None and min_accepted > 0:
+                        is_done = stopping_criteria(input_ids=accumulated_samples[:, inputs_offset : start_idx + min_accepted], scores=None)
+                        if torch.any(is_done):
+                            accumulated_samples = accumulated_samples[:, : start_idx + min_accepted]
+                            break
+
+                    accumulated_samples[:, start_idx + min_accepted] = correction_token
+
+                    if stopping_criteria is not None:
+                        is_done = stopping_criteria(
+                            input_ids=accumulated_samples[
+                                :, inputs_offset : start_idx + min_accepted + 1
+                            ],
+                            scores=None,
+                        )
+                        if torch.any(is_done):
+                            accumulated_samples = accumulated_samples[
+                                :, : start_idx + min_accepted + 1
+                            ]
+                            break
+
+                    final_accepted_len = min_accepted
+                    
+                    target_len = start_idx + min_accepted
+                    enc_kv = cache['past_key_values'] if 'past_key_values' in cache else backbone_output['past_key_values']
+                    
+                    for layer in range(len(enc_kv)):
+                        enc_kv.key_cache[layer] = enc_kv.key_cache[layer][..., :target_len, :]
+                        enc_kv.value_cache[layer] = enc_kv.value_cache[layer][..., :target_len, :]
+                    
+                    cache['past_key_values'] = enc_kv
+
+                if track_acc_rate:
+                    acc_rate_history.append((min_accepted, actual_draft_len))
+                    window_acc_count = 0
+                    window_draft_count = 0
+                    target_window_tokens = 20
+                    for hist_acc, hist_draft in reversed(acc_rate_history):
+                        window_acc_count += hist_acc
+                        window_draft_count += hist_draft
+                        if window_draft_count >= target_window_tokens: break
+                    
+                    current_window_acc_rate = window_acc_count / window_draft_count if window_draft_count > 0 else 0.0
+                    ema_acc_rate = ema_alpha * current_window_acc_rate + (1 - ema_alpha) * ema_acc_rate
+                    
+                    if ema_acc_rate > 0.8:
+                        current_draft_len = min(current_draft_len + 1, max_draft_len_dynamic)
+                    elif ema_acc_rate < 0.7:
+                        current_draft_len = max(current_draft_len - 1, min_draft_len)
+
+                advance = final_accepted_len + 1
+                current_idx += advance
+                pbar.update(advance)
+                
+                # Debug: Print current generation state
+                if tokenizer is not None:
+                    current_output = accumulated_samples[0, inputs_offset:current_idx]
+                    current_text = tokenizer.decode(current_output)
+                    print(f"\n[PROGRESS] Generated so far ({current_idx - inputs_offset} tokens): '{current_text}'")
+                    print("=" * 60 + "\n")
+
+                if stopped_and_ready_to_verify and stopping_criteria is not None:
+                    is_done = stopping_criteria(input_ids=accumulated_samples[:, inputs_offset : current_idx], scores=None)
+                    if torch.any(is_done):
+                        accumulated_samples = accumulated_samples[:, : current_idx]
+                        break
+                    else:
+                        stopped_and_ready_to_verify = False
+
+            else:
                 cache = self.update_cache(
-                    # inputs=next_tok.unsqueeze(-1),
-                    inputs=accumulated_samples[:, start_idx:start_idx + block_size],
+                    inputs=accumulated_samples[:, start_idx-1:start_idx + block_size-1],
                     cache=cache,
                 )
+                current_idx += block_size
+                pbar.update(block_size)
 
-            if tokenizer is not None:  # Useful for debugging
-                print(tokenizer.batch_decode(accumulated_samples))
+        # Debug: Print final summary
+        if tokenizer is not None:
+            final_output = accumulated_samples[0, inputs_offset:]
+            # Remove trailing mask tokens if any
+            mask_positions = (final_output == self.mask_token_id).nonzero(as_tuple=True)[0]
+            if len(mask_positions) > 0:
+                final_output = final_output[:mask_positions[0]]
+            final_text = tokenizer.decode(final_output)
+            acceptance_rate = total_accepted_tokens / total_generated_tokens if total_generated_tokens > 0 else 0
+            print("\n" + "=" * 60)
+            print("[DEBUG] E2D.generate() completed")
+            print("=" * 60)
+            print(f"[FINAL OUTPUT]: '{final_text}'")
+            print(f"[STATS] Total forward passes: {total_generated_tokens}")
+            print(f"[STATS] Total accepted tokens: {total_accepted_tokens}")
+            print(f"[STATS] Acceptance rate: {acceptance_rate:.2%}")
+            print("=" * 60 + "\n")
 
-            # Check stopping criteria (keep same as D3PM)
-            if stopping_criteria is not None:
-                is_done = stopping_criteria(
-                    input_ids=accumulated_samples[:, :cur_pos+1],
-                    scores=None,
-                )
-                if torch.any(is_done):
-                    accumulated_samples = accumulated_samples[:, :cur_pos+1]
-                    break 
-            # ------------------------------------------------------------------------------
-                
-        return accumulated_samples
+        return accumulated_samples, (total_generated_tokens, total_accepted_tokens), (total_accepted_lengths, accept_counts)

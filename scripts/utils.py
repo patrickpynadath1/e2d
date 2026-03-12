@@ -1,5 +1,6 @@
 import os
 import random
+import gc
 from typing import Any
 
 import fsspec
@@ -218,19 +219,37 @@ def load_model_from_ckpt_dir_path(
 
     with open(os.path.join(path_to_ckpt_dir, "config.yaml"), "rb") as f:
         config = yaml.safe_load(f)
-    for k, v in model_config_overrides.items():
-        config["model"]["config"][k] = v
+    # for k, v in model_config_overrides.items():
+    #     config["model"]["config"][k] = v
     config = OmegaConf.create(config)
+    if model_config_overrides:
+        override_conf = OmegaConf.create({"model": {"config": model_config_overrides}})
+        config = OmegaConf.merge(config, override_conf)
 
     model = hydra.utils.instantiate(
         config.model,
         _convert_="all",
     )
+
+    weights_suffix = "_ema" if load_ema_weights else ""
+    base_name = ckpt_file[:-3] if ckpt_file.endswith(".pt") else ckpt_file
+    weights_only_filename = f"{base_name}{weights_suffix}_weights_only.pt"
+    weights_only_path = os.path.join(path_to_ckpt_dir, "checkpoints", weights_only_filename)
+
+    if os.path.exists(weights_only_path):
+        print(f"Loading cached weights-only checkpoint from: {weights_only_path}")
+        state_dict = torch.load(weights_only_path, map_location="cpu")
+        model.load_state_dict(state_dict, strict=False)
+        model.to(device)
+        return model
+
     try:
         ckpt = torch.load(
             os.path.join(path_to_ckpt_dir, "checkpoints", ckpt_file),
             weights_only=False,
-            map_location=device,
+            # map_location=device,
+            map_location="cpu",
+            mmap=True           # Use memory mapping
         )
     except FileNotFoundError:
         print("Checkpoint not found; reinitializing model from scratch")
@@ -267,8 +286,20 @@ def load_model_from_ckpt_dir_path(
     else:
         state_dict = ckpt["state"]["model"]
     _replace_in_state_dict_if_present(state_dict, "_orig_mod.")  # for compiled models
+    torch.nn.modules.utils.consume_prefix_in_state_dict_if_present(state_dict, "module.")
     torch.nn.modules.utils.consume_prefix_in_state_dict_if_present(state_dict, "model.")
+    torch.nn.modules.utils.consume_prefix_in_state_dict_if_present(state_dict, "_fsdp_wrapped_module.")
+
+    print(f"Saving extracted weights to {weights_only_path}")
+    torch.save(state_dict, weights_only_path)
+
     model.load_state_dict(state_dict, strict=False)
+
+    del ckpt
+    del state_dict
+    gc.collect()
+
+    model.to(device)
 
     return model
 

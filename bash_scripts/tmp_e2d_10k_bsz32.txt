@@ -1,0 +1,2070 @@
+Logging into W&B as 'hankun2004-purdue-university'.
+[33m⚠️  Warning: 'huggingface-cli login' is deprecated. Use 'hf auth login' instead.[0m
+HuggingFace cache set to '/home/hankun/e2d/.hf_cache'.
+cuda:0
+[CNNDailyMailDataset] Length filter (test): 6613/11490 samples passed (source < 922 tokens, target < 102 tokens)
+Loading cached weights-only checkpoint from: /data/shared_data/hankun/outputs/cnn_block4_lr1e-5_bsz32_warm15ba_enc28_dec2_hidden2048_inter6144_e2d_20260305_055229/checkpoints/best-rank0_ema_weights_only.pt
+Num. params: 1.7B
+Num. trainable params: 1.7B
+
+============================================================
+[DEBUG] Generation started
+============================================================
+[INPUT] Prompt: <|endoftext|>Summarize the following article: (CNN)The Palestinian Authority officially became the 123rd member of the International Criminal Court on Wednesday, a step that gives the court jurisdiction over alleged crimes in Palestinian territories. The formal accession was marked with a ceremony at The Hague, in the Netherlands, where the court is based. The Palestinians signed the ICC's founding Rome Statute in January, when they also accepted its jurisdiction over alleged crimes committed "in the occupied Palestinian territory, including East Jerusalem, since June 13, 2014." Later that month, the ICC opened a preliminary examination into the situation in Palestinian territories, paving the way for possible war crimes investigations against Israelis. As members of the court, Palestinians may be subject to counter-charges as well. Israel and the United States, neither of which is an ICC member, opposed the Palestinians' efforts to join the body. But Palestinian Foreign Minister Riad al-Malki, speaking at Wednesday's ceremony, said it was a move toward greater justice. "As Palestine formally becomes a State Party to the Rome Statute today, the world is also a step closer to ending a long era of impunity and injustice," he said, according to an ICC news release. "Indeed, today brings us closer to our shared goals of justice and peace." Judge Kuniko Ozaki, a vice president of the ICC, said acceding to the treaty was just the first step for the Palestinians. "As the Rome Statute today enters into force for the State of Palestine, Palestine acquires all the rights as well as responsibilities that come with being a State Party to the Statute. These are substantive commitments, which cannot be taken lightly," she said. Rights group Human Rights Watch welcomed the development. "Governments seeking to penalize Palestine for joining the ICC should immediately end their pressure, and countries that support universal acceptance of the court's treaty should speak out to welcome its membership," said Balkees Jarrah, international justice counsel for the group. "What's objectionable is the attempts to undermine international justice, not Palestine's decision to join a treaty to which over 100 countries around the world are members." In January, when the preliminary ICC examination was opened, Israeli Prime Minister Benjamin Netanyahu described it as an outrage, saying the court was overstepping its boundaries. The United States also said it "strongly" disagreed with the court's decision. "As we have said repeatedly, we do not believe that Palestine is a state and therefore we do not believe that it is eligible to join the ICC," the State Department said in a statement. It urged the warring sides to resolve their differences through direct negotiations. "We will continue to oppose actions against Israel at the ICC as counterproductive to the cause of peace," it said. But the ICC begs to differ with the definition of a state for its purposes and refers to the territories as "Palestine." While a preliminary examination is not a formal investigation, it allows the court to review evidence and determine whether to investigate suspects on both sides. Prosecutor Fatou Bensouda said her office would "conduct its analysis in full independence and impartiality." The war between Israel and Hamas militants in Gaza last summer left more than 2,000 people dead. The inquiry will include alleged war crimes committed since June. The International Criminal Court was set up in 2002 to prosecute genocide, crimes against humanity and war crimes. CNN's Vasco Cotovio, Kareem Khadder and Faith Karimi contributed to this report.<|endoftext|>Summary:
+[CONFIG] max_new_tokens=256
+[CONFIG] conf_seg=True, track_acc_rate=False, tree_attn=True
+============================================================
+
+[DRAFT] Input Token: ':' at position 723
+[DRAFT] Step 0: token=' Palestinian' (conf=0.445)
+[DRAFT]   -> Tree candidates at step 0: [' Palestinians', ' Israeli', ' Israel', ' The', ' Official', ' U', ' "', ' ', ' International']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' Palestinian'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' Palestinian' vs verified=' The' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' The'
+[TREE BRANCH]   Correction (next) token: ' Palestinians'
+
+[PROGRESS] Generated so far (2 tokens): ' The Palestinians'
+============================================================
+
+[DRAFT] Input Token: ' Palestinians' at position 725
+[DRAFT] Step 0: token=',' (conf=0.089)
+[DRAFT]   -> Tree candidates at step 0: [' is', ' has', "'s", ' will', ' have', ' are', ':', ' says', ' also']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ','
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=',' vs verified=' are' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' are'
+[TREE BRANCH]   Correction (next) token: ' the'
+
+[PROGRESS] Generated so far (4 tokens): ' The Palestinians are the'
+============================================================
+
+[DRAFT] Input Token: ' the' at position 727
+[DRAFT] Step 0: token=' member' (conf=0.244)
+[DRAFT]   -> Tree candidates at step 0: [' membership', ' members', ' ', ' country', ' ruling', ' new', ' first', ' the', ' second']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' member'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' member' vs verified=' ' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' '
+[TREE BRANCH]   Correction (next) token: '1'
+
+[PROGRESS] Generated so far (6 tokens): ' The Palestinians are the 1'
+============================================================
+
+[DRAFT] Input Token: '1' at position 729
+[DRAFT] Step 0: token='3' (conf=0.464)
+[DRAFT]   -> Tree candidates at step 0: ['2', 'rd', '1', '4', '5', '6', '9', '0', '7']
+
+[DRAFT COMPLETE] Drafted 1 tokens: '3'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted='3' vs verified='2' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: '2'
+[TREE BRANCH]   Correction (next) token: '3'
+
+[PROGRESS] Generated so far (8 tokens): ' The Palestinians are the 123'
+============================================================
+
+[DRAFT] Input Token: '3' at position 731
+[DRAFT] Step 0: token='rd' (conf=0.988)
+[DRAFT] Input Token: 'rd' at position 732
+[DRAFT] Step 1: token=' member' (conf=0.442)
+[DRAFT]   -> Tree candidates at step 1: [' members', 'member', 'rd', ' Member', 'members', 'd', '-member', ' membership', 'ister']
+
+[DRAFT COMPLETE] Drafted 2 tokens: 'rd member'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 2 drafted tokens...
+[VERIFY]   Position 0: drafted='rd' vs verified='rd' [✓]
+[VERIFY]   Position 1: drafted=' member' vs verified=' member' [✓]
+[VERIFY] Accepted 2/2 tokens
+[GREEDY PATH] Accepted 2 tokens, correction token: ' of'
+
+[PROGRESS] Generated so far (11 tokens): ' The Palestinians are the 123rd member of'
+============================================================
+
+[DRAFT] Input Token: ' of' at position 734
+[DRAFT] Step 0: token=' the' (conf=0.443)
+[DRAFT]   -> Tree candidates at step 0: [' International', ' international', ' ICC', ' court', ' Criminal', ' member', ' members', ' criminal', ' of']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' the'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' the' vs verified=' the' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' International'
+
+[PROGRESS] Generated so far (13 tokens): ' The Palestinians are the 123rd member of the International'
+============================================================
+
+[DRAFT] Input Token: ' International' at position 736
+[DRAFT] Step 0: token=' Criminal' (conf=0.985)
+[DRAFT] Input Token: ' Criminal' at position 737
+[DRAFT] Step 1: token=' Court' (conf=0.791)
+[DRAFT]   -> Tree candidates at step 1: [' court', ' Courts', ' courts', 'Court']
+[DRAFT] Input Token: ' Court' at position 738
+[DRAFT] Step 2: token=' .
+' (conf=0.711)
+[DRAFT]   -> Tree candidates at step 2: [' .', ' is', ',', ' in']
+[DRAFT] Input Token: ' .
+' at position 739
+[DRAFT] Step 3: token='Pale' (conf=0.754)
+[DRAFT]   -> Tree candidates at step 3: ['Israel', 'The', 'Israeli', 'U']
+[DRAFT] Input Token: 'Pale' at position 740
+[DRAFT] Step 4: token=' is' (conf=0.062)
+[DRAFT]   -> Tree candidates at step 4: ["'s", 'ics', ' has', ':', ',', 'ers', ' says', ' will', 'ists']
+
+[DRAFT COMPLETE] Drafted 5 tokens: ' Criminal Court .
+Pale is'
+[DRAFT TREE] 21 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 5 drafted tokens...
+[VERIFY]   Position 0: drafted=' Criminal' vs verified=' Criminal' [✓]
+[VERIFY]   Position 1: drafted=' Court' vs verified=' Court' [✓]
+[VERIFY]   Position 2: drafted=' .
+' vs verified=' .
+' [✓]
+[VERIFY]   Position 3: drafted='Pale' vs verified='The' [✗]
+[VERIFY]   Position 4: drafted=' is' vs verified='stin' [✗]
+[VERIFY] Accepted 3/5 tokens
+[TREE BRANCH] Switched to tree branch at position 3!
+[TREE BRANCH]   Branch token: 'The'
+[TREE BRANCH]   Correction (next) token: ' court'
+
+[PROGRESS] Generated so far (18 tokens): ' The Palestinians are the 123rd member of the International Criminal Court .
+The court'
+============================================================
+
+[DRAFT] Input Token: ' court' at position 741
+[DRAFT] Step 0: token=' is' (conf=0.101)
+[DRAFT]   -> Tree candidates at step 0: [' has', ' will', ' was', ' rejects', "'s", ',', ' have', ' says', ' in']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' is'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' is' vs verified=' has' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' has'
+[TREE BRANCH]   Correction (next) token: ' jurisdiction'
+
+[PROGRESS] Generated so far (20 tokens): ' The Palestinians are the 123rd member of the International Criminal Court .
+The court has jurisdiction'
+============================================================
+
+[DRAFT] Input Token: ' jurisdiction' at position 743
+[DRAFT] Step 0: token=' to' (conf=0.198)
+[DRAFT]   -> Tree candidates at step 0: [' by', ' in', ' for', ' of', ' is', ' with', ' the', ' on', ' that']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' to'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' to' vs verified=' over' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: ' over'
+
+[PROGRESS] Generated so far (21 tokens): ' The Palestinians are the 123rd member of the International Criminal Court .
+The court has jurisdiction over'
+============================================================
+
+[DRAFT] Input Token: ' over' at position 744
+[DRAFT] Step 0: token=' crimes' (conf=0.201)
+[DRAFT]   -> Tree candidates at step 0: [' alleged', ' allegations', ' allegation', ' Palestinian', 'als', ' accused', ' the', ' al', 'crime']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' crimes'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' crimes' vs verified=' alleged' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' alleged'
+[TREE BRANCH]   Correction (next) token: ' crimes'
+
+[PROGRESS] Generated so far (23 tokens): ' The Palestinians are the 123rd member of the International Criminal Court .
+The court has jurisdiction over alleged crimes'
+============================================================
+
+[DRAFT] Input Token: ' crimes' at position 746
+[DRAFT] Step 0: token=' in' (conf=0.533)
+[DRAFT]   -> Tree candidates at step 0: [',', ' are', ' against', ' on']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' in'
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' in' vs verified=' in' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' Palestinian'
+
+[PROGRESS] Generated so far (25 tokens): ' The Palestinians are the 123rd member of the International Criminal Court .
+The court has jurisdiction over alleged crimes in Palestinian'
+============================================================
+
+[DRAFT] Input Token: ' Palestinian' at position 748
+[DRAFT] Step 0: token=' territories' (conf=0.780)
+[DRAFT]   -> Tree candidates at step 0: [' territory', ' Territories', ' territorial', ' Territory']
+[DRAFT] Input Token: ' territories' at position 749
+[DRAFT] Step 1: token=' .
+' (conf=0.394)
+[DRAFT]   -> Tree candidates at step 1: [',', ' .', ' in', ' was', ' were', ' is', ' on', ' that', '"']
+
+[DRAFT COMPLETE] Drafted 2 tokens: ' territories .
+'
+[DRAFT TREE] 13 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 2 drafted tokens...
+[VERIFY]   Position 0: drafted=' territories' vs verified=' territories' [✓]
+[VERIFY]   Position 1: drafted=' .
+' vs verified=' .
+' [✓]
+[VERIFY] Accepted 2/2 tokens
+[GREEDY PATH] Accepted 2 tokens, correction token: 'Israel'
+
+[PROGRESS] Generated so far (28 tokens): ' The Palestinians are the 123rd member of the International Criminal Court .
+The court has jurisdiction over alleged crimes in Palestinian territories .
+Israel'
+============================================================
+
+[DRAFT] Input Token: 'Israel' at position 751
+[DRAFT] Step 0: token=' is' (conf=0.128)
+[DRAFT]   -> Tree candidates at step 0: [' has', ' says', "'s", ',', ' have', ' will', ' are', ':', ' could']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' is'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' is' vs verified=' and' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: ' and'
+
+[PROGRESS] Generated so far (29 tokens): ' The Palestinians are the 123rd member of the International Criminal Court .
+The court has jurisdiction over alleged crimes in Palestinian territories .
+Israel and'
+============================================================
+
+[DRAFT] Input Token: ' and' at position 752
+[DRAFT] Step 0: token=' the' (conf=0.245)
+[DRAFT]   -> Tree candidates at step 0: [' opposition', ' United', ' U', ' Opposition', ' oppose', ' has', ' opposes', ' opposed', ' is']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' the'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' the' vs verified=' the' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' United'
+
+[PROGRESS] Generated so far (31 tokens): ' The Palestinians are the 123rd member of the International Criminal Court .
+The court has jurisdiction over alleged crimes in Palestinian territories .
+Israel and the United'
+============================================================
+
+[DRAFT] Input Token: ' United' at position 754
+[DRAFT] Step 0: token=' States' (conf=0.993)
+[DRAFT] Input Token: ' States' at position 755
+[DRAFT] Step 1: token=' United' (conf=0.397)
+[DRAFT]   -> Tree candidates at step 1: [' the', ' U', ' oppose', ' are', ',', ' have', ' opposition', ' opposed', ' has']
+
+[DRAFT COMPLETE] Drafted 2 tokens: ' States United'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 2 drafted tokens...
+[VERIFY]   Position 0: drafted=' States' vs verified=' States' [✓]
+[VERIFY]   Position 1: drafted=' United' vs verified=' have' [✗]
+[VERIFY] Accepted 1/2 tokens
+[TREE BRANCH] Switched to tree branch at position 1!
+[TREE BRANCH]   Branch token: ' have'
+[TREE BRANCH]   Correction (next) token: ' opposed'
+
+[PROGRESS] Generated so far (34 tokens): ' The Palestinians are the 123rd member of the International Criminal Court .
+The court has jurisdiction over alleged crimes in Palestinian territories .
+Israel and the United States have opposed'
+============================================================
+
+[DRAFT] Input Token: ' opposed' at position 757
+[DRAFT] Step 0: token=' the' (conf=0.218)
+[DRAFT]   -> Tree candidates at step 0: [' Palestinian', ' to', ' member', ' members', ' Palestinians', ' Israel', ' opposition', ' Israeli', ' against']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' the'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' the' vs verified=' the' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' Palestinians'
+
+[PROGRESS] Generated so far (36 tokens): ' The Palestinians are the 123rd member of the International Criminal Court .
+The court has jurisdiction over alleged crimes in Palestinian territories .
+Israel and the United States have opposed the Palestinians'
+============================================================
+
+[DRAFT] Input Token: ' Palestinians' at position 759
+[DRAFT] Step 0: token=''s' (conf=0.220)
+[DRAFT]   -> Tree candidates at step 0: [',', ' .', ' members', ' .\n', ' are', ' to', ' will', ' would', ' is']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ''s'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=''s' vs verified=''' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: '''
+
+[PROGRESS] Generated so far (37 tokens): ' The Palestinians are the 123rd member of the International Criminal Court .
+The court has jurisdiction over alleged crimes in Palestinian territories .
+Israel and the United States have opposed the Palestinians''
+============================================================
+
+[DRAFT] Input Token: ''' at position 760
+[DRAFT] Step 0: token=' members' (conf=0.301)
+[DRAFT]   -> Tree candidates at step 0: [' membership', ' joining', ' to', ' joint', '<|endoftext|>', ' member', ' this', ' join', ' Jo']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' members'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' members' vs verified=' efforts' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: ' efforts'
+
+[PROGRESS] Generated so far (38 tokens): ' The Palestinians are the 123rd member of the International Criminal Court .
+The court has jurisdiction over alleged crimes in Palestinian territories .
+Israel and the United States have opposed the Palestinians' efforts'
+============================================================
+
+[DRAFT] Input Token: ' efforts' at position 761
+[DRAFT] Step 0: token=' to' (conf=0.423)
+[DRAFT]   -> Tree candidates at step 0: [' .', ' .\n', ' in', ' from', ' by', ' for', ' as', ',', ' on']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' to'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' to' vs verified=' to' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' join'
+
+[PROGRESS] Generated so far (40 tokens): ' The Palestinians are the 123rd member of the International Criminal Court .
+The court has jurisdiction over alleged crimes in Palestinian territories .
+Israel and the United States have opposed the Palestinians' efforts to join'
+============================================================
+
+[DRAFT] Input Token: ' join' at position 763
+[DRAFT] Step 0: token=' .' (conf=0.422)
+[DRAFT]   -> Tree candidates at step 0: [' the', ' .\n', ' members', ' this', ' membership', ' it', ' member', ' in', ' a']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' .'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' .' vs verified=' the' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' the'
+[TREE BRANCH]   Correction (next) token: ' body'
+
+[PROGRESS] Generated so far (42 tokens): ' The Palestinians are the 123rd member of the International Criminal Court .
+The court has jurisdiction over alleged crimes in Palestinian territories .
+Israel and the United States have opposed the Palestinians' efforts to join the body'
+============================================================
+
+[DRAFT] Input Token: ' body' at position 765
+[DRAFT] Step 0: token=' .' (conf=0.623)
+[DRAFT]   -> Tree candidates at step 0: [' .\n', ',', ' in', ' is']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' .'
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' .' vs verified=' .' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: '<|endoftext|>'
+
+============================================================
+[DEBUG] E2D.generate() completed
+============================================================
+[FINAL OUTPUT]: ' The Palestinians are the 123rd member of the International Criminal Court .
+The court has jurisdiction over alleged crimes in Palestinian territories .
+Israel and the United States have opposed the Palestinians' efforts to join the body .<|endoftext|>'
+[STATS] Total forward passes: 28
+[STATS] Total accepted tokens: 23
+[STATS] Acceptance rate: 82.14%
+============================================================
+
+Input: <|endoftext|>Summarize the following article: (CNN)The Palestinian Authority officially became the 123rd member of the International Criminal Court on Wednesday, a step that gives the court jurisdiction over alleged crimes in Palestinian territories. The formal accession was marked with a ceremony at The Hague, in the Netherlands, where the court is based. The Palestinians signed the ICC's founding Rome Statute in January, when they also accepted its jurisdiction over alleged crimes committed "in the occupied Palestinian territory, including East Jerusalem, since June 13, 2014." Later that month, the ICC opened a preliminary examination into the situation in Palestinian territories, paving the way for possible war crimes investigations against Israelis. As members of the court, Palestinians may be subject to counter-charges as well. Israel and the United States, neither of which is an ICC member, opposed the Palestinians' efforts to join the body. But Palestinian Foreign Minister Riad al-Malki, speaking at Wednesday's ceremony, said it was a move toward greater justice. "As Palestine formally becomes a State Party to the Rome Statute today, the world is also a step closer to ending a long era of impunity and injustice," he said, according to an ICC news release. "Indeed, today brings us closer to our shared goals of justice and peace." Judge Kuniko Ozaki, a vice president of the ICC, said acceding to the treaty was just the first step for the Palestinians. "As the Rome Statute today enters into force for the State of Palestine, Palestine acquires all the rights as well as responsibilities that come with being a State Party to the Statute. These are substantive commitments, which cannot be taken lightly," she said. Rights group Human Rights Watch welcomed the development. "Governments seeking to penalize Palestine for joining the ICC should immediately end their pressure, and countries that support universal acceptance of the court's treaty should speak out to welcome its membership," said Balkees Jarrah, international justice counsel for the group. "What's objectionable is the attempts to undermine international justice, not Palestine's decision to join a treaty to which over 100 countries around the world are members." In January, when the preliminary ICC examination was opened, Israeli Prime Minister Benjamin Netanyahu described it as an outrage, saying the court was overstepping its boundaries. The United States also said it "strongly" disagreed with the court's decision. "As we have said repeatedly, we do not believe that Palestine is a state and therefore we do not believe that it is eligible to join the ICC," the State Department said in a statement. It urged the warring sides to resolve their differences through direct negotiations. "We will continue to oppose actions against Israel at the ICC as counterproductive to the cause of peace," it said. But the ICC begs to differ with the definition of a state for its purposes and refers to the territories as "Palestine." While a preliminary examination is not a formal investigation, it allows the court to review evidence and determine whether to investigate suspects on both sides. Prosecutor Fatou Bensouda said her office would "conduct its analysis in full independence and impartiality." The war between Israel and Hamas militants in Gaza last summer left more than 2,000 people dead. The inquiry will include alleged war crimes committed since June. The International Criminal Court was set up in 2002 to prosecute genocide, crimes against humanity and war crimes. CNN's Vasco Cotovio, Kareem Khadder and Faith Karimi contributed to this report.<|endoftext|>Summary:
+Output: The Palestinians are the 123rd member of the International Criminal Court.
+The court has jurisdiction over alleged crimes in Palestinian territories.
+Israel and the United States have opposed the Palestinians' efforts to join the body.
+
+============================================================
+[DEBUG] Generation started
+============================================================
+[INPUT] Prompt: <|endoftext|>Summarize the following article: (CNN)Never mind cats having nine lives. A stray pooch in Washington State has used up at least three of her own after being hit by a car, apparently whacked on the head with a hammer in a misguided mercy killing and then buried in a field -- only to survive. That's according to Washington State University, where the dog -- a friendly white-and-black bully breed mix now named Theia -- has been receiving care at the Veterinary Teaching Hospital. Four days after her apparent death, the dog managed to stagger to a nearby farm, dirt-covered and emaciated, where she was found by a worker who took her to a vet for help. She was taken in by Moses Lake, Washington, resident Sara Mellado. "Considering everything that she's been through, she's incredibly gentle and loving," Mellado said, according to WSU News. "She's a true miracle dog and she deserves a good life." Theia is only one year old but the dog's brush with death did not leave her unscathed. She suffered a dislocated jaw, leg injuries and a caved-in sinus cavity -- and still requires surgery to help her breathe. The veterinary hospital's Good Samaritan Fund committee awarded some money to help pay for the dog's treatment, but Mellado has set up a fundraising page to help meet the remaining cost of the dog's care. She's also created a Facebook page to keep supporters updated. Donors have already surpassed the $10,000 target, inspired by Theia's tale of survival against the odds. On the fundraising page, Mellado writes, "She is in desperate need of extensive medical procedures to fix her nasal damage and reset her jaw. I agreed to foster her until she finally found a loving home." She is dedicated to making sure Theia gets the medical attention she needs, Mellado adds, and wants to "make sure she gets placed in a family where this will never happen to her again!" Any additional funds raised will be "paid forward" to help other animals. Theia is not the only animal to apparently rise from the grave in recent weeks. A cat in Tampa, Florida, found seemingly dead after he was hit by a car in January, showed up alive in a neighbor's yard five days after he was buried by his owner. The cat was in bad shape, with maggots covering open wounds on his body and a ruined left eye, but remarkably survived with the help of treatment from the Humane Society.<|endoftext|>Summary:
+[CONFIG] max_new_tokens=256
+[CONFIG] conf_seg=True, track_acc_rate=False, tree_attn=True
+============================================================
+
+[DRAFT] Input Token: ':' at position 516
+[DRAFT] Step 0: token=' "' (conf=0.137)
+[DRAFT]   -> Tree candidates at step 0: [' Dog', ' A', ' I', ' The', ' ', ' Woman', ' W', ' She', ' Str']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' "'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' "' vs verified=' The' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' The'
+[TREE BRANCH]   Correction (next) token: 'ia'
+
+[PROGRESS] Generated so far (2 tokens): ' Theia'
+============================================================
+
+[DRAFT] Input Token: 'ia' at position 518
+[DRAFT] Step 0: token=' was' (conf=0.145)
+[DRAFT]   -> Tree candidates at step 0: ["'s", ' is', ' has', ',', ' "', ' had', ' will', ' have', ' are']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' was'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' was' vs verified=',' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ','
+[TREE BRANCH]   Correction (next) token: ' a'
+
+[PROGRESS] Generated so far (4 tokens): ' Theia, a'
+============================================================
+
+[DRAFT] Input Token: ' a' at position 520
+[DRAFT] Step 0: token=' ' (conf=0.284)
+[DRAFT]   -> Tree candidates at step 0: [' white', ' "', ' dog', ' mixed', ' White', ' woman', ' bully', ' hospitalized', ' year']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' '
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' ' vs verified=' white' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' white'
+[TREE BRANCH]   Correction (next) token: '-and'
+
+[PROGRESS] Generated so far (6 tokens): ' Theia, a white-and'
+============================================================
+
+[DRAFT] Input Token: '-and' at position 522
+[DRAFT] Step 0: token=' black' (conf=0.354)
+[DRAFT]   -> Tree candidates at step 0: [' and', ' Black', ' bull', ',', ' Bull', '-', '-black', ' dog', ' blacks']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' black'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' black' vs verified='-black' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: '-black'
+[TREE BRANCH]   Correction (next) token: ' bully'
+
+[PROGRESS] Generated so far (8 tokens): ' Theia, a white-and-black bully'
+============================================================
+
+[DRAFT] Input Token: ' bully' at position 524
+[DRAFT] Step 0: token=' mix' (conf=0.272)
+[DRAFT]   -> Tree candidates at step 0: [' mixed', ' breed', ' breeds', ' bred', ' Breed', ' Mix', ' mixes', ',', ' breeding']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' mix'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' mix' vs verified=' breed' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' breed'
+[TREE BRANCH]   Correction (next) token: ' mix'
+
+[PROGRESS] Generated so far (10 tokens): ' Theia, a white-and-black bully breed mix'
+============================================================
+
+[DRAFT] Input Token: ' mix' at position 526
+[DRAFT] Step 0: token=' was' (conf=0.236)
+[DRAFT]   -> Tree candidates at step 0: [' is', ',', ' will', ' of', ' has', ' died', ' with', ' in', ' and']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' was'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' was' vs verified=',' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ','
+[TREE BRANCH]   Correction (next) token: ' was'
+
+[PROGRESS] Generated so far (12 tokens): ' Theia, a white-and-black bully breed mix, was'
+============================================================
+
+[DRAFT] Input Token: ' was' at position 528
+[DRAFT] Step 0: token=' a' (conf=0.068)
+[DRAFT]   -> Tree candidates at step 0: [' struck', ' found', ' in', ' one', ' saved', ' "', ' the', ' killed', ' survived']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' a'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' a' vs verified=' hit' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: ' hit'
+
+[PROGRESS] Generated so far (13 tokens): ' Theia, a white-and-black bully breed mix, was hit'
+============================================================
+
+[DRAFT] Input Token: ' hit' at position 529
+[DRAFT] Step 0: token=' with' (conf=0.202)
+[DRAFT]   -> Tree candidates at step 0: [' in', ' by', ' the', ' on', ' at', ' a', ' from', ' to', ' for']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' with'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' with' vs verified=' by' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' by'
+[TREE BRANCH]   Correction (next) token: ' a'
+
+[PROGRESS] Generated so far (15 tokens): ' Theia, a white-and-black bully breed mix, was hit by a'
+============================================================
+
+[DRAFT] Input Token: ' a' at position 531
+[DRAFT] Step 0: token=' car' (conf=0.716)
+[DRAFT]   -> Tree candidates at step 0: [' hammer', ' carrier', ' hit', ' man']
+[DRAFT] Input Token: ' car' at position 532
+[DRAFT] Step 1: token=' in' (conf=0.180)
+[DRAFT]   -> Tree candidates at step 1: [',', ' and', ' hammer', ' with', ' .\n', ' on', ' was', ' after', ' a']
+
+[DRAFT COMPLETE] Drafted 2 tokens: ' car in'
+[DRAFT TREE] 13 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 2 drafted tokens...
+[VERIFY]   Position 0: drafted=' car' vs verified=' car' [✓]
+[VERIFY]   Position 1: drafted=' in' vs verified=',' [✗]
+[VERIFY] Accepted 1/2 tokens
+[TREE BRANCH] Switched to tree branch at position 1!
+[TREE BRANCH]   Branch token: ','
+[TREE BRANCH]   Correction (next) token: ' apparently'
+
+[PROGRESS] Generated so far (18 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently'
+============================================================
+
+[DRAFT] Input Token: ' apparently' at position 534
+[DRAFT] Step 0: token=' hammer' (conf=0.406)
+[DRAFT]   -> Tree candidates at step 0: [' buried', ' a', ' was', ' .\n', ' head', ' with', ' in', ' and', ' ham']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' hammer'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' hammer' vs verified=' wh' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: ' wh'
+
+[PROGRESS] Generated so far (19 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently wh'
+============================================================
+
+[DRAFT] Input Token: ' wh' at position 535
+[DRAFT] Step 0: token='acked' (conf=0.606)
+[DRAFT]   -> Tree candidates at step 0: ['aged', 'acker', 'arded', 'apped']
+
+[DRAFT COMPLETE] Drafted 1 tokens: 'acked'
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted='acked' vs verified='acked' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' on'
+
+[PROGRESS] Generated so far (21 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on'
+============================================================
+
+[DRAFT] Input Token: ' on' at position 537
+[DRAFT] Step 0: token=' head' (conf=0.626)
+[DRAFT]   -> Tree candidates at step 0: [' the', ' hammer', ' her', ' a']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' head'
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' head' vs verified=' the' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' the'
+[TREE BRANCH]   Correction (next) token: ' head'
+
+[PROGRESS] Generated so far (23 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head'
+============================================================
+
+[DRAFT] Input Token: ' head' at position 539
+[DRAFT] Step 0: token=' .
+' (conf=0.690)
+[DRAFT]   -> Tree candidates at step 0: [' with', ' in', ' on', ' and']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' .
+'
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' .
+' vs verified=' with' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' with'
+[TREE BRANCH]   Correction (next) token: ' a'
+
+[PROGRESS] Generated so far (25 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a'
+============================================================
+
+[DRAFT] Input Token: ' a' at position 541
+[DRAFT] Step 0: token=' hammer' (conf=0.995)
+[DRAFT] Input Token: ' hammer' at position 542
+[DRAFT] Step 1: token=' .
+' (conf=0.911)
+[DRAFT]   -> Tree candidates at step 1: [' in', ' a']
+[DRAFT] Input Token: ' .
+' at position 543
+[DRAFT] Step 2: token='The' (conf=0.177)
+[DRAFT]   -> Tree candidates at step 2: ['She', 'A', 'Washington', 'Str', 'In', 'Is', 'P', 'His', 'He']
+
+[DRAFT COMPLETE] Drafted 3 tokens: ' hammer .
+The'
+[DRAFT TREE] 11 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 3 drafted tokens...
+[VERIFY]   Position 0: drafted=' hammer' vs verified=' hammer' [✓]
+[VERIFY]   Position 1: drafted=' .
+' vs verified=' .
+' [✓]
+[VERIFY]   Position 2: drafted='The' vs verified='She' [✗]
+[VERIFY] Accepted 2/3 tokens
+[TREE BRANCH] Switched to tree branch at position 2!
+[TREE BRANCH]   Branch token: 'She'
+[TREE BRANCH]   Correction (next) token: ' was'
+
+[PROGRESS] Generated so far (29 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was'
+============================================================
+
+[DRAFT] Input Token: ' was' at position 545
+[DRAFT] Step 0: token=' buried' (conf=0.371)
+[DRAFT]   -> Tree candidates at step 0: [' a', ' able', ' been', ' was', ' survived', ' stranded', ' saved', ' had', ' in']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' buried'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' buried' vs verified=' buried' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' in'
+
+[PROGRESS] Generated so far (31 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in'
+============================================================
+
+[DRAFT] Input Token: ' in' at position 547
+[DRAFT] Step 0: token=' the' (conf=0.350)
+[DRAFT]   -> Tree candidates at step 0: [' a', ' field', ' farm', ' in', ' one', ' about', ' an', ' his', ' ']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' the'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' the' vs verified=' a' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' a'
+[TREE BRANCH]   Correction (next) token: ' field'
+
+[PROGRESS] Generated so far (33 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field'
+============================================================
+
+[DRAFT] Input Token: ' field' at position 549
+[DRAFT] Step 0: token=',' (conf=0.172)
+[DRAFT]   -> Tree candidates at step 0: [' field', ' in', ' for', ' filed', ' and', ' after', ' at', ' had', ' with']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ','
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=',' vs verified=',' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' but'
+
+[PROGRESS] Generated so far (35 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but'
+============================================================
+
+[DRAFT] Input Token: ' but' at position 551
+[DRAFT] Step 0: token=' had' (conf=0.067)
+[DRAFT]   -> Tree candidates at step 0: [' survived', ' was', ' have', ' is', ' she', ' died', ' to', ' no', ' stranded']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' had'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' had' vs verified=' managed' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: ' managed'
+
+[PROGRESS] Generated so far (36 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed'
+============================================================
+
+[DRAFT] Input Token: ' managed' at position 552
+[DRAFT] Step 0: token=' to' (conf=0.352)
+[DRAFT]   -> Tree candidates at step 0: [' after', ' the', ' in', ' with', ' for', ' by', ' from', ' at', ' her']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' to'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' to' vs verified=' to' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' stagger'
+
+[PROGRESS] Generated so far (38 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger'
+============================================================
+
+[DRAFT] Input Token: ' stagger' at position 554
+[DRAFT] Step 0: token=' to' (conf=0.614)
+[DRAFT]   -> Tree candidates at step 0: [' from', ' at', ' by', ' in']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' to'
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' to' vs verified=' to' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' a'
+
+[PROGRESS] Generated so far (40 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a'
+============================================================
+
+[DRAFT] Input Token: ' a' at position 556
+[DRAFT] Step 0: token=' farm' (conf=0.617)
+[DRAFT]   -> Tree candidates at step 0: [' nearby', ' home', ' far', ' a']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' farm'
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' farm' vs verified=' nearby' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' nearby'
+[TREE BRANCH]   Correction (next) token: ' farm'
+
+[PROGRESS] Generated so far (42 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm'
+============================================================
+
+[DRAFT] Input Token: ' farm' at position 558
+[DRAFT] Step 0: token=',' (conf=0.148)
+[DRAFT]   -> Tree candidates at step 0: [' .\n', ' in', ' and', ' for', ' from', ' with', ' .', ' to', ' was']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ','
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=',' vs verified=',' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' where'
+
+[PROGRESS] Generated so far (44 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where'
+============================================================
+
+[DRAFT] Input Token: ' where' at position 560
+[DRAFT] Step 0: token=' she' (conf=0.269)
+[DRAFT]   -> Tree candidates at step 0: [' her', ' the', ' he', ' dead', ' a', ' they', ' it', ' died', ' had']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' she'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' she' vs verified=' she' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' was'
+
+[PROGRESS] Generated so far (46 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was'
+============================================================
+
+[DRAFT] Input Token: ' was' at position 562
+[DRAFT] Step 0: token=' found' (conf=0.193)
+[DRAFT]   -> Tree candidates at step 0: [' been', ' a', ' saved', ' restored', ' buried', ' was', ' at', ' now', ' working']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' found'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' found' vs verified=' found' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' by'
+
+[PROGRESS] Generated so far (48 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by'
+============================================================
+
+[DRAFT] Input Token: ' by' at position 564
+[DRAFT] Step 0: token=' the' (conf=0.117)
+[DRAFT]   -> Tree candidates at step 0: [' a', ' worker', ' ', ' st', ' dog', ' death', ' car', ' about', ' his']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' the'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' the' vs verified=' a' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' a'
+[TREE BRANCH]   Correction (next) token: ' worker'
+
+[PROGRESS] Generated so far (50 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker'
+============================================================
+
+[DRAFT] Input Token: ' worker' at position 566
+[DRAFT] Step 0: token=' .
+' (conf=0.516)
+[DRAFT]   -> Tree candidates at step 0: [' .', "'s", ' was', ' to']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' .
+'
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' .
+' vs verified=' .
+' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: 'She'
+
+[PROGRESS] Generated so far (52 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker .
+She'
+============================================================
+
+[DRAFT] Input Token: 'She' at position 568
+[DRAFT] Step 0: token=' has' (conf=0.151)
+[DRAFT]   -> Tree candidates at step 0: [' was', ' is', ' had', "'s", ' have', ' will', ' found', ' took', ' says']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' has'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' has' vs verified=' was' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' was'
+[TREE BRANCH]   Correction (next) token: ' taken'
+
+[PROGRESS] Generated so far (54 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker .
+She was taken'
+============================================================
+
+[DRAFT] Input Token: ' taken' at position 570
+[DRAFT] Step 0: token=' to' (conf=0.362)
+[DRAFT]   -> Tree candidates at step 0: [' in', ' for', ' the', ' as', ' with', ' from', ' at', ' about', ' a']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' to'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' to' vs verified=' in' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' in'
+[TREE BRANCH]   Correction (next) token: ' by'
+
+[PROGRESS] Generated so far (56 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker .
+She was taken in by'
+============================================================
+
+[DRAFT] Input Token: ' by' at position 572
+[DRAFT] Step 0: token=' a' (conf=0.161)
+[DRAFT]   -> Tree candidates at step 0: [' the', ' Sara', ' resident', ' residents', ' S', ' Sarah', ' his', ' U', ' Los']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' a'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' a' vs verified=' a' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' resident'
+
+[PROGRESS] Generated so far (58 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker .
+She was taken in by a resident'
+============================================================
+
+[DRAFT] Input Token: ' resident' at position 574
+[DRAFT] Step 0: token=' Sara' (conf=0.314)
+[DRAFT]   -> Tree candidates at step 0: [' Sarah', ' Laura', ',', ' Susan', ' S', "'s", ' in', ' M', ' and']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' Sara'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' Sara' vs verified=' of' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: ' of'
+
+[PROGRESS] Generated so far (59 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker .
+She was taken in by a resident of'
+============================================================
+
+[DRAFT] Input Token: ' of' at position 575
+[DRAFT] Step 0: token=' Sara' (conf=0.135)
+[DRAFT]   -> Tree candidates at step 0: [' the', ' dog', ' Sarah', ' "', ' a', ' woman', ' S', ' she', ' Washington']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' Sara'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' Sara' vs verified=' Washington' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' Washington'
+[TREE BRANCH]   Correction (next) token: ' State'
+
+[PROGRESS] Generated so far (61 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker .
+She was taken in by a resident of Washington State'
+============================================================
+
+[DRAFT] Input Token: ' State' at position 577
+[DRAFT] Step 0: token=',' (conf=0.542)
+[DRAFT]   -> Tree candidates at step 0: [' and', ' D', ' dog', ';']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ','
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=',' vs verified=',' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' who'
+
+[PROGRESS] Generated so far (63 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker .
+She was taken in by a resident of Washington State, who'
+============================================================
+
+[DRAFT] Input Token: ' who' at position 579
+[DRAFT] Step 0: token=' is' (conf=0.111)
+[DRAFT]   -> Tree candidates at step 0: [' are', ' was', ' have', ' has', ' had', ' were', ' fell', ' she', '...']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' is'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' is' vs verified=' has' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' has'
+[TREE BRANCH]   Correction (next) token: ' set'
+
+[PROGRESS] Generated so far (65 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker .
+She was taken in by a resident of Washington State, who has set'
+============================================================
+
+[DRAFT] Input Token: ' set' at position 581
+[DRAFT] Step 0: token=' up' (conf=0.412)
+[DRAFT]   -> Tree candidates at step 0: [' to', ' off', ' the', ' at', ' on', ' a', ' for', ' with', ' as']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' up'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' up' vs verified=' up' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' a'
+
+[PROGRESS] Generated so far (67 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker .
+She was taken in by a resident of Washington State, who has set up a'
+============================================================
+
+[DRAFT] Input Token: ' a' at position 583
+[DRAFT] Step 0: token=' fundraising' (conf=0.637)
+[DRAFT]   -> Tree candidates at step 0: [' fundraiser', ' page', ' fund', ' fundra']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' fundraising'
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' fundraising' vs verified=' fundraising' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' page'
+
+[PROGRESS] Generated so far (69 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker .
+She was taken in by a resident of Washington State, who has set up a fundraising page'
+============================================================
+
+[DRAFT] Input Token: ' page' at position 585
+[DRAFT] Step 0: token=' .' (conf=0.307)
+[DRAFT]   -> Tree candidates at step 0: [' to', ' for', ' .\n', ' on', ' page', ' in', ' about', ',', ' at']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' .'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' .' vs verified=' to' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' to'
+[TREE BRANCH]   Correction (next) token: ' help'
+
+[PROGRESS] Generated so far (71 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker .
+She was taken in by a resident of Washington State, who has set up a fundraising page to help'
+============================================================
+
+[DRAFT] Input Token: ' help' at position 587
+[DRAFT] Step 0: token=' .' (conf=0.505)
+[DRAFT]   -> Tree candidates at step 0: [' .\n', ' for', ' the', ' she']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' .'
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' .' vs verified=' pay' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: ' pay'
+
+[PROGRESS] Generated so far (72 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker .
+She was taken in by a resident of Washington State, who has set up a fundraising page to help pay'
+============================================================
+
+[DRAFT] Input Token: ' pay' at position 588
+[DRAFT] Step 0: token=' .' (conf=0.507)
+[DRAFT]   -> Tree candidates at step 0: [' the', ' .\n', ' with', ' for']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' .'
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' .' vs verified=' for' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' for'
+[TREE BRANCH]   Correction (next) token: ' her'
+
+[PROGRESS] Generated so far (74 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker .
+She was taken in by a resident of Washington State, who has set up a fundraising page to help pay for her'
+============================================================
+
+[DRAFT] Input Token: ' her' at position 590
+[DRAFT] Step 0: token=' .' (conf=0.506)
+[DRAFT]   -> Tree candidates at step 0: [' .\n', ' treatment', "'s", ' ...']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' .'
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' .' vs verified=' treatment' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' treatment'
+[TREE BRANCH]   Correction (next) token: ' .'
+
+[PROGRESS] Generated so far (76 tokens): ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker .
+She was taken in by a resident of Washington State, who has set up a fundraising page to help pay for her treatment .'
+============================================================
+
+[DRAFT] Input Token: ' .' at position 592
+[DRAFT] Step 0: token='<|endoftext|>' (conf=1.000)
+
+[DRAFT COMPLETE] Drafted 1 tokens: '<|endoftext|>'
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted='<|endoftext|>' vs verified='<|endoftext|>' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: 'Summary'
+
+============================================================
+[DEBUG] E2D.generate() completed
+============================================================
+[FINAL OUTPUT]: ' Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer .
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker .
+She was taken in by a resident of Washington State, who has set up a fundraising page to help pay for her treatment .<|endoftext|>'
+[STATS] Total forward passes: 43
+[STATS] Total accepted tokens: 38
+[STATS] Acceptance rate: 88.37%
+============================================================
+
+Input: <|endoftext|>Summarize the following article: (CNN)Never mind cats having nine lives. A stray pooch in Washington State has used up at least three of her own after being hit by a car, apparently whacked on the head with a hammer in a misguided mercy killing and then buried in a field -- only to survive. That's according to Washington State University, where the dog -- a friendly white-and-black bully breed mix now named Theia -- has been receiving care at the Veterinary Teaching Hospital. Four days after her apparent death, the dog managed to stagger to a nearby farm, dirt-covered and emaciated, where she was found by a worker who took her to a vet for help. She was taken in by Moses Lake, Washington, resident Sara Mellado. "Considering everything that she's been through, she's incredibly gentle and loving," Mellado said, according to WSU News. "She's a true miracle dog and she deserves a good life." Theia is only one year old but the dog's brush with death did not leave her unscathed. She suffered a dislocated jaw, leg injuries and a caved-in sinus cavity -- and still requires surgery to help her breathe. The veterinary hospital's Good Samaritan Fund committee awarded some money to help pay for the dog's treatment, but Mellado has set up a fundraising page to help meet the remaining cost of the dog's care. She's also created a Facebook page to keep supporters updated. Donors have already surpassed the $10,000 target, inspired by Theia's tale of survival against the odds. On the fundraising page, Mellado writes, "She is in desperate need of extensive medical procedures to fix her nasal damage and reset her jaw. I agreed to foster her until she finally found a loving home." She is dedicated to making sure Theia gets the medical attention she needs, Mellado adds, and wants to "make sure she gets placed in a family where this will never happen to her again!" Any additional funds raised will be "paid forward" to help other animals. Theia is not the only animal to apparently rise from the grave in recent weeks. A cat in Tampa, Florida, found seemingly dead after he was hit by a car in January, showed up alive in a neighbor's yard five days after he was buried by his owner. The cat was in bad shape, with maggots covering open wounds on his body and a ruined left eye, but remarkably survived with the help of treatment from the Humane Society.<|endoftext|>Summary:
+Output: Theia, a white-and-black bully breed mix, was hit by a car, apparently whacked on the head with a hammer.
+She was buried in a field, but managed to stagger to a nearby farm, where she was found by a worker.
+She was taken in by a resident of Washington State, who has set up a fundraising page to help pay for her treatment.
+
+============================================================
+[DEBUG] Generation started
+============================================================
+[INPUT] Prompt: <|endoftext|>Summarize the following article: (CNN)Five Americans who were monitored for three weeks at an Omaha, Nebraska, hospital after being exposed to Ebola in West Africa have been released, a Nebraska Medicine spokesman said in an email Wednesday. One of the five had a heart-related issue on Saturday and has been discharged but hasn't left the area, Taylor Wilson wrote. The others have already gone home. They were exposed to Ebola in Sierra Leone in March, but none developed the deadly virus. They are clinicians for Partners in Health, a Boston-based aid group. They all had contact with a colleague who was diagnosed with the disease and is being treated at the National Institutes of Health in Bethesda, Maryland. As of Monday, that health care worker is in fair condition. The Centers for Disease Control and Prevention in Atlanta has said the last of 17 patients who were being monitored are expected to be released by Thursday. More than 10,000 people have died in a West African epidemic of Ebola that dates to December 2013, according to the World Health Organization. Almost all the deaths have been in Guinea, Liberia and Sierra Leone. Ebola is spread by direct contact with the bodily fluids of an infected person.<|endoftext|>Summary:
+[CONFIG] max_new_tokens=256
+[CONFIG] conf_seg=True, track_acc_rate=False, tree_attn=True
+============================================================
+
+[DRAFT] Input Token: ':' at position 252
+[DRAFT] Step 0: token=' Americans' (conf=0.130)
+[DRAFT]   -> Tree candidates at step 0: [' Five', ' ', ' American', ' Nebraska', ' Ex', ' The', ' At', ' Washington', ' "']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' Americans'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' Americans' vs verified=' Five' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' Five'
+[TREE BRANCH]   Correction (next) token: ' Americans'
+
+[PROGRESS] Generated so far (2 tokens): ' Five Americans'
+============================================================
+
+[DRAFT] Input Token: ' Americans' at position 254
+[DRAFT] Step 0: token=' are' (conf=0.158)
+[DRAFT]   -> Tree candidates at step 0: [' were', ' reported', ' have', ' is', ' will', ' has', ' was', ',', ' who']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' are'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' are' vs verified=' who' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' who'
+[TREE BRANCH]   Correction (next) token: ' were'
+
+[PROGRESS] Generated so far (4 tokens): ' Five Americans who were'
+============================================================
+
+[DRAFT] Input Token: ' were' at position 256
+[DRAFT] Step 0: token=' exposed' (conf=0.194)
+[DRAFT]   -> Tree candidates at step 0: [' been', ' monitored', ' being', ' in', ' infected', ' involved', ' diagnosed', ' to', ' from']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' exposed'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' exposed' vs verified=' monitored' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' monitored'
+[TREE BRANCH]   Correction (next) token: ' for'
+
+[PROGRESS] Generated so far (6 tokens): ' Five Americans who were monitored for'
+============================================================
+
+[DRAFT] Input Token: ' for' at position 258
+[DRAFT] Step 0: token=' three' (conf=0.120)
+[DRAFT]   -> Tree candidates at step 0: [' expected', ' release', ' the', ' more', ' a', ' Wednesday', ' Ebola', ' released', ' West']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' three'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' three' vs verified=' three' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' weeks'
+
+[PROGRESS] Generated so far (8 tokens): ' Five Americans who were monitored for three weeks'
+============================================================
+
+[DRAFT] Input Token: ' weeks' at position 260
+[DRAFT] Step 0: token=' after' (conf=0.182)
+[DRAFT]   -> Tree candidates at step 0: [' in', ' at', ' to', ',', ' on', ' last', ' during', ' for', ' with']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' after'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' after' vs verified=' have' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: ' have'
+
+[PROGRESS] Generated so far (9 tokens): ' Five Americans who were monitored for three weeks have'
+============================================================
+
+[DRAFT] Input Token: ' have' at position 261
+[DRAFT] Step 0: token=' been' (conf=0.569)
+[DRAFT]   -> Tree candidates at step 0: [' released', ' done', ' expected', ' escaped']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' been'
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' been' vs verified=' been' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' released'
+
+[PROGRESS] Generated so far (11 tokens): ' Five Americans who were monitored for three weeks have been released'
+============================================================
+
+[DRAFT] Input Token: ' released' at position 263
+[DRAFT] Step 0: token=' .
+' (conf=0.504)
+[DRAFT]   -> Tree candidates at step 0: [' by', ',', ' from', ' in']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' .
+'
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' .
+' vs verified=' .
+' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: 'They'
+
+[PROGRESS] Generated so far (13 tokens): ' Five Americans who were monitored for three weeks have been released .
+They'
+============================================================
+
+[DRAFT] Input Token: 'They' at position 265
+[DRAFT] Step 0: token=' have' (conf=0.249)
+[DRAFT]   -> Tree candidates at step 0: [' were', ' are', ' was', ' had', ' is', ' has', ' also', ' ', ':']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' have'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' have' vs verified=' were' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' were'
+[TREE BRANCH]   Correction (next) token: ' exposed'
+
+[PROGRESS] Generated so far (15 tokens): ' Five Americans who were monitored for three weeks have been released .
+They were exposed'
+============================================================
+
+[DRAFT] Input Token: ' exposed' at position 267
+[DRAFT] Step 0: token=' to' (conf=0.406)
+[DRAFT]   -> Tree candidates at step 0: [' in', ' with', ' at', ' on', ' from', ' for', ' by', ' as', ' among']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' to'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' to' vs verified=' to' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' Ebola'
+
+[PROGRESS] Generated so far (17 tokens): ' Five Americans who were monitored for three weeks have been released .
+They were exposed to Ebola'
+============================================================
+
+[DRAFT] Input Token: ' Ebola' at position 269
+[DRAFT] Step 0: token=' in' (conf=0.411)
+[DRAFT]   -> Tree candidates at step 0: [',', ' is', ' and', ' on', ' from', ' to', ' during', ' with', ' are']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' in'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' in' vs verified=' in' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' Sierra'
+
+[PROGRESS] Generated so far (19 tokens): ' Five Americans who were monitored for three weeks have been released .
+They were exposed to Ebola in Sierra'
+============================================================
+
+[DRAFT] Input Token: ' Sierra' at position 271
+[DRAFT] Step 0: token=' Leone' (conf=0.324)
+[DRAFT]   -> Tree candidates at step 0: [' Liberia', ' West', ' Africa', ' March', ' African', ' Leon', ' Ebola', ' Lent', ' Lou']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' Leone'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' Leone' vs verified=' Leone' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' in'
+
+[PROGRESS] Generated so far (21 tokens): ' Five Americans who were monitored for three weeks have been released .
+They were exposed to Ebola in Sierra Leone in'
+============================================================
+
+[DRAFT] Input Token: ' in' at position 273
+[DRAFT] Step 0: token=' March' (conf=0.855)
+[DRAFT]   -> Tree candidates at step 0: [' the', ' Mar']
+[DRAFT] Input Token: ' March' at position 274
+[DRAFT] Step 1: token=' .' (conf=0.279)
+[DRAFT]   -> Tree candidates at step 1: [',', ' ', ' .\n', ' in', '.', ' and', ' on', ';', ' for']
+
+[DRAFT COMPLETE] Drafted 2 tokens: ' March .'
+[DRAFT TREE] 11 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 2 drafted tokens...
+[VERIFY]   Position 0: drafted=' March' vs verified=' March' [✓]
+[VERIFY]   Position 1: drafted=' .' vs verified=',' [✗]
+[VERIFY] Accepted 1/2 tokens
+[TREE BRANCH] Switched to tree branch at position 1!
+[TREE BRANCH]   Branch token: ','
+[TREE BRANCH]   Correction (next) token: ' but'
+
+[PROGRESS] Generated so far (24 tokens): ' Five Americans who were monitored for three weeks have been released .
+They were exposed to Ebola in Sierra Leone in March, but'
+============================================================
+
+[DRAFT] Input Token: ' but' at position 276
+[DRAFT] Step 0: token=' developed' (conf=0.228)
+[DRAFT]   -> Tree candidates at step 0: [' not', ' no', ' also', ' have', ' is', ' could', ' later', ' but', ' develop']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' developed'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' developed' vs verified=' none' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: ' none'
+
+[PROGRESS] Generated so far (25 tokens): ' Five Americans who were monitored for three weeks have been released .
+They were exposed to Ebola in Sierra Leone in March, but none'
+============================================================
+
+[DRAFT] Input Token: ' none' at position 277
+[DRAFT] Step 0: token=' developed' (conf=0.187)
+[DRAFT]   -> Tree candidates at step 0: [' .\n', ' disease', ' dev', ' to', ' the', ' virus', ' dead', ' did', ' development']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' developed'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' developed' vs verified=' developed' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' the'
+
+[PROGRESS] Generated so far (27 tokens): ' Five Americans who were monitored for three weeks have been released .
+They were exposed to Ebola in Sierra Leone in March, but none developed the'
+============================================================
+
+[DRAFT] Input Token: ' the' at position 279
+[DRAFT] Step 0: token=' the' (conf=0.290)
+[DRAFT]   -> Tree candidates at step 0: [' deadly', ' virus', ' life', ' dead', ' disease', ' deadliest', ' viral', ' death', ' The']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' the'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' the' vs verified=' deadly' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' deadly'
+[TREE BRANCH]   Correction (next) token: ' virus'
+
+[PROGRESS] Generated so far (29 tokens): ' Five Americans who were monitored for three weeks have been released .
+They were exposed to Ebola in Sierra Leone in March, but none developed the deadly virus'
+============================================================
+
+[DRAFT] Input Token: ' virus' at position 281
+[DRAFT] Step 0: token=' .
+' (conf=0.702)
+[DRAFT]   -> Tree candidates at step 0: [' .', ' is', '.\n', ' will']
+[DRAFT] Input Token: ' .
+' at position 282
+[DRAFT] Step 1: token='The' (conf=0.144)
+[DRAFT]   -> Tree candidates at step 1: ['A', 'He', '1', 'In', 'Health', 'Col', 'Clin', 'It', 'One']
+
+[DRAFT COMPLETE] Drafted 2 tokens: ' .
+The'
+[DRAFT TREE] 13 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 2 drafted tokens...
+[VERIFY]   Position 0: drafted=' .
+' vs verified=' .
+' [✓]
+[VERIFY]   Position 1: drafted='The' vs verified='They' [✗]
+[VERIFY] Accepted 1/2 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: 'They'
+
+[PROGRESS] Generated so far (31 tokens): ' Five Americans who were monitored for three weeks have been released .
+They were exposed to Ebola in Sierra Leone in March, but none developed the deadly virus .
+They'
+============================================================
+
+[DRAFT] Input Token: 'They' at position 283
+[DRAFT] Step 0: token=' were' (conf=0.201)
+[DRAFT]   -> Tree candidates at step 0: [' are', ' have', ' was', ' is', ' had', ' has', ' ', ':', ' will']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' were'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' were' vs verified=' are' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' are'
+[TREE BRANCH]   Correction (next) token: ' clinicians'
+
+[PROGRESS] Generated so far (33 tokens): ' Five Americans who were monitored for three weeks have been released .
+They were exposed to Ebola in Sierra Leone in March, but none developed the deadly virus .
+They are clinicians'
+============================================================
+
+[DRAFT] Input Token: ' clinicians' at position 285
+[DRAFT] Step 0: token=' for' (conf=0.150)
+[DRAFT]   -> Tree candidates at step 0: [' and', ' with', ',', ' are', ' in', ' at', ' who', ' were', ' from']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' for'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' for' vs verified=' for' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' Partners'
+
+[PROGRESS] Generated so far (35 tokens): ' Five Americans who were monitored for three weeks have been released .
+They were exposed to Ebola in Sierra Leone in March, but none developed the deadly virus .
+They are clinicians for Partners'
+============================================================
+
+[DRAFT] Input Token: ' Partners' at position 287
+[DRAFT] Step 0: token=' in' (conf=0.464)
+[DRAFT]   -> Tree candidates at step 0: [' for', ',', ' and', ' with', ' at', ' as', ' or', ' from', ' of']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' in'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' in' vs verified=' in' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' Health'
+
+[PROGRESS] Generated so far (37 tokens): ' Five Americans who were monitored for three weeks have been released .
+They were exposed to Ebola in Sierra Leone in March, but none developed the deadly virus .
+They are clinicians for Partners in Health'
+============================================================
+
+[DRAFT] Input Token: ' Health' at position 289
+[DRAFT] Step 0: token=',' (conf=0.933)
+[DRAFT]   -> Tree candidates at step 0: [' and', ';']
+[DRAFT] Input Token: ',' at position 290
+[DRAFT] Step 1: token=' Health' (conf=0.262)
+[DRAFT]   -> Tree candidates at step 1: [' but', ' aid', ' a', ' which', ' health', ' and', ' Aid', ' group', ' including']
+
+[DRAFT COMPLETE] Drafted 2 tokens: ', Health'
+[DRAFT TREE] 11 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 2 drafted tokens...
+[VERIFY]   Position 0: drafted=',' vs verified=',' [✓]
+[VERIFY]   Position 1: drafted=' Health' vs verified=' a' [✗]
+[VERIFY] Accepted 1/2 tokens
+[TREE BRANCH] Switched to tree branch at position 1!
+[TREE BRANCH]   Branch token: ' a'
+[TREE BRANCH]   Correction (next) token: ' Boston'
+
+[PROGRESS] Generated so far (40 tokens): ' Five Americans who were monitored for three weeks have been released .
+They were exposed to Ebola in Sierra Leone in March, but none developed the deadly virus .
+They are clinicians for Partners in Health, a Boston'
+============================================================
+
+[DRAFT] Input Token: ' Boston' at position 292
+[DRAFT] Step 0: token=',' (conf=0.280)
+[DRAFT]   -> Tree candidates at step 0: [' aid', ' group', ' .', '-based', "'s", ' and', ' Bas', ' or', '/AIDS']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ','
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=',' vs verified='-based' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: '-based'
+[TREE BRANCH]   Correction (next) token: ' aid'
+
+[PROGRESS] Generated so far (42 tokens): ' Five Americans who were monitored for three weeks have been released .
+They were exposed to Ebola in Sierra Leone in March, but none developed the deadly virus .
+They are clinicians for Partners in Health, a Boston-based aid'
+============================================================
+
+[DRAFT] Input Token: ' aid' at position 294
+[DRAFT] Step 0: token=' group' (conf=0.852)
+[DRAFT]   -> Tree candidates at step 0: [' .', ' health']
+[DRAFT] Input Token: ' group' at position 295
+[DRAFT] Step 1: token=' .' (conf=0.747)
+[DRAFT]   -> Tree candidates at step 1: [' .\n', ' is', ' says', ' in']
+[DRAFT] Input Token: ' .' at position 296
+[DRAFT] Step 2: token='<|endoftext|>' (conf=1.000)
+
+[DRAFT COMPLETE] Drafted 3 tokens: ' group .<|endoftext|>'
+[DRAFT TREE] 6 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 3 drafted tokens...
+[VERIFY]   Position 0: drafted=' group' vs verified=' group' [✓]
+[VERIFY]   Position 1: drafted=' .' vs verified=' .' [✓]
+[VERIFY]   Position 2: drafted='<|endoftext|>' vs verified='<|endoftext|>' [✓]
+[VERIFY] Accepted 3/3 tokens
+[GREEDY PATH] Accepted 3 tokens, correction token: 'Summary'
+
+============================================================
+[DEBUG] E2D.generate() completed
+============================================================
+[FINAL OUTPUT]: ' Five Americans who were monitored for three weeks have been released .
+They were exposed to Ebola in Sierra Leone in March, but none developed the deadly virus .
+They are clinicians for Partners in Health, a Boston-based aid group .<|endoftext|>'
+[STATS] Total forward passes: 27
+[STATS] Total accepted tokens: 24
+[STATS] Acceptance rate: 88.89%
+============================================================
+
+Input: <|endoftext|>Summarize the following article: (CNN)Five Americans who were monitored for three weeks at an Omaha, Nebraska, hospital after being exposed to Ebola in West Africa have been released, a Nebraska Medicine spokesman said in an email Wednesday. One of the five had a heart-related issue on Saturday and has been discharged but hasn't left the area, Taylor Wilson wrote. The others have already gone home. They were exposed to Ebola in Sierra Leone in March, but none developed the deadly virus. They are clinicians for Partners in Health, a Boston-based aid group. They all had contact with a colleague who was diagnosed with the disease and is being treated at the National Institutes of Health in Bethesda, Maryland. As of Monday, that health care worker is in fair condition. The Centers for Disease Control and Prevention in Atlanta has said the last of 17 patients who were being monitored are expected to be released by Thursday. More than 10,000 people have died in a West African epidemic of Ebola that dates to December 2013, according to the World Health Organization. Almost all the deaths have been in Guinea, Liberia and Sierra Leone. Ebola is spread by direct contact with the bodily fluids of an infected person.<|endoftext|>Summary:
+Output: Five Americans who were monitored for three weeks have been released.
+They were exposed to Ebola in Sierra Leone in March, but none developed the deadly virus.
+They are clinicians for Partners in Health, a Boston-based aid group.
+
+============================================================
+[DEBUG] Generation started
+============================================================
+[INPUT] Prompt: <|endoftext|>Summarize the following article: (CNN)A Duke student has admitted to hanging a noose made of rope from a tree near a student union, university officials said Thursday. The prestigious private school didn't identify the student, citing federal privacy laws. In a news release, it said the student was no longer on campus and will face student conduct review. The student was identified during an investigation by campus police and the office of student affairs and admitted to placing the noose on the tree early Wednesday, the university said. Officials are still trying to determine if other people were involved. Criminal investigations into the incident are ongoing as well. Students and faculty members marched Wednesday afternoon chanting "We are not afraid. We stand together,"  after pictures of the noose were passed around on social media. At a forum held on the steps of Duke Chapel, close to where the noose was discovered at 2 a.m., hundreds of people gathered. "You came here for the reason that you want to say with me, 'This is no Duke we will accept. This is no Duke we want. This is not the Duke we're here to experience. And this is not the Duke we're here to create,' " Duke President Richard Brodhead told the crowd. The incident is one of several recent racist events to affect college students. Last month a fraternity at the University of Oklahoma had its charter removed after a video surfaced showing members using the N-word and referring to lynching in a chant. Two students were expelled. In February, a noose was hung around the neck of a statue of a famous civil rights figure at the University of Mississippi. A statement issued by Duke said there was a previous report of hate speech directed at students on campus. In the news release, the vice president for student affairs called the noose incident a "cowardly act." "To whomever committed this hateful and stupid act, I just want to say that if your intent was to create fear, it will have the opposite effect," Larry Moneta said Wednesday. Duke University is a private college with about 15,000 students in Durham, North Carolina. CNN's Dave Alsup contributed to this report.<|endoftext|>Summary:
+[CONFIG] max_new_tokens=256
+[CONFIG] conf_seg=True, track_acc_rate=False, tree_attn=True
+============================================================
+
+[DRAFT] Input Token: ':' at position 449
+[DRAFT] Step 0: token=' "' (conf=0.095)
+[DRAFT]   -> Tree candidates at step 0: [' NEW', ' Student', ' No', ' Police', ' Two', ' The', ' Ad', ' A', ' Students']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' "'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' "' vs verified=' No' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' No'
+[TREE BRANCH]   Correction (next) token: 'ose'
+
+[PROGRESS] Generated so far (2 tokens): ' Noose'
+============================================================
+
+[DRAFT] Input Token: 'ose' at position 451
+[DRAFT] Step 0: token=' was' (conf=0.154)
+[DRAFT]   -> Tree candidates at step 0: [' on', ' has', ' of', ' is', ',', ' had', ' in', ' will', ' and']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' was'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' was' vs verified=' was' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' found'
+
+[PROGRESS] Generated so far (4 tokens): ' Noose was found'
+============================================================
+
+[DRAFT] Input Token: ' found' at position 453
+[DRAFT] Step 0: token=' on' (conf=0.235)
+[DRAFT]   -> Tree candidates at step 0: [' in', ' near', ' a', ' to', ' at', ' about', ' the', ' around', ' from']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' on'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' on' vs verified=' near' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' near'
+[TREE BRANCH]   Correction (next) token: ' a'
+
+[PROGRESS] Generated so far (6 tokens): ' Noose was found near a'
+============================================================
+
+[DRAFT] Input Token: ' a' at position 455
+[DRAFT] Step 0: token=' student' (conf=0.187)
+[DRAFT]   -> Tree candidates at step 0: [' U', ' University', ' university', ' tree', ' Union', ' Duke', ' ', ' campus', ' new']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' student'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' student' vs verified=' student' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' union'
+
+[PROGRESS] Generated so far (8 tokens): ' Noose was found near a student union'
+============================================================
+
+[DRAFT] Input Token: ' union' at position 457
+[DRAFT] Step 0: token=' .
+' (conf=0.393)
+[DRAFT]   -> Tree candidates at step 0: [' in', ' .', ',', ' at', ' on', ';', ' of', ' was', ' is']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' .
+'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' .
+' vs verified=' at' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' at'
+[TREE BRANCH]   Correction (next) token: ' the'
+
+[PROGRESS] Generated so far (10 tokens): ' Noose was found near a student union at the'
+============================================================
+
+[DRAFT] Input Token: ' the' at position 459
+[DRAFT] Step 0: token=' Duke' (conf=0.403)
+[DRAFT]   -> Tree candidates at step 0: [' University', ' U', ' university', ' United', ' Ch', ' campus', ' ', ' Durham', ' State']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' Duke'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' Duke' vs verified=' university' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' university'
+[TREE BRANCH]   Correction (next) token: ' .
+'
+
+[PROGRESS] Generated so far (12 tokens): ' Noose was found near a student union at the university .
+'
+============================================================
+
+[DRAFT] Input Token: ' .
+' at position 461
+[DRAFT] Step 0: token='N' (conf=0.101)
+[DRAFT]   -> Tree candidates at step 0: ['He', 'The', 'Inc', 'Police', 'Ad', 'NEW', 'Student', 'D', 'New']
+
+[DRAFT COMPLETE] Drafted 1 tokens: 'N'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted='N' vs verified='D' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: 'D'
+[TREE BRANCH]   Correction (next) token: 'uke'
+
+[PROGRESS] Generated so far (14 tokens): ' Noose was found near a student union at the university .
+Duke'
+============================================================
+
+[DRAFT] Input Token: 'uke' at position 463
+[DRAFT] Step 0: token=' student' (conf=0.146)
+[DRAFT]   -> Tree candidates at step 0: [' officials', ' official', ' was', ' students', ' were', ' has', ' is', ',', ' are']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' student'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' student' vs verified=' University' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: ' University'
+
+[PROGRESS] Generated so far (15 tokens): ' Noose was found near a student union at the university .
+Duke University'
+============================================================
+
+[DRAFT] Input Token: ' University' at position 464
+[DRAFT] Step 0: token=' says' (conf=0.176)
+[DRAFT]   -> Tree candidates at step 0: [' is', ' student', ' has', ' was', ' identified', "'s", ' of', ' identifies', ' official']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' says'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' says' vs verified=' officials' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: ' officials'
+
+[PROGRESS] Generated so far (16 tokens): ' Noose was found near a student union at the university .
+Duke University officials'
+============================================================
+
+[DRAFT] Input Token: ' officials' at position 465
+[DRAFT] Step 0: token=' say' (conf=0.389)
+[DRAFT]   -> Tree candidates at step 0: [' acknowledge', ' says', ' said', ' identify', ' identified', ':', ' have', ' identifying', ' denied']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' say'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' say' vs verified=' say' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' the'
+
+[PROGRESS] Generated so far (18 tokens): ' Noose was found near a student union at the university .
+Duke University officials say the'
+============================================================
+
+[DRAFT] Input Token: ' the' at position 467
+[DRAFT] Step 0: token=' student' (conf=0.354)
+[DRAFT]   -> Tree candidates at step 0: [' campus', ' students', ' no', ' man', ' the', ' incident', ' "', ' first', ' university']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' student'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' student' vs verified=' student' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' is'
+
+[PROGRESS] Generated so far (20 tokens): ' Noose was found near a student union at the university .
+Duke University officials say the student is'
+============================================================
+
+[DRAFT] Input Token: ' is' at position 469
+[DRAFT] Step 0: token=' not' (conf=0.184)
+[DRAFT]   -> Tree candidates at step 0: [' no', ' facing', ' a', ' named', ' "', ' on', ' admitted', ' the', ' placed']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' not'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' not' vs verified=' no' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' no'
+[TREE BRANCH]   Correction (next) token: ' longer'
+
+[PROGRESS] Generated so far (22 tokens): ' Noose was found near a student union at the university .
+Duke University officials say the student is no longer'
+============================================================
+
+[DRAFT] Input Token: ' longer' at position 471
+[DRAFT] Step 0: token=' .
+' (conf=0.281)
+[DRAFT]   -> Tree candidates at step 0: [' on', ' in', ' long', ' to', ' campus', ' student', ' .', ' for', ' at']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' .
+'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' .
+' vs verified=' on' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' on'
+[TREE BRANCH]   Correction (next) token: ' campus'
+
+[PROGRESS] Generated so far (24 tokens): ' Noose was found near a student union at the university .
+Duke University officials say the student is no longer on campus'
+============================================================
+
+[DRAFT] Input Token: ' campus' at position 473
+[DRAFT] Step 0: token=' .
+' (conf=0.802)
+[DRAFT]   -> Tree candidates at step 0: [' .', ',']
+[DRAFT] Input Token: ' .
+' at position 474
+[DRAFT] Step 1: token='The' (conf=0.104)
+[DRAFT]   -> Tree candidates at step 1: ['D', 'N', 'He', 'Student', 'Ad', 'Students', 'Police', 'University', 'A']
+
+[DRAFT COMPLETE] Drafted 2 tokens: ' .
+The'
+[DRAFT TREE] 11 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 2 drafted tokens...
+[VERIFY]   Position 0: drafted=' .
+' vs verified=' .
+' [✓]
+[VERIFY]   Position 1: drafted='The' vs verified='The' [✓]
+[VERIFY] Accepted 2/2 tokens
+[GREEDY PATH] Accepted 2 tokens, correction token: ' incident'
+
+[PROGRESS] Generated so far (27 tokens): ' Noose was found near a student union at the university .
+Duke University officials say the student is no longer on campus .
+The incident'
+============================================================
+
+[DRAFT] Input Token: ' incident' at position 476
+[DRAFT] Step 0: token=' was' (conf=0.156)
+[DRAFT]   -> Tree candidates at step 0: [' is', ' were', ' occurred', ' are', ' have', ' in', ' has', ' on', ' will']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' was'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' was' vs verified=' is' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' is'
+[TREE BRANCH]   Correction (next) token: ' one'
+
+[PROGRESS] Generated so far (29 tokens): ' Noose was found near a student union at the university .
+Duke University officials say the student is no longer on campus .
+The incident is one'
+============================================================
+
+[DRAFT] Input Token: ' one' at position 478
+[DRAFT] Step 0: token=' of' (conf=0.731)
+[DRAFT]   -> Tree candidates at step 0: [' on', ' the', ' in', ' from']
+[DRAFT] Input Token: ' of' at position 479
+[DRAFT] Step 1: token=' the' (conf=0.279)
+[DRAFT]   -> Tree candidates at step 1: [' racist', ' a', ' recent', ' one', ' an', ' first', ' racial', ' racially', ' "']
+
+[DRAFT COMPLETE] Drafted 2 tokens: ' of the'
+[DRAFT TREE] 13 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 2 drafted tokens...
+[VERIFY]   Position 0: drafted=' of' vs verified=' of' [✓]
+[VERIFY]   Position 1: drafted=' the' vs verified=' several' [✗]
+[VERIFY] Accepted 1/2 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' several'
+
+[PROGRESS] Generated so far (31 tokens): ' Noose was found near a student union at the university .
+Duke University officials say the student is no longer on campus .
+The incident is one of several'
+============================================================
+
+[DRAFT] Input Token: ' several' at position 480
+[DRAFT] Step 0: token=' events' (conf=0.249)
+[DRAFT]   -> Tree candidates at step 0: [' recent', ' racist', ' races', ' a', ' racially', ' race', ' event', ' racial', ' rare']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' events'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' events' vs verified=' recent' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' recent'
+[TREE BRANCH]   Correction (next) token: ' racist'
+
+[PROGRESS] Generated so far (33 tokens): ' Noose was found near a student union at the university .
+Duke University officials say the student is no longer on campus .
+The incident is one of several recent racist'
+============================================================
+
+[DRAFT] Input Token: ' racist' at position 482
+[DRAFT] Step 0: token=' events' (conf=0.580)
+[DRAFT]   -> Tree candidates at step 0: [' student', ' event', ' students', ' races']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' events'
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' events' vs verified=' events' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' to'
+
+[PROGRESS] Generated so far (35 tokens): ' Noose was found near a student union at the university .
+Duke University officials say the student is no longer on campus .
+The incident is one of several recent racist events to'
+============================================================
+
+[DRAFT] Input Token: ' to' at position 484
+[DRAFT] Step 0: token=' the' (conf=0.270)
+[DRAFT]   -> Tree candidates at step 0: [' college', ' students', ' student', ' a', ' have', ' campus', ' take', ' affect', ' school']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' the'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' the' vs verified=' affect' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' affect'
+[TREE BRANCH]   Correction (next) token: ' college'
+
+[PROGRESS] Generated so far (37 tokens): ' Noose was found near a student union at the university .
+Duke University officials say the student is no longer on campus .
+The incident is one of several recent racist events to affect college'
+============================================================
+
+[DRAFT] Input Token: ' college' at position 486
+[DRAFT] Step 0: token=' students' (conf=0.514)
+[DRAFT]   -> Tree candidates at step 0: [' .\n', ' student', ' university', ' campus']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' students'
+[DRAFT TREE] 4 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' students' vs verified=' students' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' .'
+
+[PROGRESS] Generated so far (39 tokens): ' Noose was found near a student union at the university .
+Duke University officials say the student is no longer on campus .
+The incident is one of several recent racist events to affect college students .'
+============================================================
+
+[DRAFT] Input Token: ' .' at position 488
+[DRAFT] Step 0: token='<|endoftext|>' (conf=1.000)
+
+[DRAFT COMPLETE] Drafted 1 tokens: '<|endoftext|>'
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted='<|endoftext|>' vs verified='<|endoftext|>' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: 'Summary'
+
+============================================================
+[DEBUG] E2D.generate() completed
+============================================================
+[FINAL OUTPUT]: ' Noose was found near a student union at the university .
+Duke University officials say the student is no longer on campus .
+The incident is one of several recent racist events to affect college students .<|endoftext|>'
+[STATS] Total forward passes: 23
+[STATS] Total accepted tokens: 20
+[STATS] Acceptance rate: 86.96%
+============================================================
+
+Input: <|endoftext|>Summarize the following article: (CNN)A Duke student has admitted to hanging a noose made of rope from a tree near a student union, university officials said Thursday. The prestigious private school didn't identify the student, citing federal privacy laws. In a news release, it said the student was no longer on campus and will face student conduct review. The student was identified during an investigation by campus police and the office of student affairs and admitted to placing the noose on the tree early Wednesday, the university said. Officials are still trying to determine if other people were involved. Criminal investigations into the incident are ongoing as well. Students and faculty members marched Wednesday afternoon chanting "We are not afraid. We stand together,"  after pictures of the noose were passed around on social media. At a forum held on the steps of Duke Chapel, close to where the noose was discovered at 2 a.m., hundreds of people gathered. "You came here for the reason that you want to say with me, 'This is no Duke we will accept. This is no Duke we want. This is not the Duke we're here to experience. And this is not the Duke we're here to create,' " Duke President Richard Brodhead told the crowd. The incident is one of several recent racist events to affect college students. Last month a fraternity at the University of Oklahoma had its charter removed after a video surfaced showing members using the N-word and referring to lynching in a chant. Two students were expelled. In February, a noose was hung around the neck of a statue of a famous civil rights figure at the University of Mississippi. A statement issued by Duke said there was a previous report of hate speech directed at students on campus. In the news release, the vice president for student affairs called the noose incident a "cowardly act." "To whomever committed this hateful and stupid act, I just want to say that if your intent was to create fear, it will have the opposite effect," Larry Moneta said Wednesday. Duke University is a private college with about 15,000 students in Durham, North Carolina. CNN's Dave Alsup contributed to this report.<|endoftext|>Summary:
+Output: Noose was found near a student union at the university.
+Duke University officials say the student is no longer on campus.
+The incident is one of several recent racist events to affect college students.
+
+============================================================
+[DEBUG] Generation started
+============================================================
+[INPUT] Prompt: <|endoftext|>Summarize the following article: (CNN)He's a blue chip college basketball recruit. She's a high school freshman with Down syndrome. At first glance Trey Moses and Ellie Meredith couldn't be more different. But all that changed Thursday when Trey asked Ellie to be his prom date. Trey -- a star on Eastern High School's basketball team in Louisville, Kentucky, who's headed to play college ball next year at Ball State -- was originally going to take his girlfriend to Eastern's prom. So why is he taking Ellie instead? "She's great... she listens and she's easy to talk to" he said. Trey made the prom-posal (yes, that's what they are calling invites to prom these days) in the gym during Ellie's P.E. class. Trina Helson, a teacher at Eastern, alerted the school's newspaper staff to the prom-posal and posted photos of Trey and Ellie on Twitter that have gone viral. She wasn't surpristed by Trey's actions. "That's the kind of person Trey is," she said. To help make sure she said yes, Trey entered the gym armed with flowers and a poster that read "Let's Party Like it's 1989," a reference to the latest album by Taylor Swift, Ellie's favorite singer. Trey also got the OK from Ellie's parents the night before via text. They were thrilled. "You just feel numb to those moments raising a special needs child,"  said Darla Meredith, Ellie's mom. "You first feel the need to protect and then to overprotect." Darla Meredith said Ellie has struggled with friendships since elementary school, but a special program at Eastern called Best Buddies had made things easier for her. She said Best Buddies cultivates friendships between students with and without developmental disabilities and prevents students like Ellie from feeling isolated and left out of social functions. "I guess around middle school is when kids started to care about what others thought," she said, but "this school, this year has been a relief." Trey's future coach at Ball State, James Whitford, said he felt great about the prom-posal, noting that Trey, whom he's known for a long time, often works with other kids . Trey's mother, Shelly Moses, was also proud of her son. "It's exciting to bring awareness to a good cause," she said. "Trey has worked pretty hard, and he's a good son." Both Trey and Ellie have a lot of planning to do. Trey is looking to take up special education as a college major, in addition to playing basketball in the fall. As for Ellie, she can't stop thinking about prom. "Ellie can't wait to go dress shopping" her mother said. "Because I've only told about a million people!" Ellie interjected.<|endoftext|>Summary:
+[CONFIG] max_new_tokens=256
+[CONFIG] conf_seg=True, track_acc_rate=False, tree_attn=True
+============================================================
+
+[DRAFT] Input Token: ':' at position 578
+[DRAFT] Step 0: token=' Ellie' (conf=0.131)
+[DRAFT]   -> Tree candidates at step 0: [' "', ' Ell', ' Floyd', ' Ellen', ' ', ' The', ' El', ' A', ' High']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' Ellie'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' Ellie' vs verified=' High' [✗]
+[VERIFY] Accepted 0/1 tokens
+[TREE BRANCH] Switched to tree branch at position 0!
+[TREE BRANCH]   Branch token: ' High'
+[TREE BRANCH]   Correction (next) token: ' school'
+
+[PROGRESS] Generated so far (2 tokens): ' High school'
+============================================================
+
+[DRAFT] Input Token: ' school' at position 580
+[DRAFT] Step 0: token=' is' (conf=0.104)
+[DRAFT]   -> Tree candidates at step 0: [' would', ' student', ' has', "'s", ' was', ' students', ' could', ' basketball', ',']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' is'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' is' vs verified=' star' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: ' star'
+
+[PROGRESS] Generated so far (3 tokens): ' High school star'
+============================================================
+
+[DRAFT] Input Token: ' star' at position 581
+[DRAFT] Step 0: token=' with' (conf=0.139)
+[DRAFT]   -> Tree candidates at step 0: [' in', ' on', "'s", ' to', ' of', ',', ' for', ' from', ' at']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' with'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' with' vs verified=' with' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' Down'
+
+[PROGRESS] Generated so far (5 tokens): ' High school star with Down'
+============================================================
+
+[DRAFT] Input Token: ' Down' at position 583
+[DRAFT] Step 0: token=' to' (conf=0.082)
+[DRAFT]   -> Tree candidates at step 0: [' down', ' D', ' is', ' says', ' sy', ' was', ' Down', ' and', ',']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' to'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' to' vs verified=' syndrome' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: ' syndrome'
+
+[PROGRESS] Generated so far (6 tokens): ' High school star with Down syndrome'
+============================================================
+
+[DRAFT] Input Token: ' syndrome' at position 584
+[DRAFT] Step 0: token=',' (conf=0.208)
+[DRAFT]   -> Tree candidates at step 0: [' says', ' was', ' is', "'s", ' .\n', ' to', ' and', ' has', ' on']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ','
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=',' vs verified=' asks' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: ' asks'
+
+[PROGRESS] Generated so far (7 tokens): ' High school star with Down syndrome asks'
+============================================================
+
+[DRAFT] Input Token: ' asks' at position 585
+[DRAFT] Step 0: token=' he' (conf=0.112)
+[DRAFT]   -> Tree candidates at step 0: [' to', ' she', ' the', ' a', ' his', ' him', ' her', ' James', ' for']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' he'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' he' vs verified=' girlfriend' [✗]
+[VERIFY] Accepted 0/1 tokens
+[GREEDY PATH] Accepted 0 tokens, correction token: ' girlfriend'
+
+[PROGRESS] Generated so far (8 tokens): ' High school star with Down syndrome asks girlfriend'
+============================================================
+
+[DRAFT] Input Token: ' girlfriend' at position 586
+[DRAFT] Step 0: token=' to' (conf=0.352)
+[DRAFT]   -> Tree candidates at step 0: [' for', ' .\n', ' in', ' with', "'s", ' as', ' at', ' who', ' and']
+
+[DRAFT COMPLETE] Drafted 1 tokens: ' to'
+[DRAFT TREE] 9 alternative candidates in tree
+----------------------------------------
+[VERIFY] Checking 1 drafted tokens...
+[VERIFY]   Position 0: drafted=' to' vs verified=' to' [✓]
+[VERIFY] Accepted 1/1 tokens
+[GREEDY PATH] Accepted 1 tokens, correction token: ' be'

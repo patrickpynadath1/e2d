@@ -6,7 +6,7 @@ import torch
 import torch.distributed as torch_dist
 from composer.models import HuggingFaceModel
 from composer.utils import dist, reproducibility
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig, OmegaConf, open_dict
 
 from scripts.utils import (
     count_parameters,
@@ -135,10 +135,28 @@ def main(cfg: DictConfig) -> None:
     # Algorithms
     algorithms = hydra.utils.instantiate(cfg.composer.algorithms)
 
-    # Trainer
-    trainer = hydra.utils.instantiate(
-        cfg.composer.trainer,
-        _convert_="all",
+    # Parallelism config (FSDP)
+    parallelism_config = None
+    if hasattr(cfg.composer, "parallelism") and cfg.composer.parallelism is not None:
+        parallelism_config = hydra.utils.instantiate(cfg.composer.parallelism)
+        
+        # --- FIX START: Surgically remove device_mesh ---
+        if hasattr(parallelism_config, 'fsdp'):
+            fsdp_conf = parallelism_config.fsdp
+            # Check if fsdp is a dictionary/DictConfig and has the forbidden key
+            if isinstance(fsdp_conf, (dict, DictConfig)) and 'device_mesh' in fsdp_conf:
+                log.info("Manually removing deprecated 'device_mesh' key from FSDP config to prevent crash.")
+                if isinstance(fsdp_conf, DictConfig):
+                    with open_dict(fsdp_conf):
+                        del fsdp_conf['device_mesh']
+                else:
+                    fsdp_conf.pop('device_mesh', None)
+        # --- FIX END ---
+
+        log.info(f"Using parallelism config: {parallelism_config}")
+
+    # Trainer - build kwargs manually to avoid hydra converting ParallelismConfig to dict
+    trainer_kwargs = dict(
         model=model,
         train_dataloader=train_dataloader,
         eval_dataloader=eval_dataloader,
@@ -147,6 +165,14 @@ def main(cfg: DictConfig) -> None:
         algorithms=list(algorithms.values()),
         loggers=logger,
         callbacks=list(callbacks.values()),
+    )
+    if parallelism_config is not None:
+        trainer_kwargs["parallelism_config"] = parallelism_config
+
+    trainer = hydra.utils.instantiate(
+        cfg.composer.trainer,
+        _convert_="partial",
+        **trainer_kwargs,
     )
 
     trainer.fit()

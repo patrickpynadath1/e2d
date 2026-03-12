@@ -1,0 +1,4 @@
+apps_stopping_criteria:
+  _target_: src.custom_transformers.generation.RegexStoppingCriteria
+  tokenizer: ${tokenizer}
+  pattern: '\n(class |def |if __name__|# End|\[END\]|\[DONE\])'

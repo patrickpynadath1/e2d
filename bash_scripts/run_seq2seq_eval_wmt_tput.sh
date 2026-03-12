@@ -6,11 +6,11 @@ source setup_env.sh
 # TODO: Uncomment a model and run
 
 ######### AR
-#PROMPT_TEXT="Translation: "
-#KV_CACHING=true
-#ALIGN_INPUTS_TO_BLOCKS=true
-#BLOCK_SIZE=1
-#MODEL_PATH="outputs/<PATH_TO_AR_SAVED_MODEL_DIR>"
+# PROMPT_TEXT="Translation: "
+# KV_CACHING=true
+# ALIGN_INPUTS_TO_BLOCKS=true
+# BLOCK_SIZE=1
+# MODEL_PATH="/data/shared_data/hankun/outputs/wmt_block_lr3e-4_bsz128_warm1000ba_layers28_hidden1024_inter3072_ar_target_prompt_20251222_165729"
 
 ########### MDLM
 #PROMPT_TEXT=null
@@ -29,16 +29,23 @@ source setup_env.sh
 ######### E2D2
 PROMPT_TEXT=null
 BLOCK_SIZE=4
-MODEL_PATH="kuleshov-group/e2d2-wmt"
-#MODEL_PATH="outputs/<PATH_TO_MDLM_SAVED_MODEL_DIR>"
+MODEL_PATH="/data/shared_data/hankun/outputs/wmt_block4_lr3e-4_bsz128_warm1000ba_enc28_dec4_hidden1024_inter3072_e2d2_20251222_062114"
 KV_CACHING=true
 ALIGN_INPUTS_TO_BLOCKS=false
+
+######### E2D
+# PROMPT_TEXT=null
+# BLOCK_SIZE=4
+# MODEL_PATH="outputs/wmt_block4_lr3e-4_bsz128_warm1000ba_enc28_dec4_hidden512_inter1536_e2d_20251107_195313"
+# #MODEL_PATH="outputs/<PATH_TO_MDLM_SAVED_MODEL_DIR>"
+# KV_CACHING=true
+# ALIGN_INPUTS_TO_BLOCKS=false
 
 OUTPUT_DIR="outputs/${MODEL_PATH}/wmt"
 REVISION=null
 mkdir -p ${OUTPUT_DIR}
 
-L=256
+L=512
 T=${BLOCK_SIZE}
 DO_SAMPLE=false
 SAMPLING_STRATEGY="predict_and_noise" #"predict_and_noise" "posterior"
@@ -47,6 +54,7 @@ CONFIDENCE_BASED_NOISING=true
 MAX_LENGTH=1024
 CKPT="best"
 USE_EMA=true
+NUM_VISIBLE_DEVICES=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 OUTPUT_PATH="${OUTPUT_DIR}/ema${USE_EMA}_ckpt${CKPT}_L${L}_block_size${BLOCK_SIZE}-do_sample${DO_SAMPLE}-sampling_strategy${SAMPLING_STRATEGY}-T${T}_first_hitting${FIRST_HITTING}-confidence_based_noising${CONFIDENCE_BASED_NOISING}-align_inputs_to_blocks${ALIGN_INPUTS_TO_BLOCKS}"
 PORT=29502

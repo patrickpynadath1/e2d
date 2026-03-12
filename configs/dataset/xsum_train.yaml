@@ -1,0 +1,16 @@
+_target_: src.datasets.tokenize_on_demand.CNNDailyMailDataset
+split: "train"
+max_length: ${model.config.length}
+dataset_path: "EdinburghNLP/xsum"
+config_name: null
+padding: false
+add_special_tokens: true
+source_prompt_text: "Summarize the following article: "
+target_prompt_text: "Summary: "
+source_key: "document"
+target_key: "summary"
+truncate: true
+max_samples: 10000
+filter_by_length: true
+source_max_length_ratio: 0.9
+target_max_length_ratio: 0.1

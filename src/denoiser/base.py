@@ -28,6 +28,7 @@ from src.backbone.automodel import AutoModelFromPreTrained  # noqa: F401
 from src.backbone.encoder_decoder import (  # noqa: F401
     LLMasEncoderDecoder,
     LLMasEncoderDecoderShareKV,
+    LLMasEncoderDecoderShareKVEncoderGen,
 )
 from src.noise_schedule.noise_schedules import (  # noqa: F401
     CosineNoise,
@@ -438,6 +439,7 @@ class Denoiser(ABC, PreTrainedModel):
         backbone_output = self._backbone_forward(
             context_input,
             return_updated_cache=True,  # Will get absorbed in backbone_kwargs
+            # enforce_causal_mask=True, # uncomment for trainable adapter version
             **cache,
         )
         backbone_output = {k: v for k, v in backbone_output.items()}

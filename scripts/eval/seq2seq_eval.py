@@ -115,6 +115,10 @@ def main(cfg: DictConfig) -> None:
     # Iterate through the dataset and sample
     generated_samples = []
     tputs = []
+    total_generated_tokens = 0
+    total_accepted_tokens = 0
+    total_accepted_lengths = []
+    total_accept_counts = 0
     for elem_id, elem in tqdm(
         enumerate(dataloader),
         desc="Generating",
@@ -157,12 +161,31 @@ def main(cfg: DictConfig) -> None:
             input_ids = torch.cat((input_ids, prompt_ids), dim=-1)
         # Generate samples
         with torch.no_grad():
-            outputs = model.generate(
-                inputs=input_ids,
-                disable_pbar=(local_rank != 0),
-                # tokenizer=tokenizer,  # For debugging: prints intermediate generation
-                **gen_kwargs,
-            )
+            if "E2D" in type(model).__name__ or (
+                "LayerSkip" in type(model).__name__
+                and gen_kwargs.get("assistant_early_exit") is not None
+            ):
+                outputs, (generated_tokens, accepted_tokens), (accepted_lengths, accept_counts) = model.generate(
+                    inputs=input_ids,
+                    disable_pbar=(local_rank != 0),
+                    # tokenizer=tokenizer,  # For debugging: prints intermediate generation
+                    **gen_kwargs,
+                )
+            else:
+                outputs = model.generate(
+                    inputs=input_ids,
+                    disable_pbar=(local_rank != 0),
+                    # tokenizer=tokenizer,  # For debugging: prints intermediate generation
+                    **gen_kwargs,
+                )
+                generated_tokens = 1
+                accepted_tokens = 1
+                accepted_lengths = [1]
+                accept_counts = 1
+            total_generated_tokens += generated_tokens
+            total_accepted_tokens += accepted_tokens
+            total_accepted_lengths.extend(accepted_lengths)
+            total_accept_counts += accept_counts
             if local_rank == 0:
                 end_event.record()
                 torch.cuda.synchronize()
@@ -183,6 +206,8 @@ def main(cfg: DictConfig) -> None:
             print("Output:", decoded_samples)
             if elem_id >= THROUGHPUT_WARMUP:
                 print(f"Thput (tok/s): {np.mean(tputs):0.2f} +/- {np.std(tputs):0.2f}")
+                print(f"Total generated tokens: {total_generated_tokens}, Total accepted tokens: {total_accepted_tokens}, Acceptance rate: {total_accepted_tokens / total_generated_tokens:.2%}")
+                print(f"Total average accepted length: {np.mean(total_accepted_lengths):.2f}")
         generated_samples.append(decoded_samples)
 
     # Compute metrics

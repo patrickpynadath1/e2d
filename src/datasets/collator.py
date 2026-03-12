@@ -103,12 +103,16 @@ class DenoisingCollator:
             self._rank * batch_size,
             min((self._rank + 1) * batch_size, global_batch_size),
         )
+        # ---- Modification (11.20): Disable sampling t (because it relies on a predefined block size, but we don't actually need t for e2d) ----
+        
         t = self._sample_t(
             global_batch_size=global_batch_size,
             batch_size=batch_size,
             t_index=t_index,
             device=batch["input_ids"].device,
         )
+        
+        # ---- End of Modification ----
         if all([c is not None for c in context_mask]):
             context_mask = torch.nn.utils.rnn.pad_sequence(
                 context_mask,  # type: ignore
@@ -121,7 +125,11 @@ class DenoisingCollator:
                 else (self.max_length - context_mask.shape[-1], 0),
             )
             batch.update({"context_mask": context_mask})
+        # ---- Modification (11.20): Disable sampling t (because it relies on a predefined block size, but we don't actually need t for e2d) ----
+        
         batch.update({"t": t})
+        
+        # ---- End of Modification ----
 
         # Override the attention mask to attend to all tokens (including [PAD])
         if self.predict_padding:

@@ -2,3 +2,4 @@ defaults:
   - cnn_dailymail_train
 split: "test"
 truncate: true
+max_samples: 1000

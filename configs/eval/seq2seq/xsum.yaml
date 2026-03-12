@@ -1,0 +1,17 @@
+defaults:
+  - base@_here_
+  - _self_
+
+dataset:
+  _target_: src.datasets.tokenize_on_demand.CNNDailyMailDataset
+  source_prompt_text: "Summarize the following article: "
+  target_prompt_text: "Summary: "
+  dataset_path: "EdinburghNLP/xsum"
+  config_name: null
+  source_key: "document"
+  target_key: "summary"
+  truncate: false
+  filter_by_length: true
+  source_max_length_ratio: 0.9
+  target_max_length_ratio: 0.1
+  filter_max_length: 1024

@@ -1,0 +1,12 @@
+defaults:
+  - base@_here_
+  - _self_
+
+dataset:
+  _target_: src.datasets.tokenize_on_demand.MMLUDataset
+  source_prompt_text: "The following is a multiple choice question about {subject}.\n\n"
+  target_prompt_text: "Answer: "
+  split: "test"
+  sample_ratio: 0.1
+  sampling_seed: 42
+  separate_input_output: true

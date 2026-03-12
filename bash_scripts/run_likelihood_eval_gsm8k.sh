@@ -3,8 +3,8 @@
 cd ../ || exit  # Go to the root directory of the repo
 source setup_env.sh
 
-MODEL_PATH="kuleshov-group/e2d2-gsm8k-finetune-Qwen3-2B"
-# MODEL_PATH="outputs/<PATH_TO_SAVED_MODEL_DIR>"
+# MODEL_PATH="kuleshov-group/e2d2-gsm8k-finetune-Qwen3-2B"
+MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec14_e2d2_20251130_065150_tie-weights"
 REVISION=null
 
 EVAL_DATASET="gsm8k_eval"
@@ -13,6 +13,8 @@ BATCH_SIZE=1
 PRETRAINED_MODEL_NAME_OR_PATH="Qwen/Qwen3-1.7B-Base"  # TODO: Change as needed
 CKPT_FILE="best-rank0.pt"
 USE_EMA=true
+
+NUM_VISIBLE_DEVICES=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 composer -n ${NUM_VISIBLE_DEVICES} scripts/eval/likelihood_eval.py \
   hydra.output_subdir=null \

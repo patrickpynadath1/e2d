@@ -5,21 +5,22 @@ cd ../ || exit  # Go to the root directory of the repo
 source setup_env.sh
 
 # Model arch
-BLOCK_SIZE=8
-EVAL_BLOCK_SIZE=8
-HIDDEN_SIZE=256
-INTERMEDIATE_SIZE=768
-N_ENCODER_LAYERS=20
-N_DECODER_LAYERS=8
+BLOCK_SIZE=4
+EVAL_BLOCK_SIZE=4
+HIDDEN_SIZE=2048
+INTERMEDIATE_SIZE=6144
+N_ENCODER_LAYERS=28
+N_DECODER_LAYERS=2
 
 
 # Hyperparameters
-LR=3e-4
-WARMUP_DURATION="1000ba"
-BATCH_SIZE=128
-MAX_DURATION="500000ba"
+LR=1e-5
+WARMUP_DURATION="50ba"
+BATCH_SIZE=32
+MICRO_BATCH_SIZE=1
+MAX_DURATION="3000ba"
 
-PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-0.6B-Base
+PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-1.7B-Base
 
 TAG="e2d2"
 ENC_LAYERS="enc${N_ENCODER_LAYERS}"
@@ -27,14 +28,11 @@ DEC_LAYERS="dec${N_DECODER_LAYERS}"
 RUN_NAME=cnn_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_${ENC_LAYERS}_${DEC_LAYERS}_hidden${HIDDEN_SIZE}_inter${INTERMEDIATE_SIZE}_${TAG}
 
 GPU_TYPE=$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -E 's/.*(A[0-9]+|H100|A6000).*/\1/' | head -n 1)
-if [[ "$GPU_TYPE" == "A100" || "$GPU_TYPE" == "H100" ]]; then
-    MICRO_BATCH_SIZE=8
-elif [[ "$GPU_TYPE" == "A6000" ]]; then
-    MICRO_BATCH_SIZE=4
-else
-    MICRO_BATCH_SIZE=2
-fi
 NUM_WORKERS=0
+
+NUM_VISIBLE_DEVICES=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
+
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoiser.py \
   run_name=${RUN_NAME} \
@@ -42,23 +40,23 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   dataset@train_dataset=cnn_dailymail_train \
   dataset@eval_dataset=cnn_dailymail_eval \
   composer.optimizer.lr=${LR} \
-  composer.trainer.eval_interval="5000ba" \
+  composer.trainer.eval_interval="100ba" \
   composer.trainer.max_duration=${MAX_DURATION} \
   composer.trainer.save_num_checkpoints_to_keep=1 \
   composer/lr_scheduler=constant_with_warmup \
   composer.lr_scheduler.t_warmup=${WARMUP_DURATION} \
   model=e2d2 \
   model.config.attn_backend="sdpa" \
-  training.compile_backbone=true \
+  training.compile_backbone=false \
   model.config.length=1024 \
-  model/backbone@model.config.backbone_config=llm_as_encoder_decoder \
+  model/backbone@model.config.backbone_config=llm_as_encoder_decoder_share_kv \
   model.config.backbone_config.use_encoder_causal_mask=false \
   model.config.backbone_config.num_encoder_layers=${N_ENCODER_LAYERS} \
   model.config.backbone_config.num_decoder_layers=${N_DECODER_LAYERS} \
   model.config.backbone_config.tie_encoder_decoder_weights=false \
-  model.config.backbone_config.reinit_decoder=true \
-  model.config.backbone_config.reinit_encoder=true \
-  model.config.backbone_config.keep_top_decoder_layers=false \
+  model.config.backbone_config.reinit_decoder=false \
+  model.config.backbone_config.reinit_encoder=false \
+  model.config.backbone_config.keep_top_decoder_layers=true \
   model.config.backbone_config.keep_top_encoder_layers=false \
   +model.config.backbone_config.hidden_size=${HIDDEN_SIZE} \
   +model.config.backbone_config.intermediate_size=${INTERMEDIATE_SIZE} \
@@ -67,8 +65,9 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   block_size=${BLOCK_SIZE} \
   eval_block_size=${EVAL_BLOCK_SIZE} \
   training.antithetic_sampling=false \
-  hydra.run.dir=outputs/${RUN_NAME} \
-  composer.trainer.save_interval="1000ba" \
+  hydra.run.dir=/data/shared_data/hankun/outputs/${RUN_NAME} \
+  composer.trainer.save_interval="100ba" \
   composer.loggers.name=${RUN_NAME} \
   train_dataloader.num_workers=${NUM_WORKERS} \
+  eval_dataloader.batch_size=1 \
   composer.callbacks.hf_compatible_checkpointing.disable_hf=true

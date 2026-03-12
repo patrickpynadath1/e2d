@@ -1,0 +1,724 @@
+Logging into W&B as 'hankun2004-purdue-university'.
+[33m⚠️  Warning: 'huggingface-cli login' is deprecated. Use 'hf auth login' instead.[0m
+HuggingFace cache set to '/home/hankun/e2d/.hf_cache'.
+Saving extracted weights to /data/shared_data/hankun/outputs/scienceqa-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec14_e2d2_20260310_084158_tie-weights/checkpoints/best-rank0_ema_weights_only.pt
+Num. params: 1.7B
+Evaluating on 1000 ScienceQA problems
+
+[1/1000] Accuracy: 1/1 = 100.00% | Thput: 17.39 tok/s
+Total generated tokens: 24, Total accepted tokens: 24, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: 33 minutes is too better estimate. 33 hours is too slow.
+The answer is (A).Answer...
+
+[2/1000] Accuracy: 2/2 = 100.00% | Thput: 36.73 tok/s
+Total generated tokens: 32, Total accepted tokens: 32, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: The answer is (A).Answer...
+
+[3/1000] Accuracy: 3/3 = 100.00% | Thput: 40.70 tok/s
+Total generated tokens: 184, Total accepted tokens: 184, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  Chinese newigator is a reptile. It has scaly, waterproof skin.
+Chinese newigators live in near water. They can their eggs in water.
+A grass frogad is an amphibian. It has moist skin and begins its li...
+
+[4/1000] Accuracy: 3/4 = 75.00% | Thput: 40.66 tok/s
+Total generated tokens: 220, Total accepted tokens: 220, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (A)
+  Generated:  words hide and hide rhyme. They both end with the ide sound.
+The word wife does not rhyme. It ends with a different sound.
+The answer is (A).Answer...
+
+[5/1000] Accuracy: 4/5 = 80.00% | Thput: 40.67 tok/s
+Total generated tokens: 256, Total accepted tokens: 256, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  the words in alphabetical order are between glow and guess.Since glow is between the guide words garage - goose, it would be found on that page.
+The answer is (B)....
+
+[6/1000] Accuracy: 5/6 = 83.33% | Thput: 40.64 +/- 0.00 tok/s
+Total generated tokens: 288, Total accepted tokens: 288, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: arnel is pushing on the wheelchair. So, Newton's third law tells you that the wheelchair is pushing on Darnel.
+The answer is (A)....
+
+[7/1000] Accuracy: 6/7 = 85.71% | Thput: 41.08 +/- 0.43 tok/s
+Total generated tokens: 412, Total accepted tokens: 412, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (C)  Predicted: (C)
+  Generated:  1: is a physical change. A change of state does not become a different type of matter.
+Dry ice is solid carbon dioxide. When dry ice gets warm, it changes state and becomes carbon dioxide gas. This c...
+
+[8/1000] Accuracy: 7/8 = 87.50% | Thput: 40.98 +/- 0.38 tok/s
+Total generated tokens: 440, Total accepted tokens: 440, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  book should be be in italics.
+The correct title is **The Lion and the Mouse**.
+The answer is (A)....
+
+[9/1000] Accuracy: 8/9 = 88.89% | Thput: 40.81 +/- 0.44 tok/s
+Total generated tokens: 488, Total accepted tokens: 488, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  sentence tense is in present tense. You can tell because it uses a present-tense verb, learns. The verb ends in -s and tells you about something that is true or happening now.
+The answer is (B).Answe...
+
+[10/1000] Accuracy: 9/10 = 90.00% | Thput: 40.85 +/- 0.40 tok/s
+Total generated tokens: 496, Total accepted tokens: 496, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated: The answer is (B).Answer...
+
+[11/1000] Accuracy: 10/11 = 90.91% | Thput: 40.85 +/- 0.37 tok/s
+Total generated tokens: 552, Total accepted tokens: 552, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  result result is a cost. It involves giving up or spending something that Jordan wants or needs:
+Jordan will give up the chance to look at the magnolia tree. He thinks it would have looked more beaut...
+
+[12/1000] Accuracy: 10/12 = 83.33% | Thput: 40.84 +/- 0.34 tok/s
+Total generated tokens: 580, Total accepted tokens: 580, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (B)
+  Generated:  word ends with a consonant and has a short vowel sound. So, it has a closed syllable.
+The answer is (B)....
+
+[13/1000] Accuracy: 11/13 = 84.62% | Thput: 40.85 +/- 0.32 tok/s
+Total generated tokens: 656, Total accepted tokens: 656, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: umpy is a property. A bumpy material is covered in lumps and bumps. It is not flat or smooth.
+Look at each picture, one at a time. Imagine touching the material shown in each picture.
+Of the choices, ...
+
+[14/1000] Accuracy: 12/14 = 85.71% | Thput: 40.79 +/- 0.34 tok/s
+Total generated tokens: 692, Total accepted tokens: 692, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  second greeting is correct:
+Its first word is capitalized, and it ends with a comma. Pablo is capitalized because it is a proper noun.
+The answer is (A).Answer...
+
+[15/1000] Accuracy: 13/15 = 86.67% | Thput: 40.68 +/- 0.46 tok/s
+Total generated tokens: 700, Total accepted tokens: 700, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: The answer is (A).Answer...
+
+[16/1000] Accuracy: 14/16 = 87.50% | Thput: 40.70 +/- 0.44 tok/s
+Total generated tokens: 788, Total accepted tokens: 788, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: The source of the allusion Achilles's heel is Greek mythology.
+In Greek mythology, Achilles's mother dips him in a river that protects his body wherever it touches. His heel does not get wet, so it is...
+
+[17/1000] Accuracy: 15/17 = 88.24% | Thput: 40.76 +/- 0.46 tok/s
+Total generated tokens: 832, Total accepted tokens: 832, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  four men's clothing stores closed on Main Street. The number of suppliers went down. There were fewer stores selling men's shirts. So, the supply of men's shirts probably went down.
+The answer is (B)...
+
+[18/1000] Accuracy: 16/18 = 88.89% | Thput: 40.75 +/- 0.45 tok/s
+Total generated tokens: 876, Total accepted tokens: 876, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  text uses a pun, a word or phrase that humorously suggests more than one meaning.
+Impossible to put down means that the book is so good that it is hard to stop reading.
+The answer is (A)....
+
+[19/1000] Accuracy: 17/19 = 89.47% | Thput: 40.74 +/- 0.43 tok/s
+Total generated tokens: 920, Total accepted tokens: 920, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  text uses verbal irony, which involves saying one thing but implying something very different.
+As comfortable as a bed of nails shows verbal irony because sitting on nails would not be comfortable.
+T...
+
+[20/1000] Accuracy: 18/20 = 90.00% | Thput: 40.73 +/- 0.42 tok/s
+Total generated tokens: 944, Total accepted tokens: 944, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  second closing is correct:
+Its first word is capitalized, and it ends with a comma.
+The answer is (A)....
+
+[21/1000] Accuracy: 19/21 = 90.48% | Thput: 40.76 +/- 0.42 tok/s
+Total generated tokens: 984, Total accepted tokens: 984, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  two drops of honey are made of the same material and have the same mass. So, the drop of honey with more thermal energy has a higher temperature.
+The answer is (B).Answer:...
+
+[22/1000] Accuracy: 19/22 = 86.36% | Thput: 40.77 +/- 0.41 tok/s
+Total generated tokens: 1020, Total accepted tokens: 1020, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (C)
+  Generated:  words wife and swim rhyme. They both end with the i sound.
+The word life does not rhyme. It ends with a different sound.
+The answer is (C).Answer...
+
+[23/1000] Accuracy: 20/23 = 86.96% | Thput: 40.75 +/- 0.40 tok/s
+Total generated tokens: 1080, Total accepted tokens: 1080, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: The source of the allusion Peter Pan is literature.
+In a J.. Bar Bar, Bar Pan is the character who retreat in Neverland and refuses to grow up.
+The allusion Peter Pan means a person who won't take on ...
+
+[24/1000] Accuracy: 21/24 = 87.50% | Thput: 40.74 +/- 0.39 tok/s
+Total generated tokens: 1128, Total accepted tokens: 1128, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  two mugs of cocoa have the same mass but different temperatures. Since the 155°F mug of cocoa is hotter than the 115°F mug of cocoa, it has more thermal energy.
+The answer is (A)....
+
+[25/1000] Accuracy: 22/25 = 88.00% | Thput: 40.74 +/- 0.38 tok/s
+Total generated tokens: 1168, Total accepted tokens: 1168, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  for backpack carrying have the same mass. So, the backpack carrying 9 pounds needs a larger force to start rolling at the same speed as the other backpack.
+The answer is (A).Answer...
+
+[26/1000] Accuracy: 22/26 = 84.62% | Thput: 40.75 +/- 0.38 tok/s
+Total generated tokens: 1204, Total accepted tokens: 1204, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (B)
+  Generated:  humans are not born knowing how to hear different sounds. Instead, some people learn how to hear. So, hearing different sounds is an acquired trait.
+The answer is (B)....
+
+[27/1000] Accuracy: 23/27 = 85.19% | Thput: 40.75 +/- 0.37 tok/s
+Total generated tokens: 1256, Total accepted tokens: 1256, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: The text argues that an increase in Hillsdale funding was responsible for an increase in littering. However, litter and littering are not necessarily related. This illustrates a type of logical fallac...
+
+[28/1000] Accuracy: 24/28 = 85.71% | Thput: 40.72 +/- 0.39 tok/s
+Total generated tokens: 1300, Total accepted tokens: 1300, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  text uses a pun, a word or phrase that humorously suggests more than one meaning.
+The watch is to the time, because it means that the watch is running on time.
+The answer is (B).Answer...
+
+[29/1000] Accuracy: 25/29 = 86.21% | Thput: 40.75 +/- 0.42 tok/s
+Total generated tokens: 1380, Total accepted tokens: 1380, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  text uses a paradox, a statement that might at first appear to be contradictory, but that may in fact contain some truth.
+Never say never at first appears to be contradictory: by saying the phrase it...
+
+[30/1000] Accuracy: 26/30 = 86.67% | Thput: 40.77 +/- 0.41 tok/s
+Total generated tokens: 1404, Total accepted tokens: 1404, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: 22°F is too cold. 22°C is too hot.
+The answer is (A).Answer:...
+
+[31/1000] Accuracy: 27/31 = 87.10% | Thput: 40.77 +/- 0.41 tok/s
+Total generated tokens: 1448, Total accepted tokens: 1448, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  two blocks of iron have the same mass but different temperatures. Since the 135°C block is hotter than the 110°C block, it has more thermal energy.
+The answer is (A)....
+
+[32/1000] Accuracy: 28/32 = 87.50% | Thput: 40.78 +/- 0.40 tok/s
+Total generated tokens: 1456, Total accepted tokens: 1456, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated: The answer is (B).Answer...
+
+[33/1000] Accuracy: 29/33 = 87.88% | Thput: 40.63 +/- 0.88 tok/s
+Total generated tokens: 1464, Total accepted tokens: 1464, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated: The answer is (B).Answer...
+
+[34/1000] Accuracy: 30/34 = 88.24% | Thput: 40.64 +/- 0.87 tok/s
+Total generated tokens: 1472, Total accepted tokens: 1472, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: The answer is (A).Answer...
+
+[35/1000] Accuracy: 31/35 = 88.57% | Thput: 40.64 +/- 0.86 tok/s
+Total generated tokens: 1552, Total accepted tokens: 1552, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  second answer choice contains a vague pronoun reference. The pronoun it could refer to her scooter or Mr. McDowell's car.
+The first answer choice shows a possible correction for the vague pronoun ref...
+
+[36/1000] Accuracy: 32/36 = 88.89% | Thput: 40.65 +/- 0.84 tok/s
+Total generated tokens: 1712, Total accepted tokens: 1712, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  decide if an animal is part of a group by looking at the traits of the group.
+Crustaceans have the following traits:
+They have two pairs of antennae.
+They have an exoskeleton.
+Compare each animal's t...
+
+[37/1000] Accuracy: 33/37 = 89.19% | Thput: 40.66 +/- 0.83 tok/s
+Total generated tokens: 1720, Total accepted tokens: 1720, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated: The answer is (B).Answer...
+
+[38/1000] Accuracy: 34/38 = 89.47% | Thput: 40.67 +/- 0.82 tok/s
+Total generated tokens: 1764, Total accepted tokens: 1764, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  result result is a cost. It involves giving up or spending something that Mia wants or needs:
+Mia will give up the chance to wear the costume she is more excited about.
+The answer is (A).Answer...
+
+[39/1000] Accuracy: 35/39 = 89.74% | Thput: 40.68 +/- 0.81 tok/s
+Total generated tokens: 1820, Total accepted tokens: 1820, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  first sentence is the complex sentence. It is made up of an independent clause and a dependent clause. The dependent clause begins with the subordinating conjunction although.
+Although she left her h...
+
+[40/1000] Accuracy: 36/40 = 90.00% | Thput: 40.65 +/- 0.82 tok/s
+Total generated tokens: 1880, Total accepted tokens: 1880, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated: The source of the allusion Icarus is Greek mythology.
+In Greek mythology, Icarus was a bird with two wings who flew into the sun of the Greek and melted his body.
+The allusion Icarus means a person wh...
+
+[41/1000] Accuracy: 37/41 = 90.24% | Thput: 40.64 +/- 0.81 tok/s
+Total generated tokens: 1940, Total accepted tokens: 1940, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: The source of the allusion Casanova is history.
+The autobiography Gi Giovanni Giacomo Casanova, an eighteenth-century Italian adventurer, details and perhaps exaggerates his amorous adventures and suc...
+
+[42/1000] Accuracy: 38/42 = 90.48% | Thput: 40.65 +/- 0.80 tok/s
+Total generated tokens: 1972, Total accepted tokens: 1972, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  two basketballs are made of the same material and have the same mass. So, the hotter basketball has more thermal energy.
+The answer is (A)....
+
+[43/1000] Accuracy: 39/43 = 90.70% | Thput: 40.68 +/- 0.81 tok/s
+Total generated tokens: 1980, Total accepted tokens: 1980, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: The answer is (A).Answer...
+
+[44/1000] Accuracy: 40/44 = 90.91% | Thput: 40.69 +/- 0.80 tok/s
+Total generated tokens: 2004, Total accepted tokens: 2004, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: ize the should be capitalized words.
+The correct title is The Adventures of Chuck and Friends.
+The answer is (A)....
+
+[45/1000] Accuracy: 41/45 = 91.11% | Thput: 40.70 +/- 0.79 tok/s
+Total generated tokens: 2060, Total accepted tokens: 2060, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (C)  Predicted: (C)
+  Generated:  The text argues that a city in polite is has a polite population. However, even though observations isn't always polite that doesn't necessarily mean that the city is polite. This illustrates a type ...
+
+[46/1000] Accuracy: 42/46 = 91.30% | Thput: 40.71 +/- 0.79 tok/s
+Total generated tokens: 2068, Total accepted tokens: 2068, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated: The answer is (B).Answer...
+
+[47/1000] Accuracy: 42/47 = 89.36% | Thput: 40.72 +/- 0.78 tok/s
+Total generated tokens: 2580, Total accepted tokens: 2580, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (C)  Predicted: (None)
+  Generated:  Sixth Sixth Amendment says that anyone accused of a crime has the right to get help from a lawyer. In fact, the Sixth text says that " accusedy is always the word." It means " accusedy is always the ...
+
+[48/1000] Accuracy: 43/48 = 89.58% | Thput: 40.73 +/- 0.77 tok/s
+Total generated tokens: 2600, Total accepted tokens: 2600, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  better seconds is too fast. 3 minutes is too slow.
+The answer is (A)....
+
+[49/1000] Accuracy: 44/49 = 89.80% | Thput: 40.73 +/- 0.76 tok/s
+Total generated tokens: 2628, Total accepted tokens: 2628, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  sentence tells about something, and it ends with a period. It is a declarative sentence.
+The answer is (A).Answer:...
+
+[50/1000] Accuracy: 45/50 = 90.00% | Thput: 40.73 +/- 0.76 tok/s
+Total generated tokens: 2652, Total accepted tokens: 2652, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  best3 gallons is the much estimate 13 fluid ounces and 13 cups.
+The answer is (A)....
+
+[51/1000] Accuracy: 46/51 = 90.20% | Thput: 40.73 +/- 0.75 tok/s
+Total generated tokens: 2768, Total accepted tokens: 2768, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  second text uses nauseous in its traditional sense: causing disgust or nausea.
+Tisha's little brother looked a little sick after eating mounds of candy and then going on the nauseous rides at the sta...
+
+[52/1000] Accuracy: 47/52 = 90.38% | Thput: 40.74 +/- 0.75 tok/s
+Total generated tokens: 2812, Total accepted tokens: 2812, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  text uses an oxymoron, a joining of two seemingly contradictory terms.
+Open secret is a contradiction, because open describes something that is freely or publicly known, and a secret is hidden.
+The a...
+
+[53/1000] Accuracy: 48/53 = 90.57% | Thput: 40.75 +/- 0.74 tok/s
+Total generated tokens: 2860, Total accepted tokens: 2860, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  second sentence is less formal. You can tell because it uses slang ( (took, went to).
+The first sentence uses formal language in place of the slang, so it is more formal overall.
+The answer is (B).An...
+
+[54/1000] Accuracy: 49/54 = 90.74% | Thput: 40.75 +/- 0.73 tok/s
+Total generated tokens: 3000, Total accepted tokens: 3000, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (D)  Predicted: (D)
+  Generated:  bird sc spider is an insect. Like other insects, a bird scorpion is an invertebrate. It does not have a backbone. It has an exoskeleton.
+A wombat is a mammal. Like other mammals, a wombat is a verteb...
+
+[55/1000] Accuracy: 50/55 = 90.91% | Thput: 40.75 +/- 0.73 tok/s
+Total generated tokens: 3028, Total accepted tokens: 3028, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  better estimate for the temperature of a cold glass of water is 3°C.
+3°F is too cold.
+The answer is (A)....
+
+[56/1000] Accuracy: 51/56 = 91.07% | Thput: 40.76 +/- 0.72 tok/s
+Total generated tokens: 3068, Total accepted tokens: 3068, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  sentence tense is in future tense. You can tell because it uses will before the main verb, harm. The verb tells you about something that is going to happen.
+The answer is (B)....
+
+[57/1000] Accuracy: 52/57 = 91.23% | Thput: 40.76 +/- 0.72 tok/s
+Total generated tokens: 3116, Total accepted tokens: 3116, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  text uses an allusion, a brief reference to someone or something well known.
+Neverland alludes to the story of Peter Pan, a boy who lived in Neverland and never grew up.
+The answer is (A).Answer:...
+
+[58/1000] Accuracy: 53/58 = 91.38% | Thput: 40.77 +/- 0.71 tok/s
+Total generated tokens: 3176, Total accepted tokens: 3176, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (C)  Predicted: (C)
+  Generated: The text argues that video games led video science science degrees. However, even though the number of computer science PhD increased after video games became popular, that doesn't necessarily mean th...
+
+[59/1000] Accuracy: 54/59 = 91.53% | Thput: 40.78 +/- 0.71 tok/s
+Total generated tokens: 3200, Total accepted tokens: 3200, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated: 45°F is too cold. 45°C is too hot.
+The answer is (B).Answer:...
+
+[60/1000] Accuracy: 55/60 = 91.67% | Thput: 40.79 +/- 0.70 tok/s
+Total generated tokens: 3292, Total accepted tokens: 3292, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  second answer choice contains a vague pronoun reference. The pronoun he could refer to Joe Diaggio or Willie Mays.
+The first answer choice shows a possible correction for the vague pronoun reference....
+
+[61/1000] Accuracy: 56/61 = 91.80% | Thput: 40.78 +/- 0.70 tok/s
+Total generated tokens: 3344, Total accepted tokens: 3344, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  the properties of limestone match are. It is a rock.
+A brick is made in a factory. But all rocks are formed in nature.
+So, a brick is not a rock.
+Granodiorite is a rock.
+The answer is (B)....
+
+[62/1000] Accuracy: 57/62 = 91.94% | Thput: 40.79 +/- 0.69 tok/s
+Total generated tokens: 3368, Total accepted tokens: 3368, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  pet is an animal.
+A pet lives with people.
+You have to feed a pet.
+The answer is (A)....
+
+[63/1000] Accuracy: 58/63 = 92.06% | Thput: 40.79 +/- 0.69 tok/s
+Total generated tokens: 3392, Total accepted tokens: 3392, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  second closing is correct:
+Its first word is capitalized, and it ends with a comma.
+The answer is (B)....
+
+[64/1000] Accuracy: 59/64 = 92.19% | Thput: 40.79 +/- 0.68 tok/s
+Total generated tokens: 3420, Total accepted tokens: 3420, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  poem should should in quotation marks.
+The correct title is "The Mountain and the Squirrel."
+The answer is (A).Answer:...
+
+[65/1000] Accuracy: 60/65 = 92.31% | Thput: 40.79 +/- 0.68 tok/s
+Total generated tokens: 3468, Total accepted tokens: 3468, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  Jasper won the school costume contest, his mom felt proud is a run-on sentence. It has two sentences that are joined by just a comma: Jasper won the school costume contest and His mom felt proud.
+The...
+
+[66/1000] Accuracy: 61/66 = 92.42% | Thput: 40.79 +/- 0.67 tok/s
+Total generated tokens: 3504, Total accepted tokens: 3504, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  the words in alphabetical order are between smile and shred. Since smile is between the guide words slate - strong, it would be found on that page.
+The answer is (A)....
+
+[67/1000] Accuracy: 62/67 = 92.54% | Thput: 40.80 +/- 0.67 tok/s
+Total generated tokens: 3588, Total accepted tokens: 3588, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (C)  Predicted: (C)
+  Generated:  1:: Baking cookies.
+Baking cookies is a chemical change. The type of matter in the cookie dough changes when it is baked. The cookie dough turns into cookies!
+Water evaporating from a puddle is a cha...
+
+[68/1000] Accuracy: 63/68 = 92.65% | Thput: 40.80 +/- 0.67 tok/s
+Total generated tokens: 3624, Total accepted tokens: 3624, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (C)  Predicted: (C)
+  Generated:  best2 ounces is the light of 12 pounds. 12 tons is too heavy and 12 ounces is too light.
+The answer is (C).Answer...
+
+[69/1000] Accuracy: 64/69 = 92.75% | Thput: 40.81 +/- 0.66 tok/s
+Total generated tokens: 3696, Total accepted tokens: 3696, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated: The text argues that Laura Ellis is responsible for the decline in student performance. However, even though student performance fell down after Ellis Ellis became vice president of the parent-teacher...
+
+[70/1000] Accuracy: 65/70 = 92.86% | Thput: 40.82 +/- 0.66 tok/s
+Total generated tokens: 3748, Total accepted tokens: 3748, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  text uses an idiom, an expression that cannot be understood literally.
+The idiom a lot on her plate suggests that Scarlett has many responsibilities. If you have a lot on your plate, you are busy wit...
+
+[71/1000] Accuracy: 66/71 = 92.96% | Thput: 40.82 +/- 0.66 tok/s
+Total generated tokens: 3772, Total accepted tokens: 3772, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  better00 grams is too light and 100 kilograms is too heavy.
+The answer is (A)....
+
+[72/1000] Accuracy: 67/72 = 93.06% | Thput: 40.81 +/- 0.66 tok/s
+Total generated tokens: 3820, Total accepted tokens: 3820, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  two bottles of water have the same mass but different temperatures. Since the 10°C bottle of water is colder than the 20°C bottle of water, it has less thermal energy.
+The answer is (A).Answer:...
+
+[73/1000] Accuracy: 68/73 = 93.15% | Thput: 40.80 +/- 0.66 tok/s
+Total generated tokens: 3864, Total accepted tokens: 3864, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  sentence is is in past tense. You can tell because it uses a past-tense verb, invited. The verb ends in -ed and tells you about something that has already happened.
+The answer is (A)....
+
+[74/1000] Accuracy: 69/74 = 93.24% | Thput: 40.80 +/- 0.65 tok/s
+Total generated tokens: 3940, Total accepted tokens: 3940, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  second answer choice contains a vague pronoun reference. The pronoun it could refer to the memory card or the digital camera.
+The first answer choice shows a possible correction for the vague pronoun...
+
+[75/1000] Accuracy: 70/75 = 93.33% | Thput: 40.80 +/- 0.65 tok/s
+Total generated tokens: 4028, Total accepted tokens: 4028, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated: The source of the allusion prodigal son is the Bible.
+In a Biblical parable, the prodigal son irresponsibly spends the inheritance given to him by his father. When he returns home, he expects to be sh...
+
+[76/1000] Accuracy: 71/76 = 93.42% | Thput: 40.81 +/- 0.65 tok/s
+Total generated tokens: 4072, Total accepted tokens: 4072, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  do not inherit inherit your parent's scars. Instead, scars are caused by the environment. People can get scars after they get hurt. So, having a scar is an acquired trait.
+The answer is (A)....
+
+[77/1000] Accuracy: 72/77 = 93.51% | Thput: 40.81 +/- 0.64 tok/s
+Total generated tokens: 4268, Total accepted tokens: 4268, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  1: a piece of pear turning brown is a chemical change. The pear reacts with oxygen in the air and turns into a different type of matter.
+If you scrape off the brown layer of the pear, the inside will...
+
+[78/1000] Accuracy: 73/78 = 93.59% | Thput: 40.82 +/- 0.64 tok/s
+Total generated tokens: 4356, Total accepted tokens: 4356, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  1: food is by plants. Plants make food is a chemical change. Plants use energy from sunlight to change air and water into food. The food is sugar. Sugar is a different type of matter than air or wate...
+
+[79/1000] Accuracy: 74/79 = 93.67% | Thput: 40.82 +/- 0.64 tok/s
+Total generated tokens: 4380, Total accepted tokens: 4380, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  The mango is hanging motionless. So, the mango has a constant velocity.
+The answer is (A).Answer...
+
+[80/1000] Accuracy: 75/80 = 93.75% | Thput: 40.83 +/- 0.64 tok/s
+Total generated tokens: 4408, Total accepted tokens: 4408, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated: circles has bunk beds for the kids is a sentence fragment. It is missing a subject.
+The answer is (B).Answer:...
+
+[81/1000] Accuracy: 76/81 = 93.83% | Thput: 40.83 +/- 0.64 tok/s
+Total generated tokens: 4448, Total accepted tokens: 4448, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  best4 millimeters is 14 millimeters.
+14 centimeters, 14 meters, and 14 kilometers are all too long.
+The answer is (B).Answer:...
+
+[82/1000] Accuracy: 77/82 = 93.90% | Thput: 40.84 +/- 0.64 tok/s
+Total generated tokens: 4508, Total accepted tokens: 4508, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: The text argues that all seafood restaurants are overpriced. However, even though one seafood restaurant was overpriced, that doesn't necessarily mean that all seafood restaurants are overpriced. This...
+
+[83/1000] Accuracy: 78/83 = 93.98% | Thput: 40.82 +/- 0.67 tok/s
+Total generated tokens: 4516, Total accepted tokens: 4516, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (C)  Predicted: (C)
+  Generated: The answer is (C).Answer...
+
+[84/1000] Accuracy: 79/84 = 94.05% | Thput: 40.82 +/- 0.66 tok/s
+Total generated tokens: 4560, Total accepted tokens: 4560, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  for strollers have the same mass. So, stroller with kid that weighs 27 pounds needs a larger force to start moving at the same speed as the other stroller.
+The answer is (A)....
+
+[85/1000] Accuracy: 80/85 = 94.12% | Thput: 40.82 +/- 0.66 tok/s
+Total generated tokens: 4648, Total accepted tokens: 4648, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  first answer choice contains a vague pronoun reference. The pronoun she could refer to Mrs. Chapman or her assistant.
+Mrs. Chapman informed her assistant that she had to book a flight to Seoul immedi...
+
+[86/1000] Accuracy: 80/86 = 93.02% | Thput: 40.83 +/- 0.66 tok/s
+Total generated tokens: 4680, Total accepted tokens: 4680, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (A)
+  Generated:  the words in and width are compared the guide word who who - wren. So, they would be found on that page.
+The answer is (A)....
+
+[87/1000] Accuracy: 81/87 = 93.10% | Thput: 40.83 +/- 0.66 tok/s
+Total generated tokens: 4732, Total accepted tokens: 4732, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (C)  Predicted: (C)
+  Generated: The answer is a tent.Answer: A tent is a solid. A solid has a size and shape of its own. When you open a tent, it still still has a size and shape of its own.
+The answer is (C).Answer...
+
+[88/1000] Accuracy: 81/88 = 92.05% | Thput: 40.83 +/- 0.65 tok/s
+Total generated tokens: 5244, Total accepted tokens: 5244, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (None)
+  Generated: The Constitution Amendment says that the United States government has the powers listed in the Constitution. But it is not clear that the Constitution of the have all the powers of the United States. ...
+
+[89/1000] Accuracy: 82/89 = 92.13% | Thput: 40.84 +/- 0.65 tok/s
+Total generated tokens: 5304, Total accepted tokens: 5304, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: The text argues that Rebecca must watch reality television, because her sister watches reality television. However, even though Rebecca's sister watches reality television, that doesn't necessarily me...
+
+[90/1000] Accuracy: 83/90 = 92.22% | Thput: 40.84 +/- 0.65 tok/s
+Total generated tokens: 5328, Total accepted tokens: 5328, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  the countries decided to pump less. So, the supply of gasoline went down.
+The answer is (B).Answer...
+
+[91/1000] Accuracy: 84/91 = 92.31% | Thput: 40.84 +/- 0.64 tok/s
+Total generated tokens: 5424, Total accepted tokens: 5424, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: ellypaste is a liquid. It has a shape and shape of its own container. If you pourellypaste into a different container, theellypaste will take the shape of that container. But theellypaste will still t...
+
+[92/1000] Accuracy: 85/92 = 92.39% | Thput: 40.85 +/- 0.64 tok/s
+Total generated tokens: 5456, Total accepted tokens: 5456, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  best0 inches is the best estimate  the0 feet.
+100 yards and 10 miles are both too long.
+The answer is (A)....
+
+[93/1000] Accuracy: 86/93 = 92.47% | Thput: 40.85 +/- 0.64 tok/s
+Total generated tokens: 5512, Total accepted tokens: 5512, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  sentence is complex. It is made up of an independent clause and a dependent clause. The dependent clause begins with the subordinating conjunction as.
+As Bert sat down on the rickety old chair, it ab...
+
+[94/1000] Accuracy: 86/94 = 91.49% | Thput: 40.86 +/- 0.64 tok/s
+Total generated tokens: 5556, Total accepted tokens: 5556, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (C)
+  Generated: The text argues that larger larger houses are better for your health. However, this isn't necessarily true. This illustrates a type of logical fallacy known as the slippery slope fallacy.
+The answer i...
+
+[95/1000] Accuracy: 87/95 = 91.58% | Thput: 40.87 +/- 0.64 tok/s
+Total generated tokens: 5608, Total accepted tokens: 5608, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  first sentence is the complex sentence. It is made up of an independent clause and a dependent clause. The dependent clause begins with the subordinating conjunction until.
+Unc Kendrick will keep sno...
+
+[96/1000] Accuracy: 88/96 = 91.67% | Thput: 40.87 +/- 0.64 tok/s
+Total generated tokens: 5660, Total accepted tokens: 5660, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  organisms's genotype for a gene is its combination of alleles for that gene. Algernon has two alleles for brown fur (f). So, Algernon's genotype for the fur color gene is ff.
+The answer is (B).Answer...
+
+[97/1000] Accuracy: 89/97 = 91.75% | Thput: 40.88 +/- 0.64 tok/s
+Total generated tokens: 5668, Total accepted tokens: 5668, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated: The answer is (A).Answer...
+
+[98/1000] Accuracy: 90/98 = 91.84% | Thput: 40.88 +/- 0.64 tok/s
+Total generated tokens: 5676, Total accepted tokens: 5676, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (C)  Predicted: (C)
+  Generated: The answer is (C).Answer...
+
+[99/1000] Accuracy: 91/99 = 91.92% | Thput: 40.88 +/- 0.63 tok/s
+Total generated tokens: 5716, Total accepted tokens: 5716, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (A)  Predicted: (A)
+  Generated:  the passage tells on the usual wind on Mount Everest. It does not describe what the weather is like on a particular day. So, this passage describes the climate.
+The answer is (A)....
+
+[100/1000] Accuracy: 92/100 = 92.00% | Thput: 40.88 +/- 0.63 tok/s
+Total generated tokens: 5764, Total accepted tokens: 5764, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (B)  Predicted: (B)
+  Generated:  result result is a cost. It involves giving up or spending something that Paula wants or needs:
+Paulanda will spend more ride tickets on the scorpion than she would have spent on the flying bobsled.
+...
+
+[101/1000] Accuracy: 93/101 = 92.08% | Thput: 40.88 +/- 0.63 tok/s
+Total generated tokens: 5796, Total accepted tokens: 5796, Acceptance rate: 100.00%
+Average accepted length: 1.00
+  Gold: (C)  Predicted: (C)
+  Generated:  best estimate for the volume of a mustard bottle is 9 fluid ounces.
+9 cups and 9 gallons are both too much.
+The answer is (C)....

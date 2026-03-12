@@ -6,31 +6,39 @@ source setup_env.sh
 
 
 # Model arch
-HIDDEN_SIZE=512
-INTERMEDIATE_SIZE=1536
-N_LAYERS=32
+# HIDDEN_SIZE=512
+HIDDEN_SIZE=2048
+# INTERMEDIATE_SIZE=1536
+INTERMEDIATE_SIZE=6144
+# N_LAYERS=32
+N_LAYERS=28
 
 # Hyperparameters
-LR=3e-4
+LR=1e-5
 WARMUP_DURATION="1000ba"
-BATCH_SIZE=128
-MAX_DURATION="500000ba"
+BATCH_SIZE=32
+MAX_DURATION="30000ba"
 
-PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-0.6B-Base
+PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-1.7B-Base
 
 TAG="ar_target_prompt"
 LAYERS="layers${N_LAYERS}"
-RUN_NAME=wmt_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_${LAYERS}_hidden${HIDDEN_SIZE}_inter${INTERMEDIATE_SIZE}_${TAG}
+# get time stamp
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+RUN_NAME=wmt_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_${LAYERS}_hidden${HIDDEN_SIZE}_inter${INTERMEDIATE_SIZE}_${TAG}_${TIMESTAMP}
 
 GPU_TYPE=$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -E 's/.*(A[0-9]+|H100|A6000).*/\1/' | head -n 1)
-if [[ "$GPU_TYPE" == "A100" || "$GPU_TYPE" == "H100" ]]; then
-    MICRO_BATCH_SIZE=16
-elif [[ "$GPU_TYPE" == "A6000" ]]; then
-    MICRO_BATCH_SIZE=8
-else
-    MICRO_BATCH_SIZE=4
-fi
+# if [[ "$GPU_TYPE" == "A100" || "$GPU_TYPE" == "H100" ]]; then
+#     MICRO_BATCH_SIZE=16
+# elif [[ "$GPU_TYPE" == "A6000" ]]; then
+#     MICRO_BATCH_SIZE=8
+# else
+#     MICRO_BATCH_SIZE=4
+# fi
+MICRO_BATCH_SIZE=4
 NUM_WORKERS=0
+
+NUM_VISIBLE_DEVICES=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoiser.py \
   run_name=${RUN_NAME} \
@@ -40,7 +48,7 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   train_dataset.target_prompt_text="Translation: " \
   eval_dataset.target_prompt_text="Translation: " \
   composer.optimizer.lr=${LR} \
-  composer.trainer.eval_interval="5000ba" \
+  composer.trainer.eval_interval="1000ba" \
   composer.trainer.max_duration=${MAX_DURATION} \
   composer.trainer.save_num_checkpoints_to_keep=1 \
   composer/lr_scheduler=constant_with_warmup \
@@ -49,7 +57,7 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   training.compile_backbone=true \
   model.config.length=256 \
   model/backbone@model.config.backbone_config=automodel_for_causal_lm \
-  model.config.backbone_config.reinit_model=true \
+  model.config.backbone_config.reinit_model=false \
   model.config.backbone_config.num_layers=${N_LAYERS} \
   model.config.backbone_config.keep_top_layers=false \
   +model.config.backbone_config.hidden_size=${HIDDEN_SIZE} \
@@ -57,7 +65,7 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   training.global_batch_size=${BATCH_SIZE} \
   training.grad_accum=$(( BATCH_SIZE / NUM_VISIBLE_DEVICES / MICRO_BATCH_SIZE )) \
   training.antithetic_sampling=false \
-  hydra.run.dir=outputs/${RUN_NAME} \
+  hydra.run.dir=/data/shared_data/hankun/outputs/${RUN_NAME} \
   composer.trainer.save_interval="1000ba" \
   composer.loggers.name=${RUN_NAME} \
   train_dataloader.num_workers=${NUM_WORKERS} \

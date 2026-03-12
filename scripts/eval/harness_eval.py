@@ -28,6 +28,8 @@ from scripts.utils import (
     load_model_from_ckpt_dir_path,
     maybe_add_missing_special_tokens,
     register_useful_resolvers,
+    format_number,
+    count_parameters,
     set_seed,
 )
 from src.utils import fsspec_exists, fsspec_mkdirs
@@ -107,6 +109,8 @@ class LMEvalHarnessModel(LM):
                     **model_config_overrides,
                 )
         self.model = model.to(self.device)
+        print(f"Num. params: {format_number(count_parameters(model, trainable=False))}")
+        print(f"Num. trainable params: {format_number(count_parameters(model))}")
         self.model.eval()
         self.tokenizer = maybe_add_missing_special_tokens(tokenizer)
         self.gen_kwargs = gen_kwargs
@@ -129,8 +133,30 @@ class LMEvalHarnessModel(LM):
         raise NotImplementedError
 
     def generate_until(self, requests, **generation_kwargs):
+        # Detect task type from the first request
+        is_humaneval = (
+            len(requests) > 0
+            and hasattr(requests[0], "doc")
+            and "entry_point" in requests[0].doc
+        )
+        is_mbpp = (
+            len(requests) > 0
+            and hasattr(requests[0], "doc")
+            and (
+                "test_list" in requests[0].doc
+                or str(requests[0].doc.get("task_id", "")).lower().startswith("mbpp")
+            )
+        )
+        is_code_eval = is_humaneval or is_mbpp
+        is_gsm8k = (
+            len(requests) > 0
+            and hasattr(requests[0], "doc")
+            and "answer" in requests[0].doc
+            and not is_code_eval
+        )
+
         # TODO: Move this to utils file / perhaps use chat template
-        def _tokenize(
+        def _tokenize_gsm8k(
             e,
             prefix_text: str | None = (
                 f"{self.tokenizer.bos_token}Please reason step by step, and put your "
@@ -153,14 +179,45 @@ class LMEvalHarnessModel(LM):
                 "target": e["target"],
             }
 
+        def _tokenize_humaneval(e):
+            ctx = e["prefix"]
+            # For HumanEval, the prompt is already the function signature + docstring
+            # Prepend BOS token
+            ctx = self.tokenizer.bos_token + ctx
+            prefix_tokens = self.tokenizer(ctx)["input_ids"]
+            return {
+                "prefix_text": ctx,
+                "prefix": prefix_tokens,
+                "target": e["target"],
+            }
+
+        def _tokenize_default(e):
+            ctx = e["prefix"]
+            ctx = self.tokenizer.bos_token + ctx
+            prefix_tokens = self.tokenizer(ctx)["input_ids"]
+            return {
+                "prefix_text": ctx,
+                "prefix": prefix_tokens,
+                "target": e["target"],
+            }
+
         ds = [{"prefix": req.args[0], "target": req.args[1]} for req in requests]
         ds = Dataset.from_list(ds)
-        ds = ds.map(_tokenize)
+        if is_code_eval:
+            ds = ds.map(_tokenize_humaneval)
+        elif is_gsm8k:
+            ds = ds.map(_tokenize_gsm8k)
+        else:
+            ds = ds.map(_tokenize_default)
         ds = ds.with_format("torch")
         res = []
         res_for_json = []
         correct, total = 0, 0
         tputs = []
+        total_generated_tokens = 0
+        total_accepted_tokens = 0
+        total_accepted_lengths = []
+        total_accept_counts = 0
         for i, elem in tqdm(
             enumerate(ds), desc="Generating", total=len(ds), disable=(self.rank != 0)
         ):
@@ -188,12 +245,31 @@ class LMEvalHarnessModel(LM):
                 start_event.record()
             else:
                 start_event, end_event = None, None
-            sample = self.model.generate(
-                inputs=elem["prefix"][None, ...].to(self.device),
-                disable_pbar=(self.rank != 0),
-                # tokenizer=self.tokenizer,  # Uncomment for debugging
-                **self.gen_kwargs,
-            )
+            if ("E2D" in type(self.model).__name__ and "E2D2" not in type(self.model).__name__) or (
+                "LayerSkip" in type(self.model).__name__
+                and self.gen_kwargs.get("assistant_early_exit") is not None
+            ):
+                sample, (generated_tokens, accepted_tokens), (accepted_lengths, accept_counts) = self.model.generate(
+                    inputs=elem["prefix"][None, ...].to(self.device),
+                    disable_pbar=(self.rank != 0),
+                    # tokenizer=self.tokenizer,  # Uncomment for debugging
+                    **self.gen_kwargs,
+                )
+            else:
+                sample = self.model.generate(
+                    inputs=elem["prefix"][None, ...].to(self.device),
+                    disable_pbar=(self.rank != 0),
+                    # tokenizer=self.tokenizer,  # Uncomment for debugging
+                    **self.gen_kwargs,
+                )
+                generated_tokens = 1
+                accepted_tokens = 1
+                accepted_lengths = [1]
+                accept_counts = 1
+            total_generated_tokens += generated_tokens
+            total_accepted_tokens += accepted_tokens
+            total_accepted_lengths.extend(accepted_lengths)
+            total_accept_counts += accept_counts
             if self.rank == 0:
                 end_event.record()
                 torch.cuda.synchronize()
@@ -207,33 +283,59 @@ class LMEvalHarnessModel(LM):
                 self.tokenizer.eos_token,
             ]:
                 result = result.split(until)[0]
-            predicted_ans = None
-            if "boxed{" in result:
-                predicted_ans = result.split("boxed{")[1].split("}")[0]
-                result = result.split("boxed{")[0] + "#### " + predicted_ans
-                result = result.replace("$\\", "")
-            if self.rank == 0:
-                print("=" * 20)
-                print("prefix: ", elem["prefix_text"], result)
-                print("(Ground truth): ", requests[i].doc["answer"])
-                print("=" * 20, end="\n\n")
-            res.append(result)
 
-            # log accuracy
-            ground_truth_ans = requests[i].doc["answer"].split("### ")[1]
-            if predicted_ans is not None and ground_truth_ans == predicted_ans:
-                correct += 1
-            total += 1
+            if is_code_eval:
+                # For HumanEval: result is code completion after the prompt
+                # The lm_eval harness filter will prepend the prompt back
+                if self.rank == 0:
+                    print("=" * 20)
+                    print("prompt: ", elem["prefix_text"])
+                    print("generated: ", result)
+                    print("=" * 20, end="\n\n")
+                res.append(result)
+                total += 1
+                res_for_json.append(
+                    {
+                        "task_id": requests[i].doc.get(
+                            "task_id", f"CodeEval/{i}"
+                        ),
+                        "prefix": elem["prefix_text"],
+                        "result": result,
+                    }
+                )
+            else:
+                # GSM8K / default: extract \boxed{} answer
+                predicted_ans = None
+                if "boxed{" in result:
+                    predicted_ans = result.split("boxed{")[1].split("}")[0]
+                    result = result.split("boxed{")[0] + "#### " + predicted_ans
+                    result = result.replace("$\\", "")
+                if self.rank == 0:
+                    print("=" * 20)
+                    print("prefix: ", elem["prefix_text"], result)
+                    print("(Ground truth): ", requests[i].doc["answer"])
+                    print("=" * 20, end="\n\n")
+                res.append(result)
 
-            res_for_json.append(
-                {
-                    "prefix": elem["prefix_text"],
-                    "result": result,
-                }
-            )
+                # log accuracy
+                ground_truth_ans = requests[i].doc["answer"].split("### ")[1]
+                if predicted_ans is not None and ground_truth_ans == predicted_ans:
+                    correct += 1
+                total += 1
+                res_for_json.append(
+                    {
+                        "prefix": elem["prefix_text"],
+                        "result": result,
+                    }
+                )
             # torch.cuda.empty_cache()
             if self.rank == 0:
-                print(f"\nAccuracy: {correct}/{total} = {correct / total:.2%}\n")
+                if is_gsm8k:
+                    print(f"\nAccuracy: {correct}/{total} = {correct / total:.2%}\n")
+                else:
+                    print(f"\nCompleted: {total}/{len(ds)}\n")
+                print(f"Total generated tokens: {total_generated_tokens}, Total accepted tokens: {total_accepted_tokens}, Acceptance rate: {total_accepted_tokens / total_generated_tokens:.2%}")
+                print(f"Average accepted length: {np.sum(total_accepted_lengths) / total_accept_counts:.2f}")
                 if i >= self.throughput_warmup:
                     print(
                         f"Thput (tok/s): {np.mean(tputs):0.2f} +/- {np.std(tputs):0.2f}"
