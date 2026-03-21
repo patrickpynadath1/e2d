@@ -10,22 +10,24 @@ EVAL_BLOCK_SIZE=4
 HIDDEN_SIZE=2048
 INTERMEDIATE_SIZE=6144
 N_ENCODER_LAYERS=28
-N_DECODER_LAYERS=2
+N_DECODER_LAYERS=4
 
 
 # Hyperparameters
 LR=1e-5
-WARMUP_DURATION="50ba"
+ALPHA_F=0.5
+WARMUP_DURATION="100ba"
 BATCH_SIZE=32
 MICRO_BATCH_SIZE=1
-MAX_DURATION="3000ba"
+MAX_DURATION="30000ba"
 
 PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-1.7B-Base
 
 TAG="e2d2"
 ENC_LAYERS="enc${N_ENCODER_LAYERS}"
 DEC_LAYERS="dec${N_DECODER_LAYERS}"
-RUN_NAME=cnn_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_${ENC_LAYERS}_${DEC_LAYERS}_hidden${HIDDEN_SIZE}_inter${INTERMEDIATE_SIZE}_${TAG}
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+RUN_NAME=cnn_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_${ENC_LAYERS}_${DEC_LAYERS}_hidden${HIDDEN_SIZE}_inter${INTERMEDIATE_SIZE}_${TAG}_${TIMESTAMP}
 
 GPU_TYPE=$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -E 's/.*(A[0-9]+|H100|A6000).*/\1/' | head -n 1)
 NUM_WORKERS=0
@@ -40,11 +42,12 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   dataset@train_dataset=cnn_dailymail_train \
   dataset@eval_dataset=cnn_dailymail_eval \
   composer.optimizer.lr=${LR} \
-  composer.trainer.eval_interval="100ba" \
+  composer.trainer.eval_interval="1000ba" \
   composer.trainer.max_duration=${MAX_DURATION} \
   composer.trainer.save_num_checkpoints_to_keep=1 \
-  composer/lr_scheduler=constant_with_warmup \
+  composer/lr_scheduler=cosine_annealing_with_warmup \
   composer.lr_scheduler.t_warmup=${WARMUP_DURATION} \
+  composer.lr_scheduler.alpha_f=${ALPHA_F} \
   model=e2d2 \
   model.config.attn_backend="sdpa" \
   training.compile_backbone=false \
@@ -53,7 +56,7 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   model.config.backbone_config.use_encoder_causal_mask=false \
   model.config.backbone_config.num_encoder_layers=${N_ENCODER_LAYERS} \
   model.config.backbone_config.num_decoder_layers=${N_DECODER_LAYERS} \
-  model.config.backbone_config.tie_encoder_decoder_weights=false \
+  model.config.backbone_config.tie_encoder_decoder_weights=true \
   model.config.backbone_config.reinit_decoder=false \
   model.config.backbone_config.reinit_encoder=false \
   model.config.backbone_config.keep_top_decoder_layers=true \
@@ -66,7 +69,7 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   eval_block_size=${EVAL_BLOCK_SIZE} \
   training.antithetic_sampling=false \
   hydra.run.dir=/data/shared_data/hankun/outputs/${RUN_NAME} \
-  composer.trainer.save_interval="100ba" \
+  composer.trainer.save_interval="1000ba" \
   composer.loggers.name=${RUN_NAME} \
   train_dataloader.num_workers=${NUM_WORKERS} \
   eval_dataloader.batch_size=1 \

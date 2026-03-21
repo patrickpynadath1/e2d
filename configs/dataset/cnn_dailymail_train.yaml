@@ -7,7 +7,6 @@ add_special_tokens: true
 source_prompt_text: "Summarize the following article: "
 target_prompt_text: "Summary: "
 truncate: true
-max_samples: 120000
-filter_by_length: true
+filter_by_length: false
 source_max_length_ratio: 0.9
 target_max_length_ratio: 0.1

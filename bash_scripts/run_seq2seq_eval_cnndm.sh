@@ -14,6 +14,9 @@ source setup_env.sh
 # 10k training samples, batch_size = 1, constant LR (eval loss keeps going up, 34.4/14.4/25.0)
 # 30k training samples, batch_size = 1, constant LR (eval loss keeps going up)
 # 60k training samples, batch_size = 1, cosine LR (35.0/15.0/25.6)
+# all, batch_size = 32, cosine LR
+# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_lr1e-5_bsz32_warm100ba_layers28_hidden2048_inter6144_ar_20260315_075324"
+# PROMPT_TEXT="Summary: "
 # KV_CACHING=true
 # ALIGN_INPUTS_TO_BLOCKS=true
 # BLOCK_SIZE=1
@@ -22,35 +25,33 @@ source setup_env.sh
 # REPETITION_PENALTY=1.0
 
 ########### E2D2
-# BLOCK_SIZE=8
-# MODEL_PATH="kuleshov-group/e2d2-cnndm"
-# #MODEL_PATH="outputs/<PATH_TO_E2D2_SAVED_MODEL_DIR>"
-# KV_CACHING=true
-# ALIGN_INPUTS_TO_BLOCKS=false
-# LEN_PENALTY=1.1
-# REGULATION_START=80
-# REPETITION_PENALTY=1.5
-
-########### E2D
-# 10k training samples, batch_size = 32, constant LR (0.9 acc. length)
-# 30k training samples, batch_size = 32, constant LR (1.2 acc. length, 35.6/15.0/25.5)
-# 60k training samples, batch_size = 32, cosine LR, 3k steps (not converging, 1.23 acc. length, 36.3/15.6/26.4, 45.4 tokens/s)
-# 60k training samples, batch_size = 32, cosine LR, 5k steps
-# 120k training samples, batch_size = 32, cosine LR (not converging, 1.34 acc. length, 36.7/16.2/26.8, 49.0 tokens/s)
-# -------
-# 10k training samples, batch_size = 1, cosine LR (1.35 acc. length, 48.8 tokens/s)
-# 30k training samples, batch_size = 1, constant LR (1.58 acc. length, 34.9/14.9/25.1)
-# 60k training samples, batch_size = 1, cosine LR (1.60 acc. length, 36.0/15.7/26.2, conf_seg=0.7/0.6/0.5: 53.15 token/s, 0.4: 54.3 tokens/s, 0.3: 55.3 tokens/s)
-# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr1e-5_bsz1_warm100ba_enc28_dec2_hidden2048_inter6144_e2d_20260306_231602"
+MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr1e-5_bsz32_warm100ba_enc28_dec4_hidden2048_inter6144_e2d2_20260317_052211"
 BLOCK_SIZE=4
+PROMPT_TEXT="Summary: "
 KV_CACHING=true
 ALIGN_INPUTS_TO_BLOCKS=false
 LEN_PENALTY=1.0
 REGULATION_START=0
 REPETITION_PENALTY=1.0
 
+########### E2D
+# 60k training samples, batch_size = 1, cosine LR (1.81 acc. length, conf_seg=0.7: 54.9 token/s)
+# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr1e-5_bsz1_warm100ba_enc28_dec2_hidden2048_inter6144_e2d_20260306_231602"
+# 120k training samples, batch_size = 128, converged (1.91 acc. length, conf_seg=0.7: 55.8 tokens/s)
+# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr1e-5_bsz128_warm100ba_enc28_dec2_hidden2048_inter6144_e2d_20260313_060652"
+# all, batch_size = 32
+# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr1e-5_bsz32_warm100ba_enc28_dec2_hidden2048_inter6144_e2d_20260314_003028"
+# PROMPT_TEXT=null
+# BLOCK_SIZE=4
+# KV_CACHING=true
+# ALIGN_INPUTS_TO_BLOCKS=false
+# LEN_PENALTY=1.0
+# REGULATION_START=0
+# REPETITION_PENALTY=1.0
+
 ########### LayerSkip
-# MODEL_PATH="/data/shared_data/hankun/outputs/"
+# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_lr1e-5_bsz32_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_layerskip_20260315_075756"
+# PROMPT_TEXT="Summary: "
 # KV_CACHING=true
 # ALIGN_INPUTS_TO_BLOCKS=true
 # BLOCK_SIZE=1
@@ -78,7 +79,7 @@ ASSISTANT_EARLY_EXIT=${ASSISTANT_EARLY_EXIT:-0}
 NUM_VISIBLE_DEVICES=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 OUTPUT_PATH="${OUTPUT_DIR}/L-${L}-block_size-${BLOCK_SIZE}-do_sample-${DO_SAMPLE}-sampling_strategy-${SAMPLING_STRATEGY}-first_hitting-${FIRST_HITTING}-confidence_based_noising-${CONFIDENCE_BASED_NOISING}-align_inputs_to_blocks${ALIGN_INPUTS_TO_BLOCKS}-ckpt${CKPT}-ema${USE_EMA}-assistant_early_exit${ASSISTANT_EARLY_EXIT}-rep-penalty-${REPETITION_PENALTY}_len-penalty-${LEN_PENALTY}_reg-start${REGULATION_START}"
-PORT=29504
+PORT=29505
 torchrun --nproc_per_node ${NUM_VISIBLE_DEVICES} --master_port=${PORT} scripts/eval/seq2seq_eval.py \
   hydra.output_subdir=null \
   hydra.run.dir="${PWD}" \
@@ -86,12 +87,13 @@ torchrun --nproc_per_node ${NUM_VISIBLE_DEVICES} --master_port=${PORT} scripts/e
   hydra/hydra_logging=disabled \
   +eval/seq2seq@task=cnn_dailymail \
   task.dataset.max_samples=${EVAL_MAX_SAMPLES} \
+  +task.dataset.target_prompt_text=${PROMPT_TEXT} \
   pretrained_model_name_or_path=${MODEL_PATH} \
   pretrained_model_revision=${REVISION} \
   +model_config_overrides.length=${MAX_LENGTH} \
   +ckpt_file="${CKPT}-rank0.pt" \
   +load_ema_weights=${USE_EMA} \
-  tokenizer.pretrained_model_name_or_path="Qwen/Qwen3-0.6B-Base" \
+  tokenizer.pretrained_model_name_or_path="Qwen/Qwen3-1.7B-Base" \
   output_path=${OUTPUT_PATH} \
   generated_samples_output_path=${OUTPUT_PATH} \
   max_length=${MAX_LENGTH} \

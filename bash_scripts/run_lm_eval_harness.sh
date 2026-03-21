@@ -3,9 +3,9 @@
 cd ../ || exit  # Go to the root directory of the repo
 source setup_env.sh
 
-QWEN_MODEL="Qwen/Qwen3-1.7B-Base"
+# QWEN_MODEL="Qwen/Qwen3-1.7B-Base"
 # QWEN_MODEL="meta-llama/Llama-3.2-1B"
-# QWEN_MODEL="Qwen/Qwen3-8B-Base"
+QWEN_MODEL="Qwen/Qwen3-8B-Base"
 NUM_FEW_SHOT=0
 
 # TODO: Uncomment a model and run
@@ -14,7 +14,6 @@ NUM_FEW_SHOT=0
 # MODEL_PATH="outputs/<PATH_TO_AR_SAVED_MODEL_DIR>"
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_ar_20251201_061752"
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_ar_20251204_032135"
-# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers16_ar_20260129_004627"
 # Qwen3-4B
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers36_ar_20260130_062332"
 # Qwen3-8B
@@ -39,34 +38,27 @@ NUM_FEW_SHOT=0
 #USE_EMA=true
 
 ######## E2D2
-# 24(14)
-# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec14_e2d2_20251201_072658_tie-weights"
 # 24(4)
-MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec4_e2d2_20260310_220501_tie-weights"
-BLOCK_SIZE=4
-KV_CACHING=true
-ALIGN_INPUTS_TO_BLOCKS=true
-USE_EMA=true
+# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec4_e2d2_20260310_220501_tie-weights"
+# BLOCK_SIZE=4
+# KV_CACHING=true
+# ALIGN_INPUTS_TO_BLOCKS=true
+# USE_EMA=true
 
 ######## LayerSkip (self-speculative decoding via early exit)
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_layerskip_20260212_203501"
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_layerskip_20260213_022759"
 # qwen3-1.7b-base
-# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_layerskip_20260213_193059"
+MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_layerskip_20260213_193059"
 # llama-3.2-1b
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers16_layerskip_llama_20260214_032750"
-# BLOCK_SIZE=1
-# KV_CACHING=true
-# ALIGN_INPUTS_TO_BLOCKS=true
-# USE_EMA=true
-# ASSISTANT_EARLY_EXIT=8  # Layer index for self-speculative drafting (1 to num_hidden_layers-1); set to 0 or comment out to disable
+BLOCK_SIZE=1
+KV_CACHING=true
+ALIGN_INPUTS_TO_BLOCKS=true
+USE_EMA=true
+ASSISTANT_EARLY_EXIT=8  # Layer index for self-speculative drafting (1 to num_hidden_layers-1); set to 0 or comment out to disable
 
 ######## E2D
-# MODEL_PATH="kuleshov-group/e2d2-gsm8k-finetune-Qwen3-2B"
-# enforce_causal_mask
-# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec14_e2d_20251219_031056_tie-weights"
-# enforce_causal_mask, also let encoder predict the next token
-# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec14_e2d_20251220_064902_tie-weights"
 # adapter (context bidirectional)
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec14_e2d_20251228_012410_tie-weights"
 # adapter (context causal)
@@ -97,7 +89,9 @@ USE_EMA=true
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz2_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc36_TOPdec2_e2d_20260202_035147_tie-weights_fsdp"
 # 26(2), lora r = 16, alpha = 32, lr = 1e-4
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-4_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260222_010759_tie-weights"
-# BLOCK_SIZE=4
+# 28(2), block_size=8
+# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block8_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260318_222300_tie-weights"
+# BLOCK_SIZE=8
 # KV_CACHING=true
 # ALIGN_INPUTS_TO_BLOCKS=false
 # USE_EMA=true

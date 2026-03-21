@@ -15,21 +15,21 @@ source setup_env.sh
 # MODEL_PATH="/data/shared_data/hankun/outputs/wmt_block_lr3e-4_bsz128_warm1000ba_layers28_hidden1024_inter3072_ar_target_prompt_20251222_165729"
 
 ########### MDLM
-#PROMPT_TEXT=null
+#PROMPT_TEXT="Translation: "
 #KV_CACHING=false
 #ALIGN_INPUTS_TO_BLOCKS=false
 #BLOCK_SIZE=32
 #MODEL_PATH="outputs/<PATH_TO_MDLM_SAVED_MODEL_DIR>"
 
 ########### BD3LM
-#PROMPT_TEXT=null
+#PROMPT_TEXT="Translation: "
 #KV_CACHING=true
 #ALIGN_INPUTS_TO_BLOCKS=true
 #BLOCK_SIZE=4
 #MODEL_PATH="outputs/<PATH_TO_BD3LM_SAVED_MODEL_DIR>"
 
 ######### E2D2
-# PROMPT_TEXT=null
+# PROMPT_TEXT="Translation: "
 # BLOCK_SIZE=4
 # # MODEL_PATH="kuleshov-group/e2d2-wmt"
 # # MODEL_PATH="outputs/wmt_block4_lr3e-4_bsz128_warm1000ba_enc28_dec4_hidden512_inter1536_e2d2_20251120_233640"
@@ -39,16 +39,11 @@ source setup_env.sh
 # ALIGN_INPUTS_TO_BLOCKS=false
 
 ######### E2D
-# MODEL_PATH="/data/shared_data/hankun/outputs/wmt_block4_lr3e-4_bsz128_warm1000ba_enc28_dec4_hidden512_inter1536_e2d_20251130_073021"
-# share_kv_encoder_gen, finetune
-# MODEL_PATH="/data/shared_data/hankun/outputs/wmt_block4_lr3e-4_bsz128_warm1000ba_enc28_dec4_hidden1024_inter3072_e2d_20251221_191010"
-# 28(2)
-# MODEL_PATH="/data/shared_data/hankun/outputs/wmt_block4_lr3e-4_bsz128_warm1000ba_enc28_dec2_hidden1024_inter3072_e2d_20251227_234139"
 # Qwen3-1.7B-Base
-MODEL_PATH="/data/shared_data/hankun/outputs/wmt_block4_lr1e-5_bsz1_warm100ba_enc28_dec2_hidden2048_inter6144_e2d_20260227_064135"
+MODEL_PATH="/data/shared_data/hankun/outputs/wmt_block4_lr1e-5_bsz128_warm1000ba_enc28_dec2_hidden2048_inter6144_e2d_20260314_031634"
 PORT=29503
 PROMPT_TEXT="Translation: "
-PROMPT_TEXT=null
+# PROMPT_TEXT=null
 BLOCK_SIZE=4
 KV_CACHING=true
 ALIGN_INPUTS_TO_BLOCKS=false
@@ -91,7 +86,7 @@ torchrun --nproc_per_node ${NUM_VISIBLE_DEVICES} --master_port=${PORT} scripts/e
   pretrained_model_revision=${REVISION} \
   +ckpt_file="${CKPT}-rank0.pt" \
   +load_ema_weights=${USE_EMA} \
-  tokenizer.pretrained_model_name_or_path="Qwen/Qwen3-0.6B-Base" \
+  tokenizer.pretrained_model_name_or_path="Qwen/Qwen3-1.7B-Base" \
   output_path=${OUTPUT_PATH} \
   generated_samples_output_path=${OUTPUT_PATH} \
   max_length=${MAX_LENGTH} \

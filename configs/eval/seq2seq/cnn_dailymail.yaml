@@ -5,7 +5,6 @@ defaults:
 dataset:
   _target_: src.datasets.tokenize_on_demand.CNNDailyMailDataset
   source_prompt_text: "Summarize the following article: "
-  target_prompt_text: "Summary: "
   truncate: false
   filter_by_length: true
   source_max_length_ratio: 0.9

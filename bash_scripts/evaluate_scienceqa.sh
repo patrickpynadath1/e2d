@@ -22,19 +22,19 @@ QWEN_MODEL="Qwen/Qwen3-1.7B-Base"
 # USE_EMA=true
 
 ###########  E2D2
-MODEL_PATH="/data/shared_data/hankun/outputs/scienceqa-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec4_e2d2_20260310_181821_tie-weights"
-BLOCK_SIZE=4
-KV_CACHING=true
-ALIGN_INPUTS_TO_BLOCKS=false
-USE_EMA=true
+# MODEL_PATH="/data/shared_data/hankun/outputs/scienceqa-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec4_e2d2_20260310_181821_tie-weights"
+# BLOCK_SIZE=4
+# KV_CACHING=true
+# ALIGN_INPUTS_TO_BLOCKS=false
+# USE_EMA=true
 
 ###########  LayerSkip
-# MODEL_PATH="/data/shared_data/hankun/outputs/scienceqa-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_layerskip_20260310_084518"
-# BLOCK_SIZE=1
-# KV_CACHING=true
-# ALIGN_INPUTS_TO_BLOCKS=true
-# USE_EMA=true
-# ASSISTANT_EARLY_EXIT=8  # Set >0 to enable self-speculative decoding
+MODEL_PATH="/data/shared_data/hankun/outputs/scienceqa-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_layerskip_20260310_084518"
+BLOCK_SIZE=1
+KV_CACHING=true
+ALIGN_INPUTS_TO_BLOCKS=true
+USE_EMA=true
+ASSISTANT_EARLY_EXIT=8  # Set >0 to enable self-speculative decoding
 
 # ScienceQA evaluation settings
 SCIENCEQA_NUM_SAMPLES=null  # null for all, or integer to limit

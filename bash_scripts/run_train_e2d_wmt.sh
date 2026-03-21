@@ -15,11 +15,10 @@ N_ENCODER_LAYERS=28
 N_DECODER_LAYERS=2
 
 # Hyperparameters
-# LR=3e-4
 LR=1e-5
 WARMUP_DURATION="1000ba"
-BATCH_SIZE=32
-MAX_DURATION="30000ba"
+BATCH_SIZE=128
+MAX_DURATION="50000ba"
 
 PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-1.7B-Base
 
@@ -31,14 +30,7 @@ TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 RUN_NAME=wmt_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_${ENC_LAYERS}_${DEC_LAYERS}_hidden${HIDDEN_SIZE}_inter${INTERMEDIATE_SIZE}_${TAG}_${TIMESTAMP}
 
 GPU_TYPE=$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -E 's/.*(A[0-9]+|H100|A6000).*/\1/' | head -n 1)
-# if [[ "$GPU_TYPE" == "A100" || "$GPU_TYPE" == "H100" ]]; then
-#     MICRO_BATCH_SIZE=16
-# elif [[ "$GPU_TYPE" == "A6000" ]]; then
-#     MICRO_BATCH_SIZE=8
-# else
-#     MICRO_BATCH_SIZE=4
-# fi
-MICRO_BATCH_SIZE=2
+MICRO_BATCH_SIZE=16
 NUM_WORKERS=0
 
 NUM_VISIBLE_DEVICES=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
@@ -76,8 +68,9 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   block_size=${BLOCK_SIZE} \
   eval_block_size=${EVAL_BLOCK_SIZE} \
   training.antithetic_sampling=false \
-  hydra.run.dir=/data/shared_data/hankun/outputs/${RUN_NAME} \
+  hydra.run.dir=outputs/${RUN_NAME} \
   composer.trainer.save_interval="1000ba" \
   composer.loggers.name=${RUN_NAME} \
   train_dataloader.num_workers=${NUM_WORKERS} \
+  eval_dataloader.batch_size=1 \
   composer.callbacks.hf_compatible_checkpointing.disable_hf=true

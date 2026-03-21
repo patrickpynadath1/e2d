@@ -153,13 +153,24 @@ def main(cfg: DictConfig) -> None:
         subject = example.get("subject", "unknown")
 
         q_text = _format_question(question, choices, hint)
-        ctx = (
-            (tokenizer.bos_token or "")
-            + source_prompt_text
-            + q_text
-            + (tokenizer.eos_token or "")
-            + target_prompt_text
-        )
+
+        is_e2d = "E2D" in type(model).__name__ and "E2D2" not in type(model).__name__
+        # E2D uses bidirectional attention to encode the prompt during training
+        if is_e2d:
+            ctx = (
+                (tokenizer.bos_token or "")
+                + source_prompt_text
+                + q_text
+                + (tokenizer.eos_token or "")
+            )
+        else:
+            ctx = (
+                (tokenizer.bos_token or "")
+                + source_prompt_text
+                + q_text
+                + (tokenizer.eos_token or "")
+                + target_prompt_text
+            )
 
         prefix_tokens = tokenizer(ctx, return_tensors="pt", add_special_tokens=False)[
             "input_ids"
@@ -169,7 +180,6 @@ def main(cfg: DictConfig) -> None:
         end_event = torch.cuda.Event(enable_timing=True)
         start_event.record()
 
-        is_e2d = "E2D" in type(model).__name__ and "E2D2" not in type(model).__name__
         is_layerskip_speculative = (
             "LayerSkip" in type(model).__name__
             and gen_kwargs.get("assistant_early_exit") is not None
@@ -274,6 +284,7 @@ def main(cfg: DictConfig) -> None:
                 f"{np.sum(total_accepted_lengths) / total_accept_counts:.2f}"
             )
         print(f"  Gold: ({gold_letter})  Predicted: ({predicted_letter})")
+        print(f"  Question: {ctx}")
         print(f"  Generated: {generated_text[:200]}...")
 
     # --- Aggregate metrics ---

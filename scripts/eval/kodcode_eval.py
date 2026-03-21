@@ -677,6 +677,7 @@ def main(cfg: DictConfig) -> None:
                 f"Average accepted length: "
                 f"{np.sum(total_accepted_lengths) / total_accept_counts:.2f}"
             )
+        print(f"  Prompt: {ctx}")
         print(f"  Generated: {generated_text[:200]}...")
         print(
             f"  Passed: {test_results['passed']}/{test_results['total']}"

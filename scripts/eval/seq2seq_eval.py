@@ -161,7 +161,7 @@ def main(cfg: DictConfig) -> None:
             input_ids = torch.cat((input_ids, prompt_ids), dim=-1)
         # Generate samples
         with torch.no_grad():
-            if "E2D" in type(model).__name__ or (
+            if ("E2D" in type(model).__name__ and "E2D2" not in type(model).__name__) or (
                 "LayerSkip" in type(model).__name__
                 and gen_kwargs.get("assistant_early_exit") is not None
             ):
@@ -201,6 +201,8 @@ def main(cfg: DictConfig) -> None:
             for st in stop_tokens:
                 outputs = outputs.split(st)[0]
         decoded_samples = outputs.strip()
+        if "E2D" in type(model).__name__:
+            decoded_samples = decoded_samples.removeprefix("Summary: ")
         if local_rank == 0:
             print("Input:", tokenizer.decode(input_ids[0]))
             print("Output:", decoded_samples)

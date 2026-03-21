@@ -171,7 +171,10 @@ class LMEvalHarnessModel(LM):
                 flags=re.MULTILINE,
             )
             ctx = ctx.replace("Question: ", prefix_text)
-            ctx = ctx.replace("\nAnswer:", f"{self.tokenizer.eos_token}Answer:")
+            if ("E2D" in type(self.model).__name__ and "E2D2" not in type(self.model).__name__):
+                ctx = ctx.replace("\nAnswer:", f"{self.tokenizer.eos_token}")
+            else:
+                ctx = ctx.replace("\nAnswer:", f"{self.tokenizer.eos_token}Answer:")
             prefix_tokens = self.tokenizer(ctx)["input_ids"]
             return {
                 "prefix_text": ctx,
@@ -312,8 +315,9 @@ class LMEvalHarnessModel(LM):
                     result = result.replace("$\\", "")
                 if self.rank == 0:
                     print("=" * 20)
-                    print("prefix: ", elem["prefix_text"], result)
-                    print("(Ground truth): ", requests[i].doc["answer"])
+                    print("Prefix:", elem["prefix_text"])
+                    print("Generated:", result)
+                    print("(Ground truth):", requests[i].doc["answer"])
                     print("=" * 20, end="\n\n")
                 res.append(result)
 

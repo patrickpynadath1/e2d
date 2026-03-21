@@ -25,19 +25,19 @@ QWEN_MODEL="Qwen/Qwen3-1.7B-Base"
 # USE_EMA=true
 
 ###########  E2D2
-MODEL_PATH="/data/shared_data/hankun/outputs/kodcode-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur50000ba_amp_bf16_enc28_TOPdec4_e2d2_20260303_073356_tie-weights"
-BLOCK_SIZE=4
-KV_CACHING=true
-ALIGN_INPUTS_TO_BLOCKS=false
-USE_EMA=true
+# MODEL_PATH="/data/shared_data/hankun/outputs/kodcode-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur50000ba_amp_bf16_enc28_TOPdec4_e2d2_20260303_073356_tie-weights"
+# BLOCK_SIZE=4
+# KV_CACHING=true
+# ALIGN_INPUTS_TO_BLOCKS=false
+# USE_EMA=true
 
 ###########  LayerSkip
-# MODEL_PATH="/data/shared_data/hankun/outputs/kodcode-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur50000ba_amp_bf16_layers28_layerskip_20260303_053152"
-# BLOCK_SIZE=1
-# KV_CACHING=true
-# ALIGN_INPUTS_TO_BLOCKS=true
-# USE_EMA=true
-# ASSISTANT_EARLY_EXIT=8
+MODEL_PATH="/data/shared_data/hankun/outputs/kodcode-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur50000ba_amp_bf16_layers28_layerskip_20260303_053152"
+BLOCK_SIZE=1
+KV_CACHING=true
+ALIGN_INPUTS_TO_BLOCKS=true
+USE_EMA=true
+ASSISTANT_EARLY_EXIT=8
 
 # KodCode evaluation settings
 KODCODE_DIFFICULTY="easy"       # "easy", "medium", "hard", or null for all

@@ -14,10 +14,10 @@ EARLY_EXIT_ROTATION_STRIDE=8
 
 # Hyperparameters
 LR=1e-5
-WARMUP_DURATION="50ba"
+WARMUP_DURATION="100ba"
 ALPHA_F=0.5
 BATCH_SIZE=32
-MAX_DURATION="3000ba"
+MAX_DURATION="30000ba"
 PRECISION="amp_bf16"
 
 PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-1.7B-Base
@@ -25,7 +25,8 @@ PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-1.7B-Base
 TAG="layerskip"
 
 # Get time stamp
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+# TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+TIMESTAMP="20260315_075756"
 
 LAYERS="layers${N_LAYERS}"
 RUN_NAME=cnn_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_alphaf${ALPHA_F}_max-dur${MAX_DURATION}_${PRECISION}_${LAYERS}_${TAG}_${TIMESTAMP}
@@ -44,12 +45,11 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   dataset@eval_dataset=cnn_dailymail_eval \
   composer.optimizer.lr=${LR} \
   composer.trainer.precision=${PRECISION} \
-  composer.trainer.eval_interval="100ba" \
+  composer.trainer.eval_interval="1000ba" \
   composer.trainer.max_duration=${MAX_DURATION} \
   composer.trainer.save_num_checkpoints_to_keep=1 \
-  composer/lr_scheduler=cosine_annealing_with_warmup \
+  composer/lr_scheduler=constant_with_warmup \
   composer.lr_scheduler.t_warmup=${WARMUP_DURATION} \
-  composer.lr_scheduler.alpha_f=${ALPHA_F} \
   model=layerskip \
   model/backbone@model.config.backbone_config=automodel_for_causal_lm \
   model.config.attn_backend="sdpa" \
@@ -64,7 +64,7 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   training.grad_accum=$(( BATCH_SIZE / NUM_VISIBLE_DEVICES / MICRO_BATCH_SIZE )) \
   training.compile_backbone=false \
   hydra.run.dir=/data/shared_data/hankun/outputs/${RUN_NAME} \
-  composer.trainer.save_interval="100ba" \
+  composer.trainer.save_interval="1000ba" \
   composer.loggers.name=${RUN_NAME} \
   train_dataloader.num_workers=${NUM_WORKERS} \
   composer.callbacks.hf_compatible_checkpointing.disable_hf=true \
