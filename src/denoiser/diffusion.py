@@ -1564,8 +1564,13 @@ class E2DConfig(E2D2Config):
         "AutoModelForCausalLM": "diffusion.E2D",
     }
 
-    def __init__(self, **kwargs):
+    def __init__(
+        self,
+        decoder_loss_lambda: float = 1.0,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
+        self.decoder_loss_lambda = decoder_loss_lambda
 
 class E2D(E2D2):
     """Autoregressive variant of E2D2 using block causal attention."""
@@ -1791,6 +1796,26 @@ class E2D(E2D2):
         **kwargs: Any,
     ) -> LossAndNllOutput:
         """Standard autoregressive cross-entropy loss."""
+        decoder_loss_lambda = float(getattr(self.config, "decoder_loss_lambda", 1.0))
+        if decoder_loss_lambda <= -1.0:
+            raise ValueError(
+                "`decoder_loss_lambda` must be greater than -1.0 when using "
+                "weighted-average loss normalization."
+            )
+
+        def _flatten_for_cross_entropy(
+            in_logits: torch.FloatTensor,
+            in_targets: torch.LongTensor,
+            in_mask: Optional[torch.FloatTensor],
+        ) -> tuple[torch.FloatTensor, torch.LongTensor]:
+            flat_logits_local = in_logits.contiguous().view(-1, in_logits.size(-1))
+            flat_targets_local = in_targets.contiguous().view(-1)
+            if in_mask is not None:
+                flat_mask_local = in_mask.contiguous().view(-1).bool()
+                flat_logits_local = flat_logits_local[flat_mask_local]
+                flat_targets_local = flat_targets_local[flat_mask_local]
+            return flat_logits_local, flat_targets_local
+
         # Shift targets: predict next token
         targets = denoiser_inputs.x0[:, 1:]  # Remove first token (typically BOS)
         
@@ -1802,24 +1827,45 @@ class E2D(E2D2):
             # Decoder logits: last seq_len tokens
             enc_logits = model_output[:, :seq_len-1, :]
             dec_logits = model_output[:, seq_len:-1, :]
-            logits = torch.cat([enc_logits, dec_logits], dim=1)
-            
-            # Duplicate targets
-            targets = torch.cat([targets, targets], dim=1)
-            
+
             # Duplicate mask if exists
             if denoiser_inputs.tokens_mask is not None:
                 M = denoiser_inputs.tokens_mask
                 M_loss = torch.cat([M[:, 1:], M[:, 1:]], dim=1)
-                
+
                 # Update denoiser_inputs.tokens_mask for metrics.py
                 # Prepend dummy to match the slicing logic in metrics.py
                 dummy = torch.zeros((M.shape[0], 1), device=M.device, dtype=M.dtype)
                 denoiser_inputs.tokens_mask = torch.cat([dummy, M_loss], dim=1)
-                
+
+                enc_dec_mask = M[:, 1:]
                 mask = M_loss
             else:
+                enc_dec_mask = None
                 mask = None
+
+            enc_flat_logits, enc_flat_targets = _flatten_for_cross_entropy(
+                enc_logits,
+                targets,
+                enc_dec_mask,
+            )
+            dec_flat_logits, dec_flat_targets = _flatten_for_cross_entropy(
+                dec_logits,
+                targets,
+                enc_dec_mask,
+            )
+            encoder_loss = torch.nn.functional.cross_entropy(
+                enc_flat_logits, enc_flat_targets
+            )
+            decoder_loss = torch.nn.functional.cross_entropy(
+                dec_flat_logits, dec_flat_targets
+            )
+            loss = (encoder_loss + decoder_loss_lambda * decoder_loss) / (
+                1.0 + decoder_loss_lambda
+            )
+
+            logits = torch.cat([enc_logits, dec_logits], dim=1)
+            targets = torch.cat([targets, targets], dim=1)
         else:
             logits = model_output[:, :-1, :]     # Remove last prediction
             if denoiser_inputs.tokens_mask is not None:
@@ -1838,7 +1884,8 @@ class E2D(E2D2):
             flat_targets = flat_targets[flat_mask.bool()]
         
         # Compute cross-entropy loss
-        loss = torch.nn.functional.cross_entropy(flat_logits, flat_targets)
+        if model_output.shape[1] != 2 * seq_len:
+            loss = torch.nn.functional.cross_entropy(flat_logits, flat_targets)
         
         # Compute per-token NLLs for compatibility
         with torch.no_grad():
@@ -1917,6 +1964,8 @@ class E2D(E2D2):
         total_accepted_tokens = 0
         total_accepted_lengths = []
         accept_counts = 0
+        draft_position_attempt_counts = [0 for _ in range(block_size)]
+        draft_position_accept_counts = [0 for _ in range(block_size)]
         
         if generation_config.use_cache and inputs.numel() > 0:
             cache = self.update_cache(
@@ -2304,6 +2353,15 @@ class E2D(E2D2):
                     
                     cache['past_key_values'] = enc_kv
 
+                accepted_prefix_len = min(final_accepted_len, actual_draft_len)
+                for pos in range(actual_draft_len):
+                    if pos >= len(draft_position_attempt_counts):
+                        draft_position_attempt_counts.append(0)
+                        draft_position_accept_counts.append(0)
+                    draft_position_attempt_counts[pos] += 1
+                    if pos < accepted_prefix_len:
+                        draft_position_accept_counts[pos] += 1
+
                 if track_acc_rate:
                     acc_rate_history.append((min_accepted, actual_draft_len))
                     window_acc_count = 0
@@ -2366,5 +2424,14 @@ class E2D(E2D2):
             print(f"[STATS] Total accepted tokens: {total_accepted_tokens}")
             print(f"[STATS] Acceptance rate: {acceptance_rate:.2%}")
             print("=" * 60 + "\n")
+
+        self._last_draft_position_acceptance = {
+            "attempt_counts": draft_position_attempt_counts,
+            "accept_counts": draft_position_accept_counts,
+            "acceptance_rates": [
+                (acc / att) if att > 0 else 0.0
+                for acc, att in zip(draft_position_accept_counts, draft_position_attempt_counts)
+            ],
+        }
 
         return accumulated_samples, (total_generated_tokens, total_accepted_tokens), (total_accepted_lengths, accept_counts)

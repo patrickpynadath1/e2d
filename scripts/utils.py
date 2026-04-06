@@ -200,7 +200,7 @@ def load_model_from_ckpt_dir_path(
         for key in keys:
             if prefix in key:
                 newkey = key.replace(prefix, replacement)
-                sd[newkey] = state_dict.pop(key)
+                sd[newkey] = sd.pop(key)
 
         # also strip the prefix in metadata if any.
         if hasattr(sd, "_metadata"):

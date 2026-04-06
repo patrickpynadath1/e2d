@@ -1,0 +1,207 @@
+{
+  "dataset": "scienceqa",
+  "config": {
+    "e2d_ckpt_dir": "/data/shared_data/hankun/outputs/scienceqa-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260309_232246_tie-weights",
+    "ar_ckpt_dir": "/data/shared_data/hankun/outputs/scienceqa-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_ar_20260309_232509",
+    "ckpt_file": "best-rank0.pt",
+    "load_ema_e2d": true,
+    "load_ema_ar": true,
+    "tokenizer_name": "Qwen/Qwen3-1.7B-Base",
+    "max_length": 768,
+    "max_train_examples": 7000,
+    "max_eval_examples": 1000,
+    "max_positions_per_example": 64,
+    "target_only_positions": true,
+    "horizons": "1,2,3,4,5",
+    "probe_vocab_size": 8192,
+    "max_train_samples_per_horizon": 200000,
+    "max_eval_samples_per_horizon": 50000,
+    "epochs": 8,
+    "batch_size": 1024,
+    "lr": 0.001,
+    "weight_decay": 0.0,
+    "device": "cuda",
+    "seed": 1,
+    "output_dir": "probe_outputs/scienceqa_future_probe",
+    "dataset_path": "derek-thomas/ScienceQA",
+    "test_size": 1000,
+    "sampling_seed": 1,
+    "source_prompt_text": "The following is a multiple choice question. Think step by step and then give your final answer.\n\n",
+    "target_prompt_text": "Answer: "
+  },
+  "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "hidden_state_index": 26,
+  "lprime_layer": 25,
+  "ar": {
+    "1": {
+      "horizon": 1,
+      "train_loss": 0.6044143380355835,
+      "eval_loss": 9.478056505087201,
+      "train_acc": 0.990345,
+      "eval_acc": 0.9441773881898299,
+      "num_train_samples": 200000,
+      "num_eval_samples": 42438,
+      "num_classes": 8192
+    },
+    "2": {
+      "horizon": 2,
+      "train_loss": 3.2946956312561033,
+      "eval_loss": 22.378041650519556,
+      "train_acc": 0.9406,
+      "eval_acc": 0.8331761599396454,
+      "num_train_samples": 200000,
+      "num_eval_samples": 42416,
+      "num_classes": 8192
+    },
+    "3": {
+      "horizon": 3,
+      "train_loss": 6.660292614135742,
+      "eval_loss": 28.131189278892634,
+      "train_acc": 0.872305,
+      "eval_acc": 0.7506072110736435,
+      "num_train_samples": 200000,
+      "num_eval_samples": 42407,
+      "num_classes": 8192
+    },
+    "4": {
+      "horizon": 4,
+      "train_loss": 9.41342164794922,
+      "eval_loss": 31.511282406712244,
+      "train_acc": 0.80835,
+      "eval_acc": 0.6837667231957791,
+      "num_train_samples": 200000,
+      "num_eval_samples": 42456,
+      "num_classes": 8192
+    },
+    "5": {
+      "horizon": 5,
+      "train_loss": 10.576601857910156,
+      "eval_loss": 33.280731629072406,
+      "train_acc": 0.772095,
+      "eval_acc": 0.6434311299634735,
+      "num_train_samples": 200000,
+      "num_eval_samples": 42435,
+      "num_classes": 8192
+    }
+  },
+  "e2d": {
+    "1": {
+      "horizon": 1,
+      "train_loss": 0.4868756135940552,
+      "eval_loss": 9.420438454655542,
+      "train_acc": 0.99164,
+      "eval_acc": 0.9400537254347519,
+      "num_train_samples": 200000,
+      "num_eval_samples": 42438,
+      "num_classes": 8192
+    },
+    "2": {
+      "horizon": 2,
+      "train_loss": 1.9958653855895996,
+      "eval_loss": 20.677000686835452,
+      "train_acc": 0.963055,
+      "eval_acc": 0.8600763862693324,
+      "num_train_samples": 200000,
+      "num_eval_samples": 42416,
+      "num_classes": 8192
+    },
+    "3": {
+      "horizon": 3,
+      "train_loss": 4.059986912841797,
+      "eval_loss": 24.395578371311046,
+      "train_acc": 0.93024,
+      "eval_acc": 0.8079090716155352,
+      "num_train_samples": 200000,
+      "num_eval_samples": 42407,
+      "num_classes": 8192
+    },
+    "4": {
+      "horizon": 4,
+      "train_loss": 5.86951771484375,
+      "eval_loss": 27.036003611643526,
+      "train_acc": 0.892065,
+      "eval_acc": 0.7607640851705295,
+      "num_train_samples": 200000,
+      "num_eval_samples": 42456,
+      "num_classes": 8192
+    },
+    "5": {
+      "horizon": 5,
+      "train_loss": 7.219946458129883,
+      "eval_loss": 29.761924510464535,
+      "train_acc": 0.847035,
+      "eval_acc": 0.7097678802874985,
+      "num_train_samples": 200000,
+      "num_eval_samples": 42435,
+      "num_classes": 8192
+    }
+  },
+  "summary": [
+    {
+      "horizon": 1,
+      "ar_eval_acc": 0.9441773881898299,
+      "e2d_eval_acc": 0.9400537254347519,
+      "delta_eval_acc": -0.004123662755078028,
+      "ar_eval_loss": 9.478056505087201,
+      "e2d_eval_loss": 9.420438454655542,
+      "delta_eval_loss": -0.057618050431658574,
+      "ar_num_eval_samples": 42438,
+      "e2d_num_eval_samples": 42438,
+      "num_classes": 8192
+    },
+    {
+      "horizon": 2,
+      "ar_eval_acc": 0.8331761599396454,
+      "e2d_eval_acc": 0.8600763862693324,
+      "delta_eval_acc": 0.026900226329686916,
+      "ar_eval_loss": 22.378041650519556,
+      "e2d_eval_loss": 20.677000686835452,
+      "delta_eval_loss": -1.701040963684104,
+      "ar_num_eval_samples": 42416,
+      "e2d_num_eval_samples": 42416,
+      "num_classes": 8192
+    },
+    {
+      "horizon": 3,
+      "ar_eval_acc": 0.7506072110736435,
+      "e2d_eval_acc": 0.8079090716155352,
+      "delta_eval_acc": 0.05730186054189168,
+      "ar_eval_loss": 28.131189278892634,
+      "e2d_eval_loss": 24.395578371311046,
+      "delta_eval_loss": -3.735610907581588,
+      "ar_num_eval_samples": 42407,
+      "e2d_num_eval_samples": 42407,
+      "num_classes": 8192
+    },
+    {
+      "horizon": 4,
+      "ar_eval_acc": 0.6837667231957791,
+      "e2d_eval_acc": 0.7607640851705295,
+      "delta_eval_acc": 0.07699736197475038,
+      "ar_eval_loss": 31.511282406712244,
+      "e2d_eval_loss": 27.036003611643526,
+      "delta_eval_loss": -4.475278795068718,
+      "ar_num_eval_samples": 42456,
+      "e2d_num_eval_samples": 42456,
+      "num_classes": 8192
+    },
+    {
+      "horizon": 5,
+      "ar_eval_acc": 0.6434311299634735,
+      "e2d_eval_acc": 0.7097678802874985,
+      "delta_eval_acc": 0.06633675032402497,
+      "ar_eval_loss": 33.280731629072406,
+      "e2d_eval_loss": 29.761924510464535,
+      "delta_eval_loss": -3.518807118607871,
+      "ar_num_eval_samples": 42435,
+      "e2d_num_eval_samples": 42435,
+      "num_classes": 8192
+    }
+  ]
+}

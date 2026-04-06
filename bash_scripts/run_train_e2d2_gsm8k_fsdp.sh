@@ -7,31 +7,33 @@ source setup_env.sh
 # Model arch
 BLOCK_SIZE=4
 EVAL_BLOCK_SIZE=4
-N_ENCODER_LAYERS=28
+N_ENCODER_LAYERS=36
 ENCODER_TOP_LAYERS=false
-N_DECODER_LAYERS=2
+N_DECODER_LAYERS=4
 DECODER_TOP_LAYERS=true
 REINIT_ENCODER=false
 REINIT_DECODER=false
 TIE_WEIGHTS=true
 FREEZE_ENCODER=false
 ENCODER_CAUSAL_MASK=false
-NULLIFY_SELF_ATTN=false
 
 # Hyperparameters
 LR=1e-5
 WARMUP_DURATION="100ba"
 ALPHA_F=0.5
-DECODER_LOSS_LAMBDA=2.0
-BATCH_SIZE=1
+BATCH_SIZE=2
 MAX_DURATION="30000ba"
 PRECISION="amp_bf16"
 
-PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-1.7B-Base
+USE_FSDP=true
+FSDP_SHARDING_STRATEGY="FULL_SHARD"
+
+PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-4B-Base
 NUM_SHOT=0
 TRAIN_ON_CONTEXT=false
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
-TAG="e2d"
+TAG="e2d2"
 if [ "${ENCODER_TOP_LAYERS}" == "true" ]; then
   ENC_LAYERS="TOPenc${N_ENCODER_LAYERS}"
 else
@@ -42,10 +44,6 @@ if [ "${DECODER_TOP_LAYERS}" == "true" ]; then
 else
   DEC_LAYERS="dec${N_DECODER_LAYERS}"
 fi
-
-# get time stamp
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-
 RUN_NAME=gsm8k-${NUM_SHOT}shot_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_alphaf${ALPHA_F}_max-dur${MAX_DURATION}_${PRECISION}_${ENC_LAYERS}_${DEC_LAYERS}_${TAG}_${TIMESTAMP}
 if [ "${TIE_WEIGHTS}" == "true" ]; then
   RUN_NAME="${RUN_NAME}_tie-weights"
@@ -55,6 +53,12 @@ if [ "${ENCODER_CAUSAL_MASK}" == "true" ]; then
 fi
 if [ "${FREEZE_ENCODER}" == "true" ]; then
   RUN_NAME="${RUN_NAME}_freeze-enc"
+fi
+
+FSDP_ARGS=""
+if [ "${USE_FSDP}" == "true" ]; then
+  RUN_NAME="${RUN_NAME}_fsdp"
+  FSDP_ARGS="+composer/parallelism=fsdp composer.parallelism.fsdp.sharding_strategy=${FSDP_SHARDING_STRATEGY}"
 fi
 
 MICRO_BATCH_SIZE=1
@@ -76,11 +80,11 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   composer/lr_scheduler=cosine_annealing_with_warmup \
   composer.lr_scheduler.t_warmup=${WARMUP_DURATION} \
   composer.lr_scheduler.alpha_f=${ALPHA_F} \
-  model=e2d \
+  model=e2d2 \
   model.config.attn_backend="sdpa" \
   training.compile_backbone=false \
   model.config.length=768 \
-  model/backbone@model.config.backbone_config=llm_as_encoder_decoder_share_kv_encoder_gen \
+  model/backbone@model.config.backbone_config=llm_as_encoder_decoder_share_kv \
   model.config.backbone_config.use_encoder_causal_mask=${ENCODER_CAUSAL_MASK} \
   model.config.backbone_config.num_encoder_layers=${N_ENCODER_LAYERS} \
   model.config.backbone_config.num_decoder_layers=${N_DECODER_LAYERS} \
@@ -96,13 +100,12 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   block_size=${BLOCK_SIZE} \
   eval_block_size=${EVAL_BLOCK_SIZE} \
   training.antithetic_sampling=false \
-  hydra.run.dir=/data/shared_data/hankun/outputs/${RUN_NAME} \
+  hydra.run.dir=outputs/${RUN_NAME} \
   composer.trainer.save_interval="1000ba" \
   composer.loggers.name=${RUN_NAME} \
   train_dataloader.num_workers=${NUM_WORKERS} \
   composer.callbacks.hf_compatible_checkpointing.disable_hf=true \
   composer.callbacks.save_best_checkpointing.save_local=false \
-  eval_dataloader.batch_size=2 \
+  eval_dataloader.batch_size=1 \
   model.config.train_on_context=${TRAIN_ON_CONTEXT} \
-  model.config.decoder_loss_lambda=${DECODER_LOSS_LAMBDA} \
-  +model.config.nullify_self_attn=${NULLIFY_SELF_ATTN} \
+  ${FSDP_ARGS}

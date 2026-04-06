@@ -6,16 +6,10 @@ source setup_env.sh
 # TODO: Uncomment a model and run
 
 ######## AR
-# untrained AR (27.3/11.3/18.6)
-# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_lr1e-5_bsz32_warm0ba_layers28_hidden2048_inter6144_ar_20260308_191936"
-# 10k training samples, batch_size = 32, constant LR (35.0/14.4/24.9)
-# 30k training samples, batch_size = 32, constant LR (35.9/15.4/25.8)
-# 60k training samples, batch_size = 32, cosine LR (38.1/17.2/28.1, 34.18 tokens/s)
-# 10k training samples, batch_size = 1, constant LR (eval loss keeps going up, 34.4/14.4/25.0)
-# 30k training samples, batch_size = 1, constant LR (eval loss keeps going up)
-# 60k training samples, batch_size = 1, cosine LR (35.0/15.0/25.6)
-# all, batch_size = 32, cosine LR
+# Qwen3-1.7B-Base
 # MODEL_PATH="/data/shared_data/hankun/outputs/cnn_lr1e-5_bsz32_warm100ba_layers28_hidden2048_inter6144_ar_20260315_075324"
+# Qwen3-4B-Base
+# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_lr5e-6_bsz32_warm100ba_layers36_hidden2560_inter9728_ar_20260323_045839"
 # PROMPT_TEXT="Summary: "
 # KV_CACHING=true
 # ALIGN_INPUTS_TO_BLOCKS=true
@@ -25,7 +19,10 @@ source setup_env.sh
 # REPETITION_PENALTY=1.0
 
 ########### E2D2
-MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr1e-5_bsz32_warm100ba_enc28_dec4_hidden2048_inter6144_e2d2_20260317_052211"
+# Qwen3-1.7B-Base
+# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr1e-5_bsz32_warm100ba_enc28_dec4_hidden2048_inter6144_e2d2_20260317_052211"
+# Qwen3-4B-Base
+MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr5e-6_bsz32_warm100ba_enc36_dec4_hidden2560_inter9728_e2d2_20260324_154042_fsdp"
 BLOCK_SIZE=4
 PROMPT_TEXT="Summary: "
 KV_CACHING=true
@@ -35,12 +32,10 @@ REGULATION_START=0
 REPETITION_PENALTY=1.0
 
 ########### E2D
-# 60k training samples, batch_size = 1, cosine LR (1.81 acc. length, conf_seg=0.7: 54.9 token/s)
-# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr1e-5_bsz1_warm100ba_enc28_dec2_hidden2048_inter6144_e2d_20260306_231602"
-# 120k training samples, batch_size = 128, converged (1.91 acc. length, conf_seg=0.7: 55.8 tokens/s)
-# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr1e-5_bsz128_warm100ba_enc28_dec2_hidden2048_inter6144_e2d_20260313_060652"
-# all, batch_size = 32
+# Qwen3-1.7B-Base
 # MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr1e-5_bsz32_warm100ba_enc28_dec2_hidden2048_inter6144_e2d_20260314_003028"
+# Qwen3-4B-Base
+# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr5e-6_bsz32_warm100ba_enc36_dec2_hidden2560_inter9728_e2d_20260323_034605"
 # PROMPT_TEXT=null
 # BLOCK_SIZE=4
 # KV_CACHING=true
@@ -50,7 +45,10 @@ REPETITION_PENALTY=1.0
 # REPETITION_PENALTY=1.0
 
 ########### LayerSkip
+# Qwen3-1.7B-Base
 # MODEL_PATH="/data/shared_data/hankun/outputs/cnn_lr1e-5_bsz32_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_layerskip_20260315_075756"
+# Qwen3-4B-Base
+# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_lr5e-6_bsz32_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers36_layerskip_20260323_132707"
 # PROMPT_TEXT="Summary: "
 # KV_CACHING=true
 # ALIGN_INPUTS_TO_BLOCKS=true
@@ -58,7 +56,7 @@ REPETITION_PENALTY=1.0
 # LEN_PENALTY=1.0
 # REGULATION_START=0
 # REPETITION_PENALTY=1.0
-# ASSISTANT_EARLY_EXIT=8
+# ASSISTANT_EARLY_EXIT=12
 
 OUTPUT_DIR="/data/shared_data/hankun/outputs/${MODEL_PATH}/cnn_dailymail"
 REVISION=null
@@ -70,9 +68,11 @@ DO_SAMPLE=false
 SAMPLING_STRATEGY="predict_and_noise"  # "predict_and_noise" "posterior"
 FIRST_HITTING=true
 CONFIDENCE_BASED_NOISING=true
-MAX_LENGTH=4096
+# MAX_LENGTH=4096
+MAX_LENGTH=1024 # set for e2d2 Qwen3-4B-Base because it's loaded via EMA path, which bypassed buffer keys
 CKPT="best"
-USE_EMA=true
+# USE_EMA=true
+USE_EMA=false # set for e2d2 Qwen3-4B-Base
 EVAL_MAX_SAMPLES=1000
 ASSISTANT_EARLY_EXIT=${ASSISTANT_EARLY_EXIT:-0}
 

@@ -6,22 +6,31 @@ source setup_env.sh
 
 
 # Model arch
-N_LAYERS=28
+N_LAYERS=36
 
 # Hyperparameters
 LR=1e-5
 WARMUP_DURATION="100ba"
 ALPHA_F=0.5
-BATCH_SIZE=1
+BATCH_SIZE=2
 MAX_DURATION="30000ba"
 PRECISION="amp_bf16"
 
-PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-1.7B-Base
+USE_FSDP=true
+FSDP_SHARDING_STRATEGY="FULL_SHARD"
+
+PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-4B-Base
 NUM_SHOT=0
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 TAG="ar"
 LAYERS="layers${N_LAYERS}"
 RUN_NAME=kodcode-${NUM_SHOT}shot_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_alphaf${ALPHA_F}_max-dur${MAX_DURATION}_${PRECISION}_${LAYERS}_${TAG}_${TIMESTAMP}
+
+FSDP_ARGS=""
+if [ "${USE_FSDP}" == "true" ]; then
+  RUN_NAME="${RUN_NAME}_fsdp"
+  FSDP_ARGS="+composer/parallelism=fsdp composer.parallelism.fsdp.sharding_strategy=${FSDP_SHARDING_STRATEGY}"
+fi
 
 MICRO_BATCH_SIZE=1
 NUM_WORKERS=0
@@ -50,9 +59,10 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   model.config.backbone_config.keep_top_layers=false \
   training.global_batch_size=${BATCH_SIZE} \
   training.grad_accum=$(( BATCH_SIZE / NUM_VISIBLE_DEVICES / MICRO_BATCH_SIZE )) \
-  hydra.run.dir=/data/shared_data/hankun/outputs/${RUN_NAME} \
+  hydra.run.dir=outputs/${RUN_NAME} \
   composer.trainer.save_interval="1000ba" \
   composer.loggers.name=${RUN_NAME} \
   train_dataloader.num_workers=${NUM_WORKERS} \
   composer.callbacks.hf_compatible_checkpointing.disable_hf=true \
-  eval_dataloader.batch_size=1
+  eval_dataloader.batch_size=1 \
+  ${FSDP_ARGS}

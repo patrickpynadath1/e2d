@@ -67,6 +67,11 @@ class LMEvalHarnessModel(LM):
             throughput_run (bool): Whether to run the evaluation throughput.
             model_config_overrides (dict[str, Any]): Model config overrides.
         """
+        if "fsdp" in pretrained_model_name_or_path:
+            load_ema_weights = False
+        # E2D and AR trained on GSM8K still used ema
+        if ("e2d" in pretrained_model_name_or_path and "e2d2" not in pretrained_model_name_or_path) and "gsm8k" in pretrained_model_name_or_path and "fsdp" in pretrained_model_name_or_path:
+            load_ema_weights = True
         super().__init__()
         self.generated_samples_output_path = generated_samples_output_path
         if not fsspec_exists(self.generated_samples_output_path):
@@ -221,6 +226,8 @@ class LMEvalHarnessModel(LM):
         total_accepted_tokens = 0
         total_accepted_lengths = []
         total_accept_counts = 0
+        total_draft_position_attempt_counts: List[int] = []
+        total_draft_position_accept_counts: List[int] = []
         for i, elem in tqdm(
             enumerate(ds), desc="Generating", total=len(ds), disable=(self.rank != 0)
         ):
@@ -248,31 +255,53 @@ class LMEvalHarnessModel(LM):
                 start_event.record()
             else:
                 start_event, end_event = None, None
-            if ("E2D" in type(self.model).__name__ and "E2D2" not in type(self.model).__name__) or (
-                "LayerSkip" in type(self.model).__name__
-                and self.gen_kwargs.get("assistant_early_exit") is not None
+            sample_output = self.model.generate(
+                inputs=elem["prefix"][None, ...].to(self.device),
+                disable_pbar=(self.rank != 0),
+                # tokenizer=self.tokenizer,  # Uncomment for debugging
+                **self.gen_kwargs,
+            )
+
+            if (
+                isinstance(sample_output, tuple)
+                and len(sample_output) == 3
+                and isinstance(sample_output[1], tuple)
+                and isinstance(sample_output[2], tuple)
             ):
-                sample, (generated_tokens, accepted_tokens), (accepted_lengths, accept_counts) = self.model.generate(
-                    inputs=elem["prefix"][None, ...].to(self.device),
-                    disable_pbar=(self.rank != 0),
-                    # tokenizer=self.tokenizer,  # Uncomment for debugging
-                    **self.gen_kwargs,
-                )
+                sample, (generated_tokens, accepted_tokens), (accepted_lengths, accept_counts) = sample_output
+                draft_position_stats = getattr(self.model, "_last_draft_position_acceptance", None)
             else:
-                sample = self.model.generate(
-                    inputs=elem["prefix"][None, ...].to(self.device),
-                    disable_pbar=(self.rank != 0),
-                    # tokenizer=self.tokenizer,  # Uncomment for debugging
-                    **self.gen_kwargs,
-                )
-                generated_tokens = 1
-                accepted_tokens = 1
-                accepted_lengths = [1]
+                sample = sample_output
+                generated_tokens = int(sample.shape[-1] - elem["prefix"].numel())
+                accepted_tokens = generated_tokens
+                accepted_lengths = [generated_tokens]
                 accept_counts = 1
+                draft_position_stats = None
             total_generated_tokens += generated_tokens
             total_accepted_tokens += accepted_tokens
             total_accepted_lengths.extend(accepted_lengths)
             total_accept_counts += accept_counts
+            if draft_position_stats is not None:
+                attempt_counts = draft_position_stats.get("attempt_counts", [])
+                accept_counts_pos = draft_position_stats.get("accept_counts", [])
+                max_len = max(
+                    len(total_draft_position_attempt_counts),
+                    len(attempt_counts),
+                    len(total_draft_position_accept_counts),
+                    len(accept_counts_pos),
+                )
+                if len(total_draft_position_attempt_counts) < max_len:
+                    total_draft_position_attempt_counts.extend(
+                        [0] * (max_len - len(total_draft_position_attempt_counts))
+                    )
+                if len(total_draft_position_accept_counts) < max_len:
+                    total_draft_position_accept_counts.extend(
+                        [0] * (max_len - len(total_draft_position_accept_counts))
+                    )
+                for idx, val in enumerate(attempt_counts):
+                    total_draft_position_attempt_counts[idx] += int(val)
+                for idx, val in enumerate(accept_counts_pos):
+                    total_draft_position_accept_counts[idx] += int(val)
             if self.rank == 0:
                 end_event.record()
                 torch.cuda.synchronize()
@@ -338,14 +367,64 @@ class LMEvalHarnessModel(LM):
                     print(f"\nAccuracy: {correct}/{total} = {correct / total:.2%}\n")
                 else:
                     print(f"\nCompleted: {total}/{len(ds)}\n")
-                print(f"Total generated tokens: {total_generated_tokens}, Total accepted tokens: {total_accepted_tokens}, Acceptance rate: {total_accepted_tokens / total_generated_tokens:.2%}")
-                print(f"Average accepted length: {np.sum(total_accepted_lengths) / total_accept_counts:.2f}")
+                acceptance_rate = (
+                    total_accepted_tokens / total_generated_tokens
+                    if total_generated_tokens > 0
+                    else 0.0
+                )
+                avg_accepted_len = (
+                    np.sum(total_accepted_lengths) / total_accept_counts
+                    if total_accept_counts > 0
+                    else 0.0
+                )
+                print(f"Total generated tokens: {total_generated_tokens}, Total accepted tokens: {total_accepted_tokens}, Acceptance rate: {acceptance_rate:.2%}")
+                print(f"Average accepted length: {avg_accepted_len:.2f}")
+                if len(total_draft_position_attempt_counts) > 0:
+                    per_pos_strings = []
+                    for pos, (acc, att) in enumerate(
+                        zip(total_draft_position_accept_counts, total_draft_position_attempt_counts),
+                        start=1,
+                    ):
+                        rate = (acc / att) if att > 0 else 0.0
+                        per_pos_strings.append(f"p{pos}:{rate:.2%} ({acc}/{att})")
+                    print("Per-position acceptance rate: " + ", ".join(per_pos_strings))
                 if i >= self.throughput_warmup:
                     print(
                         f"Thput (tok/s): {np.mean(tputs):0.2f} +/- {np.std(tputs):0.2f}"
                     )
                 else:
                     print(f"Thput (tok/s): {tput:0.2f}")
+
+        if self.rank == 0 and len(total_draft_position_attempt_counts) > 0:
+            per_position_summary = []
+            for pos, (acc, att) in enumerate(
+                zip(total_draft_position_accept_counts, total_draft_position_attempt_counts),
+                start=1,
+            ):
+                per_position_summary.append(
+                    {
+                        "position": pos,
+                        "accept_count": int(acc),
+                        "attempt_count": int(att),
+                        "acceptance_rate": float(acc / att) if att > 0 else 0.0,
+                    }
+                )
+            draft_position_metrics_path = (
+                f"{self.generated_samples_output_path}/draft_position_acceptance-rank{self.rank}.json"
+            )
+            with open(draft_position_metrics_path, "w") as f:
+                json.dump(per_position_summary, f, indent=2)
+
+            draft_position_metrics_txt_path = (
+                f"{self.generated_samples_output_path}/draft_position_acceptance-rank{self.rank}.txt"
+            )
+            with open(draft_position_metrics_txt_path, "w") as f:
+                for row in per_position_summary:
+                    f.write(
+                        f"position={row['position']}, acceptance_rate={row['acceptance_rate']:.6f}, "
+                        f"accept_count={row['accept_count']}, attempt_count={row['attempt_count']}\n"
+                    )
+
         samples_path = f"{self.generated_samples_output_path}/rank{self.rank}"
         with open(f"{samples_path}.json", "w") as f:
             json.dump(

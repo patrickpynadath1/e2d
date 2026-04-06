@@ -1,0 +1,149 @@
+{
+  "config": {
+    "model_type": "e2d",
+    "e2d_ckpt_dir": "/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20251228_064711_tie-weights",
+    "ar_ckpt_dir": null,
+    "mtp_ckpt_dir": null,
+    "ckpt_file": "best-rank0.pt",
+    "load_ema_e2d": false,
+    "load_ema_ar": false,
+    "load_ema_mtp": false,
+    "hidden_state_index": null,
+    "dataset_path": "openai/gsm8k",
+    "dataset_config": "main",
+    "train_split": "train",
+    "eval_split": "test",
+    "max_length": 768,
+    "max_train_examples": 7000,
+    "max_eval_examples": 1000,
+    "max_positions_per_example": 64,
+    "target_only_positions": false,
+    "horizons": "1,2,3,4,5",
+    "probe_vocab_size": 8192,
+    "max_train_samples_per_horizon": 200000,
+    "max_eval_samples_per_horizon": 50000,
+    "epochs": 8,
+    "batch_size": 1024,
+    "lr": 0.001,
+    "weight_decay": 0.0,
+    "device": "cuda",
+    "seed": 42,
+    "output_dir": "probe_outputs"
+  },
+  "model_type": "e2d",
+  "horizons": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "hidden_state_indices": {
+    "e2d": 26
+  },
+  "lprime_layer": 25,
+  "summary": [
+    {
+      "horizon": 1,
+      "model": "e2d",
+      "eval_acc": 0.71026,
+      "eval_loss": 34.2005387109375,
+      "train_acc": 0.905175,
+      "train_loss": 3.2509547399902345,
+      "num_eval_samples": 50000,
+      "num_classes": 8192
+    },
+    {
+      "horizon": 2,
+      "model": "e2d",
+      "eval_acc": 0.50624,
+      "eval_loss": 45.512253359375,
+      "train_acc": 0.75613,
+      "train_loss": 6.672020374755859,
+      "num_eval_samples": 50000,
+      "num_classes": 8192
+    },
+    {
+      "horizon": 3,
+      "model": "e2d",
+      "eval_acc": 0.37088,
+      "eval_loss": 50.873667421875,
+      "train_acc": 0.631265,
+      "train_loss": 8.741605177001952,
+      "num_eval_samples": 50000,
+      "num_classes": 8192
+    },
+    {
+      "horizon": 4,
+      "model": "e2d",
+      "eval_acc": 0.2933,
+      "eval_loss": 52.217365625,
+      "train_acc": 0.544545,
+      "train_loss": 9.582767303466797,
+      "num_eval_samples": 50000,
+      "num_classes": 8192
+    },
+    {
+      "horizon": 5,
+      "model": "e2d",
+      "eval_acc": 0.23102,
+      "eval_loss": 54.0213478125,
+      "train_acc": 0.480065,
+      "train_loss": 10.646688005371093,
+      "num_eval_samples": 50000,
+      "num_classes": 8192
+    }
+  ],
+  "e2d": {
+    "1": {
+      "horizon": 1,
+      "train_loss": 3.2509547399902345,
+      "eval_loss": 34.2005387109375,
+      "train_acc": 0.905175,
+      "eval_acc": 0.71026,
+      "num_train_samples": 200000,
+      "num_eval_samples": 50000,
+      "num_classes": 8192
+    },
+    "2": {
+      "horizon": 2,
+      "train_loss": 6.672020374755859,
+      "eval_loss": 45.512253359375,
+      "train_acc": 0.75613,
+      "eval_acc": 0.50624,
+      "num_train_samples": 200000,
+      "num_eval_samples": 50000,
+      "num_classes": 8192
+    },
+    "3": {
+      "horizon": 3,
+      "train_loss": 8.741605177001952,
+      "eval_loss": 50.873667421875,
+      "train_acc": 0.631265,
+      "eval_acc": 0.37088,
+      "num_train_samples": 200000,
+      "num_eval_samples": 50000,
+      "num_classes": 8192
+    },
+    "4": {
+      "horizon": 4,
+      "train_loss": 9.582767303466797,
+      "eval_loss": 52.217365625,
+      "train_acc": 0.544545,
+      "eval_acc": 0.2933,
+      "num_train_samples": 200000,
+      "num_eval_samples": 50000,
+      "num_classes": 8192
+    },
+    "5": {
+      "horizon": 5,
+      "train_loss": 10.646688005371093,
+      "eval_loss": 54.0213478125,
+      "train_acc": 0.480065,
+      "eval_acc": 0.23102,
+      "num_train_samples": 200000,
+      "num_eval_samples": 50000,
+      "num_classes": 8192
+    }
+  }
+}

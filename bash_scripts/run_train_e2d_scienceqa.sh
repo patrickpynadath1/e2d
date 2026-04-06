@@ -22,6 +22,7 @@ NULLIFY_SELF_ATTN=false
 LR=1e-5
 WARMUP_DURATION="100ba"
 ALPHA_F=0.5
+DECODER_LOSS_LAMBDA=1.0
 BATCH_SIZE=1
 MAX_DURATION="30000ba"
 PRECISION="amp_bf16"
@@ -103,4 +104,5 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   composer.callbacks.save_best_checkpointing.save_local=false \
   eval_dataloader.batch_size=2 \
   model.config.train_on_context=${TRAIN_ON_CONTEXT} \
+  model.config.decoder_loss_lambda=${DECODER_LOSS_LAMBDA} \
   +model.config.nullify_self_attn=${NULLIFY_SELF_ATTN} \

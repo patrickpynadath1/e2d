@@ -640,13 +640,15 @@ class LayerSkip(AR):
         # Draft length: how many tokens the drafter proposes per round
         # draft_len = assistant_early_exit  # heuristic: more layers -> longer drafts
         # draft_len = max(1, min(draft_len, 16))  # clamp to [1, 16]
-        draft_len = 4
+        draft_len = 6
 
         # Metrics tracking
         total_generated_tokens = 0  # drafted tokens proposed by early-exit model
         total_accepted_tokens = 0
         total_accepted_lengths: List[int] = []
         accept_counts = 0
+        draft_position_attempt_counts: List[int] = [0 for _ in range(draft_len)]
+        draft_position_accept_counts: List[int] = [0 for _ in range(draft_len)]
 
         # Start with the prompt
         generated = inputs.clone()
@@ -762,6 +764,13 @@ class LayerSkip(AR):
             total_accepted_tokens += n_accepted
             total_accepted_lengths.append(n_accepted)
             accept_counts += 1
+            for pos in range(actual_draft_len):
+                if pos >= len(draft_position_attempt_counts):
+                    draft_position_attempt_counts.append(0)
+                    draft_position_accept_counts.append(0)
+                draft_position_attempt_counts[pos] += 1
+                if pos < n_accepted:
+                    draft_position_accept_counts[pos] += 1
 
             # Accept the matching tokens
             if n_accepted > 0:
@@ -833,6 +842,15 @@ class LayerSkip(AR):
             print(f"[LayerSkip] Acceptance rate: {acceptance_rate:.2%}")
             print(f"[LayerSkip] Avg accepted length: {avg_accepted_len:.2f}")
             print(tokenizer.batch_decode(generated))
+
+        self._last_draft_position_acceptance = {
+            "attempt_counts": draft_position_attempt_counts,
+            "accept_counts": draft_position_accept_counts,
+            "acceptance_rates": [
+                (acc / att) if att > 0 else 0.0
+                for acc, att in zip(draft_position_accept_counts, draft_position_attempt_counts)
+            ],
+        }
 
         return (
             generated,

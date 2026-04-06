@@ -429,6 +429,9 @@ def main(cfg: DictConfig) -> None:
     ckpt_file = cfg.get("ckpt_file", "best-rank0.pt")
     load_ema = cfg.get("load_ema_weights", True)
 
+    if "fsdp" in pretrained_model_name_or_path:
+        load_ema = False
+
     if fsspec_exists(os.path.join(pretrained_model_name_or_path, "config.yaml")):
         model = load_model_from_ckpt_dir_path(
             path_to_ckpt_dir=pretrained_model_name_or_path,

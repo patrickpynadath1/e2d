@@ -15,6 +15,7 @@ N_DECODER_LAYERS=2
 # Hyperparameters
 LR=1e-5
 ALPHA_F=0.5
+DECODER_LOSS_LAMBDA=1.0
 WARMUP_DURATION="100ba"
 BATCH_SIZE=32
 MICRO_BATCH_SIZE=1
@@ -74,4 +75,5 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   composer.loggers.name=${RUN_NAME} \
   train_dataloader.num_workers=${NUM_WORKERS} \
   eval_dataloader.batch_size=1 \
+  model.config.decoder_loss_lambda=${DECODER_LOSS_LAMBDA} \
   composer.callbacks.hf_compatible_checkpointing.disable_hf=true

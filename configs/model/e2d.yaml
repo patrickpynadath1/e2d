@@ -5,3 +5,4 @@ defaults:
 _target_: src.denoiser.diffusion.E2D
 config:
   _target_: src.denoiser.diffusion.E2DConfig
+  decoder_loss_lambda: 1.0

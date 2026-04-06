@@ -1,0 +1,13 @@
+defaults:
+  - ar@_here_
+  - _self_
+
+_target_: src.denoiser.mtp.MTP
+config:
+  _target_: src.denoiser.mtp.MTPConfig
+  target_loss_weight: 1.0
+  future_loss_weight: 0.1
+  num_future_heads: 4
+  speculative_draft_len: 4
+  mtp_per_block: false
+  mtp_block_size: 4
