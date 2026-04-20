@@ -3,7 +3,9 @@
 cd ../ || exit  # Go to the root directory of the repo
 source setup_env.sh
 
-QWEN_MODEL="Qwen/Qwen3-1.7B-Base"
+QWEN_MODEL_BASE="Qwen/Qwen3-1.7B-Base"
+QWEN_MODEL_INSTRUCT="Qwen/Qwen3-1.7B"
+QWEN_MODEL="${QWEN_MODEL_BASE}"
 # QWEN_MODEL="meta-llama/Llama-3.2-1B"
 NUM_FEW_SHOT=0
 
@@ -35,8 +37,6 @@ NUM_FEW_SHOT=0
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_layerskip_20260213_193059"
 # Qwen3-4B-Base
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr5e-6_bsz2_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers36_layerskip_20260323_111643_fsdp"
-# llama-3.2-1b
-# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers16_layerskip_llama_20260214_032750"
 # BLOCK_SIZE=1
 # KV_CACHING=true
 # ALIGN_INPUTS_TO_BLOCKS=true
@@ -77,13 +77,11 @@ NUM_FEW_SHOT=0
 # 28(4)
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec4_e2d_20251227_234110_tie-weights"
 # 28(2)
-# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20251228_064711_tie-weights"
+MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20251228_064711_tie-weights"
 # 28(1)
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec1_e2d_20260118_054940_tie-weights"
 # 28(4), freeze bottom encoder
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec4_e2d_20260211_041417_tie-weights"
-# llama-3.2-1b 16(2)
-# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc16_TOPdec2_e2d_20260129_002614_tie-weights"
 # 28(2), lora r = 16, alpha = 32, lr = 1e-4
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-4_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260222_010759_tie-weights"
 # 28(2), block_size=2
@@ -97,25 +95,37 @@ NUM_FEW_SHOT=0
 # 28(2), block_size=12
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block12_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260405_002950_tie-weights"
 # 28(2), lambda = 2.0
-# MODEL_PATH="/data/shared_data/hankun/outputs/"
+# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260406_001643_tie-weights"
 # 28(2), lambda = 1.5
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260405_195525_tie-weights"
-# 28(2), lambda = 1.0
-MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260405_195413_tie-weights"
 # 28(2), lambda = 0.5
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260405_195642_tie-weights"
 # 28(2), lambda = 0.1
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260405_195841_tie-weights"
 # Qwen3-4B-Base, 36(2), lr = 5e-6
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr5e-6_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc36_TOPdec2_e2d_20260323_011022_tie-weights"
+# ultrachat (instruction-tuned Qwen3-1.7B with thinking mode), 10k, bsz1
+# MODEL_PATH="/data/shared_data/hankun/outputs/ultrachat_block8_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur3ep_amp_bf16_enc28_TOPdec2_e2d_ultrachat_20260419_032210_tie-weights"
+# fine-tune from AR
+# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260418_032322_tie-weights"
 BLOCK_SIZE=4
 KV_CACHING=true
 ALIGN_INPUTS_TO_BLOCKS=false
 USE_EMA=true
 
+IS_INSTRUCTION_MODEL=false
+if [[ "${MODEL_PATH}" == *"ultrachat"* ]]; then
+  IS_INSTRUCTION_MODEL=true
+  QWEN_MODEL="${QWEN_MODEL_INSTRUCT}"
+fi
+
 NUM_VISIBLE_DEVICES=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
-OUTPUT_DIR="/data/shared_data/hankun/outputs/${MODEL_PATH}/lm_eval_harness_output"
+if [[ "${MODEL_PATH}" = /* ]]; then
+  OUTPUT_DIR="${MODEL_PATH}/lm_eval_harness_output"
+else
+  OUTPUT_DIR="/data/shared_data/hankun/outputs/${MODEL_PATH}/lm_eval_harness_output"
+fi
 REVISION=null
 
 mkdir -p ${OUTPUT_DIR}
@@ -148,6 +158,10 @@ accelerate launch scripts/eval/harness_eval.py \
   pretrained_model_revision=${REVISION} \
   task.model.ckpt_file="${CKPT}-rank0.pt" \
   task.model.load_ema_weights=${USE_EMA} \
+  +task.model.is_instruction_model=${IS_INSTRUCTION_MODEL} \
+  +task.model.use_chat_template_for_gsm8k=${IS_INSTRUCTION_MODEL} \
+  +task.model.enable_thinking_for_gsm8k=${IS_INSTRUCTION_MODEL} \
+  +task.model.strip_thinking_for_gsm8k=${IS_INSTRUCTION_MODEL} \
   tokenizer.pretrained_model_name_or_path=${QWEN_MODEL} \
   output_path=${OUTPUT_PATH} \
   generated_samples_output_path=${OUTPUT_PATH} \

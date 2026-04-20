@@ -23,15 +23,12 @@ LR=1e-5
 WARMUP_DURATION="100ba"
 ALPHA_F=0.5
 DECODER_LOSS_LAMBDA=1.0
-BATCH_SIZE=1
-MAX_DURATION="30000ba"
+BATCH_SIZE=32
+MAX_DURATION="1ep"
 PRECISION="amp_bf16"
 
 PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-1.7B-Base
-NUM_SHOT=0
 TRAIN_ON_CONTEXT=false
-TRAIN_ON_AR=false
-AR_CHECKPOINT_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_ar_20251201_061752/checkpoints/best-rank0_ema_weights_only.pt"
 
 TAG="e2d"
 if [ "${ENCODER_TOP_LAYERS}" == "true" ]; then
@@ -48,7 +45,7 @@ fi
 # get time stamp
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
-RUN_NAME=gsm8k-${NUM_SHOT}shot_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_alphaf${ALPHA_F}_max-dur${MAX_DURATION}_${PRECISION}_${ENC_LAYERS}_${DEC_LAYERS}_${TAG}_${TIMESTAMP}
+RUN_NAME=tuluv2_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_alphaf${ALPHA_F}_max-dur${MAX_DURATION}_${PRECISION}_${ENC_LAYERS}_${DEC_LAYERS}_${TAG}_${TIMESTAMP}
 if [ "${TIE_WEIGHTS}" == "true" ]; then
   RUN_NAME="${RUN_NAME}_tie-weights"
 fi
@@ -64,15 +61,16 @@ NUM_WORKERS=0
 
 NUM_VISIBLE_DEVICES=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
 composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoiser.py \
   run_name=${RUN_NAME} \
   pretrained_model_name_or_path=${PRETRAINED_MODEL_NAME_OR_PATH} \
-  dataset@train_dataset=gsm8k_train \
-  dataset@eval_dataset=gsm8k_eval \
-  train_dataset.num_shot=${NUM_SHOT} \
+  dataset@train_dataset=tulu_v2_sft_train \
+  dataset@eval_dataset=tulu_v2_sft_eval \
   composer.optimizer.lr=${LR} \
   composer.trainer.precision=${PRECISION} \
-  composer.trainer.eval_interval="1000ba" \
+  composer.trainer.eval_interval="100ba" \
   composer.trainer.max_duration=${MAX_DURATION} \
   composer.trainer.save_num_checkpoints_to_keep=1 \
   composer/lr_scheduler=cosine_annealing_with_warmup \
@@ -81,7 +79,7 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   model=e2d \
   model.config.attn_backend="sdpa" \
   training.compile_backbone=false \
-  model.config.length=768 \
+  model.config.length=1024 \
   model/backbone@model.config.backbone_config=llm_as_encoder_decoder_share_kv_encoder_gen \
   model.config.backbone_config.use_encoder_causal_mask=${ENCODER_CAUSAL_MASK} \
   model.config.backbone_config.num_encoder_layers=${N_ENCODER_LAYERS} \
@@ -99,14 +97,12 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   eval_block_size=${EVAL_BLOCK_SIZE} \
   training.antithetic_sampling=false \
   hydra.run.dir=/data/shared_data/hankun/outputs/${RUN_NAME} \
-  composer.trainer.save_interval="1000ba" \
+  composer.trainer.save_interval="400ba" \
   composer.loggers.name=${RUN_NAME} \
   train_dataloader.num_workers=${NUM_WORKERS} \
   composer.callbacks.hf_compatible_checkpointing.disable_hf=true \
   composer.callbacks.save_best_checkpointing.save_local=false \
-  eval_dataloader.batch_size=2 \
+  eval_dataloader.batch_size=1 \
   model.config.train_on_context=${TRAIN_ON_CONTEXT} \
   model.config.decoder_loss_lambda=${DECODER_LOSS_LAMBDA} \
-  model.config.backbone_config.train_on_ar=${TRAIN_ON_AR} \
-  model.config.backbone_config.ar_checkpoint_path=${AR_CHECKPOINT_PATH} \
   +model.config.nullify_self_attn=${NULLIFY_SELF_ATTN} \

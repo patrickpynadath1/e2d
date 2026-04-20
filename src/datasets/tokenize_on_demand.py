@@ -849,3 +849,191 @@ class KodCodeDataset(Dataset):
             "attention_mask": attention_mask,
             "context_mask": context_mask,
         }
+
+
+class TuluV2SFTDataset(Dataset):
+    """Tulu v2 SFT dataset for instruction tuning.
+
+    The dataset is expected to contain either chat-style ``messages`` or
+    instruction-style prompt/response fields. For chat-style examples we use all
+    turns before the final assistant response as source (context), and the final
+    assistant response as target.
+    """
+
+    def __init__(
+        self,
+        tokenizer: PreTrainedTokenizer,
+        split: Literal["train", "test"] = "train",
+        max_length: int = 1024,
+        dataset_path: str = "allenai/tulu-v2-sft-mixture",
+        padding: bool = False,
+        add_special_tokens: bool = True,
+        test_size: int = 1000,
+        sampling_seed: int = 42,
+        source_prompt_text: str | None = None,
+        target_prompt_text: str | None = None,
+        # Unused tokenizer arg (compat. with other dataset loading functions/classes)
+        **_: Dict[str, Any],
+    ):
+        self.tokenizer = tokenizer
+        self.split = split
+        self.max_length = max_length
+        self.padding = padding
+        self.add_special_tokens = add_special_tokens
+        self.source_prompt_text = source_prompt_text
+        self.target_prompt_text = target_prompt_text
+
+        full_dataset = load_dataset(dataset_path, split="train", trust_remote_code=True)
+
+        if len(full_dataset) <= 1:
+            self.dataset = full_dataset
+        else:
+            eval_size = min(test_size, len(full_dataset) // 10)
+            eval_size = max(1, eval_size)
+
+            rng = np.random.RandomState(sampling_seed)
+            perm = rng.permutation(len(full_dataset)).tolist()
+            eval_indices = sorted(perm[-eval_size:])
+            train_indices = sorted(perm[:-eval_size])
+
+            if split == "train":
+                self.dataset = full_dataset.select(train_indices)
+            else:
+                self.dataset = full_dataset.select(eval_indices)
+
+    def __len__(self):
+        return len(self.dataset)
+
+    @staticmethod
+    def _normalize_content(content: Any) -> str:
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            chunks = []
+            for item in content:
+                if isinstance(item, str):
+                    chunks.append(item)
+                elif isinstance(item, dict):
+                    if "text" in item and isinstance(item["text"], str):
+                        chunks.append(item["text"])
+                    elif "content" in item and isinstance(item["content"], str):
+                        chunks.append(item["content"])
+            return "\n".join([c for c in chunks if c])
+        return str(content)
+
+    def _format_messages_fallback(self, messages: list[dict[str, Any]]) -> str:
+        parts = []
+        for m in messages:
+            role = str(m.get("role", "user")).strip().lower()
+            content = self._normalize_content(m.get("content", "")).strip()
+            if content:
+                parts.append(f"{role}: {content}")
+        if not parts:
+            return ""
+        return "\n\n".join(parts) + "\n\nassistant: "
+
+    def _build_source_from_messages(self, prefix_messages: list[dict[str, Any]]) -> str:
+        if hasattr(self.tokenizer, "apply_chat_template"):
+            try:
+                return self.tokenizer.apply_chat_template(
+                    prefix_messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+            except Exception:
+                pass
+        return self._format_messages_fallback(prefix_messages)
+
+    def _extract_source_target(self, example: dict[str, Any]) -> tuple[str, str]:
+        # Preferred format: chat-style messages.
+        if "messages" in example and example["messages"] is not None:
+            messages = example["messages"]
+            if isinstance(messages, str):
+                try:
+                    messages = json.loads(messages)
+                except json.JSONDecodeError:
+                    messages = []
+
+            if isinstance(messages, list) and len(messages) > 0:
+                normalized = []
+                for msg in messages:
+                    if not isinstance(msg, dict):
+                        continue
+                    role = str(msg.get("role", "")).strip().lower()
+                    content = self._normalize_content(msg.get("content", "")).strip()
+                    if role and content:
+                        normalized.append({"role": role, "content": content})
+
+                last_assistant_idx = -1
+                for i in range(len(normalized) - 1, -1, -1):
+                    if normalized[i]["role"] == "assistant":
+                        last_assistant_idx = i
+                        break
+
+                if last_assistant_idx > 0:
+                    source = self._build_source_from_messages(
+                        normalized[:last_assistant_idx]
+                    )
+                    target = normalized[last_assistant_idx]["content"]
+                    return source, target
+
+                if last_assistant_idx == 0:
+                    return "", normalized[0]["content"]
+
+                source = self._build_source_from_messages(normalized)
+                return source, ""
+
+        # Fallback formats.
+        if "prompt" in example and "completion" in example:
+            return str(example["prompt"]), str(example["completion"])
+        if "instruction" in example and "response" in example:
+            return str(example["instruction"]), str(example["response"])
+        if "question" in example and "answer" in example:
+            return str(example["question"]), str(example["answer"])
+        if "text" in example:
+            return "", str(example["text"])
+
+        return "", json.dumps(example, ensure_ascii=False)
+
+    def __getitem__(self, idx):
+        example = self.dataset[idx]
+        source, target = self._extract_source_target(example)
+
+        if self.source_prompt_text is not None:
+            source = self.source_prompt_text + source
+        if self.target_prompt_text is not None:
+            target = self.target_prompt_text + target
+
+        if self.add_special_tokens:
+            source = (self.tokenizer.bos_token or "") + source
+            if source and self.tokenizer.eos_token is not None:
+                source = source + self.tokenizer.eos_token
+            if self.tokenizer.eos_token is not None:
+                target = target + self.tokenizer.eos_token
+
+        qa_tokenized = self.tokenizer.batch_encode_plus(
+            [source, target],
+            max_length=self.max_length // 2,
+            padding=self.padding,
+            add_special_tokens=False,
+            truncation=True,
+        )
+
+        input_ids = torch.cat(
+            [torch.LongTensor(t) for t in qa_tokenized["input_ids"]], dim=-1
+        )
+        attention_mask = torch.cat(
+            [torch.LongTensor(a) for a in qa_tokenized["attention_mask"]], dim=-1
+        )
+        context_mask = torch.cat(
+            (
+                torch.LongTensor(qa_tokenized["attention_mask"][0]),
+                torch.zeros_like(torch.LongTensor(qa_tokenized["input_ids"][1])),
+            ),
+            dim=-1,
+        )
+        return {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "context_mask": context_mask,
+        }

@@ -49,6 +49,10 @@ class LMEvalHarnessModel(LM):
         throughput_run: bool = False,
         throughput_samples: int = 100,
         throughput_warmup: int = 100,
+        is_instruction_model: bool | None = None,
+        use_chat_template_for_gsm8k: bool | None = None,
+        enable_thinking_for_gsm8k: bool | None = None,
+        strip_thinking_for_gsm8k: bool | None = None,
         model_config_overrides: dict[str, Any] | None = None,
     ):
         """
@@ -65,6 +69,16 @@ class LMEvalHarnessModel(LM):
                 however this method expects `gen_kwargs` as string with comma-separated
                 arguments, which is not compatible in our hydra framework.
             throughput_run (bool): Whether to run the evaluation throughput.
+            is_instruction_model (bool | None): Whether this is an instruction-tuned
+                checkpoint. If None, infer from model path (ultrachat => True).
+            use_chat_template_for_gsm8k (bool | None): Whether to format GSM8K as
+                chat turns. If None, follow `is_instruction_model`.
+            enable_thinking_for_gsm8k (bool | None): Whether to request Qwen3
+                thinking mode when using chat template. If None, follow
+                `is_instruction_model`.
+            strip_thinking_for_gsm8k (bool | None): Whether to split <think>
+                content from final content before metric extraction. If None,
+                follow `is_instruction_model`.
             model_config_overrides (dict[str, Any]): Model config overrides.
         """
         if "fsdp" in pretrained_model_name_or_path:
@@ -118,10 +132,38 @@ class LMEvalHarnessModel(LM):
         print(f"Num. trainable params: {format_number(count_parameters(model))}")
         self.model.eval()
         self.tokenizer = maybe_add_missing_special_tokens(tokenizer)
+        # print tokenizer name
+        print(f"Using tokenizer: {self.tokenizer.name_or_path}")
         self.gen_kwargs = gen_kwargs
         self.throughput_run = throughput_run
         self.throughput_warmup = throughput_warmup
         self.throughput_samples = throughput_samples
+        self.pretrained_model_name_or_path = pretrained_model_name_or_path
+
+        def _coerce_bool(value: Any) -> bool:
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, str):
+                lowered = value.strip().lower()
+                if lowered in {"1", "true", "yes", "on"}:
+                    return True
+                if lowered in {"0", "false", "no", "off", ""}:
+                    return False
+            return bool(value)
+
+        if is_instruction_model is None:
+            is_instruction_model = "ultrachat" in pretrained_model_name_or_path.lower()
+        self.is_instruction_model = _coerce_bool(is_instruction_model)
+
+        if use_chat_template_for_gsm8k is None:
+            use_chat_template_for_gsm8k = self.is_instruction_model
+        if enable_thinking_for_gsm8k is None:
+            enable_thinking_for_gsm8k = self.is_instruction_model
+        if strip_thinking_for_gsm8k is None:
+            strip_thinking_for_gsm8k = self.is_instruction_model
+        self.use_chat_template_for_gsm8k = _coerce_bool(use_chat_template_for_gsm8k)
+        self.enable_thinking_for_gsm8k = _coerce_bool(enable_thinking_for_gsm8k)
+        self.strip_thinking_for_gsm8k = _coerce_bool(strip_thinking_for_gsm8k)
 
     @property
     def rank(self):
@@ -130,6 +172,25 @@ class LMEvalHarnessModel(LM):
     @property
     def world_size(self):
         return self._world_size
+
+    def _apply_chat_template_for_gsm8k(self, user_prompt: str) -> str:
+        messages = [{"role": "user", "content": user_prompt}]
+        if hasattr(self.tokenizer, "apply_chat_template"):
+            if self.enable_thinking_for_gsm8k:
+                return self.tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    # enable_thinking=True,
+                    enable_thinking=False # disable thinking because greedy decoding requires non-thinking mode
+                )
+            return self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+        bos = self.tokenizer.bos_token or ""
+        return f"{bos}{user_prompt}"
 
     def loglikelihood(self, requests) -> List[Tuple[float, bool]]:
         raise NotImplementedError
@@ -163,23 +224,36 @@ class LMEvalHarnessModel(LM):
         # TODO: Move this to utils file / perhaps use chat template
         def _tokenize_gsm8k(
             e,
-            prefix_text: str | None = (
-                f"{self.tokenizer.bos_token}Please reason step by step, and put your "
-                + "final answer within $\\boxed{}$. "
+            prefix_text: str = (
+                "Please reason step by step, and put your final answer within "
+                + "$\\boxed{}$."
             ),
         ):
             ctx = e["prefix"]
             ctx = re.sub(
                 r"^####\s*(\d+)\s*$",
-                r"$\\boxed{\1}$" + self.tokenizer.eos_token,
+                r"$\\boxed{\1}$" + (self.tokenizer.eos_token or ""),
                 ctx,
                 flags=re.MULTILINE,
             )
-            ctx = ctx.replace("Question: ", prefix_text)
-            if ("E2D" in type(self.model).__name__ and "E2D2" not in type(self.model).__name__):
-                ctx = ctx.replace("\nAnswer:", f"{self.tokenizer.eos_token}")
+
+            if self.is_instruction_model:
+                user_prompt = ctx.replace("Question: ", f"{prefix_text} ", 1)
+                if user_prompt == ctx:
+                    user_prompt = f"{prefix_text} {ctx}"
+                user_prompt = re.sub(r"\nAnswer:\s*$", "", user_prompt).strip()
+                ctx = self._apply_chat_template_for_gsm8k(user_prompt)
             else:
-                ctx = ctx.replace("\nAnswer:", f"{self.tokenizer.eos_token}Answer:")
+                bos = self.tokenizer.bos_token or ""
+                eos = self.tokenizer.eos_token or ""
+                ctx = ctx.replace("Question: ", f"{bos}{prefix_text} ")
+                if (
+                    "E2D" in type(self.model).__name__
+                    and "E2D2" not in type(self.model).__name__
+                ):
+                    ctx = ctx.replace("\nAnswer:", f"{eos}")
+                else:
+                    ctx = ctx.replace("\nAnswer:", f"{eos}Answer:")
             prefix_tokens = self.tokenizer(ctx)["input_ids"]
             return {
                 "prefix_text": ctx,
@@ -337,6 +411,7 @@ class LMEvalHarnessModel(LM):
                 )
             else:
                 # GSM8K / default: extract \boxed{} answer
+                raw_result = result
                 predicted_ans = None
                 if "boxed{" in result:
                     predicted_ans = result.split("boxed{")[1].split("}")[0]
@@ -356,10 +431,18 @@ class LMEvalHarnessModel(LM):
                     correct += 1
                 total += 1
                 res_for_json.append(
-                    {
-                        "prefix": elem["prefix_text"],
-                        "result": result,
-                    }
+                    (
+                        {
+                            "prefix": elem["prefix_text"],
+                            "result": result,
+                            "final_content": raw_result,
+                        }
+                        if is_gsm8k and self.is_instruction_model
+                        else {
+                            "prefix": elem["prefix_text"],
+                            "result": result,
+                        }
+                    )
                 )
             # torch.cuda.empty_cache()
             if self.rank == 0:

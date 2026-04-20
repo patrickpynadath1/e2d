@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from functools import partial
-from typing import Optional, Tuple, Union
+import os
+from typing import Any, Optional, Tuple, Union
 
 import torch
 from torch import nn
@@ -407,6 +408,8 @@ class LLMasEncoderDecoderShareKV(nn.Module):
         keep_top_encoder_layers: bool = False,
         keep_top_decoder_layers: bool = False,
         use_gradient_checkpointing: bool = False,
+        train_on_ar: bool = False,
+        ar_checkpoint_path: Optional[str] = None,
         **llm_init_kwargs,
     ):
         assert not (tie_encoder_decoder_weights and reinit_decoder), (
@@ -415,9 +418,34 @@ class LLMasEncoderDecoderShareKV(nn.Module):
         assert not (tie_encoder_decoder_weights and freeze_encoder), (
             "Cannot freeze encoder weights when tying encoder-decoder weights."
         )
+        assert not (train_on_ar and (reinit_encoder or reinit_decoder)), (
+            "Cannot reinitialize encoder/decoder when train_on_ar is enabled."
+        )
         super().__init__()
         self.use_encoder_causal_mask = use_encoder_causal_mask
         self.tie_encoder_decoder_weights = tie_encoder_decoder_weights
+
+        use_ar_checkpoint = train_on_ar
+        ar_state_dict = None
+        if use_ar_checkpoint:
+            if ar_checkpoint_path is None:
+                raise ValueError(
+                    "train_on_ar is enabled but ar_checkpoint_path is not set."
+                )
+            if not os.path.isfile(ar_checkpoint_path):
+                raise FileNotFoundError(
+                    f"AR checkpoint does not exist: {ar_checkpoint_path}"
+                )
+            logger.info(f"Loading AR checkpoint from {ar_checkpoint_path}")
+            try:
+                checkpoint = torch.load(
+                    ar_checkpoint_path,
+                    map_location="cpu",
+                    weights_only=False,
+                )
+            except TypeError:
+                checkpoint = torch.load(ar_checkpoint_path, map_location="cpu")
+            ar_state_dict = self._extract_checkpoint_state_dict(checkpoint)
 
         if reinit_encoder:
             assert num_encoder_layers > 0
@@ -436,6 +464,19 @@ class LLMasEncoderDecoderShareKV(nn.Module):
                 attn_implementation=attn_backend,
                 **llm_init_kwargs,
             )
+            if use_ar_checkpoint:
+                self._load_ar_weights_into_module(
+                    module=self.encoder,
+                    full_state_dict=ar_state_dict,
+                    module_name="encoder",
+                    preferred_prefixes=(
+                        "model.backbone.encoder.",
+                        "backbone.encoder.",
+                        "encoder.",
+                        "model.backbone.model.",
+                        "backbone.model.",
+                    ),
+                )
             assert num_encoder_layers <= len(self.encoder.model.layers), (
                 f"Cannot keep {num_encoder_layers} layers. "
                 f"Pre-trained model only has {len(self.encoder.model.layers)} layers."
@@ -495,6 +536,19 @@ class LLMasEncoderDecoderShareKV(nn.Module):
                     attn_implementation=attn_backend,
                     **llm_init_kwargs,
                 )
+                if use_ar_checkpoint:
+                    self._load_ar_weights_into_module(
+                        module=self.decoder,
+                        full_state_dict=ar_state_dict,
+                        module_name="decoder",
+                        preferred_prefixes=(
+                            "model.backbone.decoder.",
+                            "backbone.decoder.",
+                            "decoder.",
+                            "model.backbone.model.",
+                            "backbone.model.",
+                        ),
+                    )
                 assert num_decoder_layers <= len(self.decoder.model.layers), (
                     f"Cannot keep {num_decoder_layers} layers. "
                     f"Pre-trained model only has {len(self.decoder.layers)} layers."
@@ -536,6 +590,93 @@ class LLMasEncoderDecoderShareKV(nn.Module):
             if use_gradient_checkpointing:
                 self.decoder.gradient_checkpointing_enable()
         self.max_length = max_length
+
+    @staticmethod
+    def _extract_checkpoint_state_dict(checkpoint: Any) -> dict[str, torch.Tensor]:
+        if not isinstance(checkpoint, dict):
+            raise ValueError("Expected AR checkpoint to be a dictionary.")
+
+        candidate = checkpoint
+        if (
+            "state" in checkpoint
+            and isinstance(checkpoint["state"], dict)
+            and "model" in checkpoint["state"]
+            and isinstance(checkpoint["state"]["model"], dict)
+        ):
+            candidate = checkpoint["state"]["model"]
+        else:
+            for key in ("state_dict", "model_state_dict", "model"):
+                if key in checkpoint and isinstance(checkpoint[key], dict):
+                    candidate = checkpoint[key]
+                    break
+
+        tensor_state = {
+            key: value
+            for key, value in candidate.items()
+            if isinstance(key, str) and torch.is_tensor(value)
+        }
+        if not tensor_state:
+            raise ValueError(
+                "Could not find tensor weights in AR checkpoint. "
+                "Expected a state dict or nested {'state': {'model': ...}} format."
+            )
+        return tensor_state
+
+    def _load_ar_weights_into_module(
+        self,
+        module: nn.Module,
+        full_state_dict: Optional[dict[str, torch.Tensor]],
+        module_name: str,
+        preferred_prefixes: tuple[str, ...],
+    ) -> None:
+        if full_state_dict is None:
+            raise ValueError("AR checkpoint state dict is missing.")
+
+        target_keys = set(module.state_dict().keys())
+        matched_state_dict: dict[str, torch.Tensor] = {}
+
+        for raw_key, tensor in full_state_dict.items():
+            key = raw_key[7:] if raw_key.startswith("module.") else raw_key
+            candidates = [key]
+
+            for prefix in preferred_prefixes:
+                if key.startswith(prefix):
+                    candidates.append(key[len(prefix) :])
+
+            if key.startswith("model."):
+                candidates.append(key[len("model.") :])
+            if key.startswith("backbone."):
+                candidates.append(key[len("backbone.") :])
+
+            for candidate_key in candidates:
+                if candidate_key in target_keys:
+                    matched_state_dict[candidate_key] = tensor
+                    break
+
+        if not matched_state_dict:
+            sample_keys = list(full_state_dict.keys())[:8]
+            raise ValueError(
+                f"Failed to map AR checkpoint keys for {module_name}. "
+                f"Sample keys from checkpoint: {sample_keys}"
+            )
+
+        incompatible_keys = module.load_state_dict(matched_state_dict, strict=False)
+        if incompatible_keys.missing_keys:
+            logger.warning(
+                f"Missing {len(incompatible_keys.missing_keys)} {module_name} keys "
+                f"when loading AR checkpoint. "
+                f"First few: {incompatible_keys.missing_keys[:8]}"
+            )
+        if incompatible_keys.unexpected_keys:
+            logger.warning(
+                f"Unexpected {len(incompatible_keys.unexpected_keys)} {module_name} keys "
+                f"when loading AR checkpoint. "
+                f"First few: {incompatible_keys.unexpected_keys[:8]}"
+            )
+        logger.info(
+            f"Loaded {len(matched_state_dict)} parameters into {module_name} "
+            "from AR checkpoint."
+        )
 
     def freeze_encoder(self):
         for p in self.encoder.model.parameters():

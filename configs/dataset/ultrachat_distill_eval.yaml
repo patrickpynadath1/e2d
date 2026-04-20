@@ -1,0 +1,5 @@
+defaults:
+  - ultrachat_distill_train
+
+# Overridden by run_train_e2d_ultrachat.sh
+dataset_path: "${oc.env:DATA_DIR}/ultrachat_distill/eval_preprocessed"

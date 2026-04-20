@@ -7,6 +7,7 @@ t_steps = np.array([1, 2, 3, 4, 5, 6])
 layerskip = np.array([59.06, 42.75, 32.84, 26.45, 21.29, 18.04])
 e2d = np.array([85.07, 73.87, 63.47, 54.65, 46.05, 38.31])
 eagle3 = np.array([86.42, 64.30, 43.06, 28.37, 19.77, 14.43])
+mtp = np.array([76.57, 60.81, 49.45, 40.38])
 
 # 2. Set up the plot style
 plt.rcParams['font.family'] = 'serif'
@@ -15,6 +16,7 @@ plt.rcParams['font.family'] = 'serif'
 c_ours = '#DD795E'      # Salmon/Orange
 c_layerskip = '#7A7A7A'  # Neutral Medium-Dark Gray to complement the orange
 c_eagle3 = "#43A585"
+c_mtp = '#5B9BD5'
 
 fig, ax = plt.subplots(figsize=(5.5, 4.5))
 
@@ -25,6 +27,10 @@ fig, ax = plt.subplots(figsize=(5.5, 4.5))
 # Ours: Dashed line with crosses
 ax.plot(t_steps, e2d, marker='x', color=c_ours, linestyle='--', linewidth=2, 
         markersize=9, markeredgewidth=2.5, label='Dual Decoding')
+
+# MTP: Dotted line with crosses (only 4 points, so we adjust t_steps accordingly)
+ax.plot(t_steps[:4], mtp, marker='x', color=c_mtp, linestyle=':', linewidth=2, 
+        markersize=9, markeredgewidth=2.5, label='MTP')
 
 # Eagle3: Dotted line with crosses
 ax.plot(t_steps, eagle3, marker='x', color=c_eagle3, linestyle='-', linewidth=2, 
