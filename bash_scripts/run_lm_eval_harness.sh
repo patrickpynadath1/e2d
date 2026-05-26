@@ -15,14 +15,14 @@ NUM_FEW_SHOT=0
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_ar_20251201_061752"
 # Qwen3-4B-Base, LR=5e-6
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr5e-6_bsz2_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers36_ar_20260322_125401_fsdp"
-# untuned Qwen3-1.7B
-# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm0ba_alphaf0.5_max-dur0ba_amp_bf16_layers28_ar_20260422_091633"
+# untuned Qwen3-1.7B, acc. 65/87 = 74.71%, 38 tokens/s
+MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm0ba_alphaf0.5_max-dur0ba_amp_bf16_layers28_ar_20260422_091633"
 # untuned Qwen3-4B, 83.9%, 
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm0ba_alphaf0.5_max-dur0ba_amp_bf16_layers36_ar_20260423_010658"
-# BLOCK_SIZE=1
-# KV_CACHING=true
-# ALIGN_INPUTS_TO_BLOCKS=true
-# USE_EMA=true
+BLOCK_SIZE=1
+KV_CACHING=true
+ALIGN_INPUTS_TO_BLOCKS=true
+USE_EMA=true
 
 ######## E2D2
 # Qwen3-1.7B-Base 28(4)
@@ -85,7 +85,7 @@ NUM_FEW_SHOT=0
 # 28(4), block_size=10
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block10_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec4_e2d_20260512_060411_tie-weights"
 # 28(2), block_size=10
-MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block10_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260405_003211_tie-weights"
+# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block10_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260405_003211_tie-weights"
 # 28(1), block_size=10
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block10_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec1_e2d_20260512_060354_tie-weights"
 # 28(2), lambda = 2.0
@@ -102,18 +102,23 @@ MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block10_lr1e-5_bsz1_war
 # MODEL_PATH="/data/shared_data/hankun/outputs/ultrachat_block8_lr5e-6_bsz16_warm100ba_alphaf0.5_max-dur3ep_amp_bf16_enc36_TOPdec2_e2d_ultrachat_20260423_023604_tie-weights"
 # ultrachat (instruction-tuned Qwen3-1.7B w/o thinking mode), 50k, bsz16, 64.67%, 60.9 tokens/s(1.78, 80.26%)
 # MODEL_PATH="/data/shared_data/hankun/outputs/ultrachat_block8_lr1e-5_bsz16_warm100ba_alphaf0.5_max-dur3ep_amp_bf16_enc28_TOPdec2_e2d_ultrachat_20260421_065938_tie-weights"
+# ultrachat (instruction-tuned Qwen3-1.7B w/o thinking mode), all, bsz32
+# result: < 1 epoch (acc. 148/250 = 59.20%, 72.5 tokens/s, 2.39, 85.49%)
+# MODEL_PATH="/data/shared_data/hankun/outputs/ultrachat_block4_lr1e-5_bsz32_warm100ba_alphaf0.5_max-dur3ep_amp_bf16_enc28_TOPdec2_e2d_ultrachat_20260523_014055_tie-weights"
 # fine-tune from AR, block4
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260418_032322_tie-weights"
 # fine-tune from AR, block10
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block10_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260514_192750_tie-weights"
-BLOCK_SIZE=4
-KV_CACHING=true
-ALIGN_INPUTS_TO_BLOCKS=false
-USE_EMA=true
+# BLOCK_SIZE=4
+# KV_CACHING=true
+# ALIGN_INPUTS_TO_BLOCKS=false
+# USE_EMA=true
 
-# IS_INSTRUCTION_MODEL=true
-# QWEN_MODEL="${QWEN_MODEL_INSTRUCT}"
-IS_INSTRUCTION_MODEL=false
+# Uncomment these lines to evaluate an instruction-tuned model
+IS_INSTRUCTION_MODEL=true
+QWEN_MODEL="${QWEN_MODEL_INSTRUCT}"
+# Uncomment this line to evaluate a fine-tuned base model
+# IS_INSTRUCTION_MODEL=false
 
 NUM_VISIBLE_DEVICES=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 

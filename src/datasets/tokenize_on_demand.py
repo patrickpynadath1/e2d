@@ -444,6 +444,18 @@ class HendrycksMathDataset(GSM8KDataset):
 
 
 class CNNDailyMailDataset(Dataset):
+    @staticmethod
+    def _coerce_bool(value: Any) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"1", "true", "yes", "on"}:
+                return True
+            if lowered in {"0", "false", "no", "off", ""}:
+                return False
+        return bool(value)
+
     def __init__(
         self,
         tokenizer: PreTrainedTokenizer,
@@ -464,10 +476,22 @@ class CNNDailyMailDataset(Dataset):
         source_max_length_ratio: float = 0.5,
         target_max_length_ratio: float = 0.5,
         filter_max_length: int | None = None,
+        is_instruction_model: bool | None = None,
+        use_chat_template: bool | None = None,
+        enable_thinking: bool | None = False,
         # Unused tokenizer arg (compat. with other dataset loading functions/classes)
         **_: Dict[str, Any],
     ):
         self.tokenizer = tokenizer
+        self.add_special_tokens = add_special_tokens
+        self.source_prompt_text = source_prompt_text
+        self.target_prompt_text = target_prompt_text
+        self.is_instruction_model = self._coerce_bool(is_instruction_model)
+        if use_chat_template is None:
+            use_chat_template = self.is_instruction_model
+        self.use_chat_template = self._coerce_bool(use_chat_template)
+        self.enable_thinking = self._coerce_bool(enable_thinking)
+
         self.dataset = load_dataset(
             dataset_path, config_name, split=split, trust_remote_code=True
         )
@@ -481,17 +505,17 @@ class CNNDailyMailDataset(Dataset):
             max_source_len = source_max_length_ratio * filter_len
             max_target_len = target_max_length_ratio * filter_len
 
-            sp = (tokenizer.bos_token if add_special_tokens else "") + (
-                source_prompt_text or ""
-            )
-            tp = target_prompt_text or ""
-            eos = tokenizer.eos_token if add_special_tokens else ""
-
             original_len = len(self.dataset)
 
             def _length_filter(examples):
-                sources = [sp + s + eos for s in examples[source_key]]
-                targets = [tp + t + eos for t in examples[target_key]]
+                sources = [
+                    self._format_source_text(str(s))
+                    for s in examples[source_key]
+                ]
+                targets = [
+                    self._format_target_text(str(t))
+                    for t in examples[target_key]
+                ]
                 s_enc = tokenizer(
                     sources, add_special_tokens=False, truncation=False
                 )
@@ -519,13 +543,50 @@ class CNNDailyMailDataset(Dataset):
             self.dataset = self.dataset.select(range(min(max_samples, len(self.dataset))))
         self.max_length = max_length
         self.padding = padding
-        self.add_special_tokens = add_special_tokens
-        self.source_prompt_text = source_prompt_text
-        self.target_prompt_text = target_prompt_text
         self.separate_input_output = separate_input_output
         self.source_key = source_key
         self.target_key = target_key
         self.truncate = truncate
+
+    def _apply_chat_template(self, user_prompt: str) -> str:
+        messages = [{"role": "user", "content": user_prompt}]
+        if hasattr(self.tokenizer, "apply_chat_template"):
+            try:
+                return self.tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    enable_thinking=self.enable_thinking,
+                )
+            except TypeError:
+                return self.tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+
+        bos = self.tokenizer.bos_token or ""
+        return f"{bos}{user_prompt}"
+
+    def _format_source_text(self, source: str) -> str:
+        source = (self.source_prompt_text or "") + source
+        if self.use_chat_template:
+            return self._apply_chat_template(source.strip())
+
+        if self.add_special_tokens:
+            source = (
+                (self.tokenizer.bos_token or "")
+                + source
+                + (self.tokenizer.eos_token or "")
+            )
+        return source
+
+    def _format_target_text(self, target: str) -> str:
+        if self.target_prompt_text is not None:
+            target = self.target_prompt_text + target
+        if self.add_special_tokens:
+            target = target + (self.tokenizer.eos_token or "")
+        return target
 
     @property
     def target_references(self) -> list[str]:
@@ -537,15 +598,8 @@ class CNNDailyMailDataset(Dataset):
 
     def __getitem__(self, idx):
         example = self.dataset[idx]
-        source = example[self.source_key]
-        target = example[self.target_key]
-        if self.source_prompt_text is not None:
-            source = self.source_prompt_text + source  # type: ignore
-        if self.target_prompt_text is not None:
-            target = self.target_prompt_text + target  # type: ignore
-        if self.add_special_tokens:
-            source = self.tokenizer.bos_token + source + self.tokenizer.eos_token
-            target = target + self.tokenizer.eos_token
+        source = self._format_source_text(str(example[self.source_key]))
+        target = self._format_target_text(str(example[self.target_key]))
 
         source_max_len = int(self.source_max_length_ratio * self.max_length)
         target_max_len = int(self.target_max_length_ratio * self.max_length)

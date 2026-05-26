@@ -13,4 +13,4 @@ fsdp:
   state_dict_type: "full"
   
   # specify the sharding degree
-  data_parallel_shard_degree: 2
+  data_parallel_shard_degree: 8

@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import re
 import sys
 
 import evaluate
@@ -26,6 +27,25 @@ from src.utils import fsspec_exists, fsspec_mkdirs
 
 THROUGHPUT_SAMPLES = 100
 THROUGHPUT_WARMUP = 100
+
+
+def coerce_bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"1", "true", "yes", "on"}:
+            return True
+        if lowered in {"0", "false", "no", "off", ""}:
+            return False
+    return bool(value)
+
+
+def strip_thinking_text(text: str) -> str:
+    text = re.sub(r"<think>.*?</think>\s*", "", text, flags=re.DOTALL)
+    if "</think>" in text:
+        text = text.split("</think>", 1)[1]
+    return text.lstrip()
 
 
 def gather_results(results, world_size):
@@ -111,6 +131,7 @@ def main(cfg: DictConfig) -> None:
             if isinstance(sc, StopStringCriteria):
                 stop_tokens = list(sc.stop_strings)
                 break
+    strip_thinking = coerce_bool(getattr(cfg, "strip_thinking", False))
 
     # Iterate through the dataset and sample
     generated_samples = []
@@ -151,9 +172,13 @@ def main(cfg: DictConfig) -> None:
         else:
             start_event, end_event = None, None
         input_ids = elem["input_ids"].to(device)  # type: ignore
-        if dataset.target_prompt_text is not None:
+        target_prompt_text = getattr(dataset, "target_prompt_text", None)
+        if (
+            target_prompt_text is not None
+            and not getattr(dataset, "use_chat_template", False)
+        ):
             prompt_ids = (
-                torch.tensor(tokenizer.encode(dataset.target_prompt_text.strip()))
+                torch.tensor(tokenizer.encode(target_prompt_text.strip()))
                 .to(input_ids.dtype)
                 .to(input_ids.device)
                 .unsqueeze(0)
@@ -200,6 +225,8 @@ def main(cfg: DictConfig) -> None:
         if stop_tokens is not None:
             for st in stop_tokens:
                 outputs = outputs.split(st)[0]
+        if strip_thinking:
+            outputs = strip_thinking_text(outputs)
         decoded_samples = outputs.strip()
         if "E2D" in type(model).__name__:
             decoded_samples = decoded_samples.removeprefix("Summary: ")

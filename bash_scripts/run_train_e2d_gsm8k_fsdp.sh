@@ -5,8 +5,8 @@ cd ../ || exit  # Go to the root directory of the repo
 source setup_env.sh
 
 # Model arch
-BLOCK_SIZE=4
-EVAL_BLOCK_SIZE=4
+BLOCK_SIZE=10
+EVAL_BLOCK_SIZE=10
 N_ENCODER_LAYERS=36
 ENCODER_TOP_LAYERS=false
 N_DECODER_LAYERS=2
@@ -18,13 +18,11 @@ FREEZE_ENCODER=false
 ENCODER_CAUSAL_MASK=false
 NULLIFY_SELF_ATTN=false
 
-USE_FSDP=true
-FSDP_SHARDING_STRATEGY="FULL_SHARD"
-
 # Hyperparameters
-LR=1e-5
+LR=5e-6
 WARMUP_DURATION="100ba"
 ALPHA_F=0.5
+DECODER_LOSS_LAMBDA=1.0
 BATCH_SIZE=8
 MAX_DURATION="30000ba"
 PRECISION="amp_bf16"
@@ -32,6 +30,8 @@ PRECISION="amp_bf16"
 PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-4B-Base
 NUM_SHOT=0
 TRAIN_ON_CONTEXT=false
+TRAIN_ON_AR=false
+AR_CHECKPOINT_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_ar_20251201_061752/checkpoints/best-rank0_ema_weights_only.pt"
 
 TAG="e2d"
 if [ "${ENCODER_TOP_LAYERS}" == "true" ]; then
@@ -44,6 +44,10 @@ if [ "${DECODER_TOP_LAYERS}" == "true" ]; then
 else
   DEC_LAYERS="dec${N_DECODER_LAYERS}"
 fi
+
+USE_FSDP=true
+FSDP_SHARDING_STRATEGY="FULL_SHARD"
+MODEL_DTYPE="bfloat16"
 
 # get time stamp
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
@@ -59,17 +63,16 @@ if [ "${FREEZE_ENCODER}" == "true" ]; then
   RUN_NAME="${RUN_NAME}_freeze-enc"
 fi
 
+FSDP_ARGS=""
+if [ "${USE_FSDP}" == "true" ]; then
+  RUN_NAME="${RUN_NAME}_fsdp"
+  FSDP_ARGS="+composer/parallelism=fsdp composer.parallelism.fsdp.sharding_strategy=${FSDP_SHARDING_STRATEGY} composer.parallelism.fsdp.activation_checkpointing=false composer.parallelism.fsdp.activation_cpu_offload=false"
+fi
+
 MICRO_BATCH_SIZE=1
 NUM_WORKERS=0
 
 NUM_VISIBLE_DEVICES=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
-
-# Build FSDP arguments if enabled
-FSDP_ARGS=""
-if [ "${USE_FSDP}" == "true" ]; then
-  RUN_NAME="${RUN_NAME}_fsdp"
-  FSDP_ARGS="+composer/parallelism=fsdp composer.parallelism.fsdp.sharding_strategy=${FSDP_SHARDING_STRATEGY}"
-fi
 
 composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoiser.py \
   run_name=${RUN_NAME} \
@@ -90,6 +93,7 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   training.compile_backbone=false \
   model.config.length=768 \
   model/backbone@model.config.backbone_config=llm_as_encoder_decoder_share_kv_encoder_gen \
+  ++model.config.backbone_config.torch_dtype=${MODEL_DTYPE} \
   model.config.backbone_config.use_encoder_causal_mask=${ENCODER_CAUSAL_MASK} \
   model.config.backbone_config.num_encoder_layers=${N_ENCODER_LAYERS} \
   model.config.backbone_config.num_decoder_layers=${N_DECODER_LAYERS} \
@@ -105,7 +109,7 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   block_size=${BLOCK_SIZE} \
   eval_block_size=${EVAL_BLOCK_SIZE} \
   training.antithetic_sampling=false \
-  hydra.run.dir=/data/shared_data/hankun/outputs/${RUN_NAME} \
+  hydra.run.dir=outputs/${RUN_NAME} \
   composer.trainer.save_interval="1000ba" \
   composer.loggers.name=${RUN_NAME} \
   train_dataloader.num_workers=${NUM_WORKERS} \
@@ -113,5 +117,8 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   composer.callbacks.save_best_checkpointing.save_local=false \
   eval_dataloader.batch_size=2 \
   model.config.train_on_context=${TRAIN_ON_CONTEXT} \
+  model.config.decoder_loss_lambda=${DECODER_LOSS_LAMBDA} \
+  model.config.backbone_config.train_on_ar=${TRAIN_ON_AR} \
+  model.config.backbone_config.ar_checkpoint_path=${AR_CHECKPOINT_PATH} \
   +model.config.nullify_self_attn=${NULLIFY_SELF_ATTN} \
   ${FSDP_ARGS}
