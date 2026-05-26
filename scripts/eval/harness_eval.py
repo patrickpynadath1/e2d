@@ -15,7 +15,7 @@ import torch
 from lm_eval.api.model import LM
 from lm_eval.loggers.evaluation_tracker import EvaluationTracker
 from lm_eval.utils import make_table
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 from transformers import (
     AutoModelForCausalLM,
@@ -84,8 +84,8 @@ class LMEvalHarnessModel(LM):
         if "fsdp" in pretrained_model_name_or_path:
             load_ema_weights = False
         # E2D and AR trained on GSM8K still used ema
-        if ("e2d" in pretrained_model_name_or_path and "e2d2" not in pretrained_model_name_or_path) and "gsm8k" in pretrained_model_name_or_path and "fsdp" in pretrained_model_name_or_path:
-            load_ema_weights = True
+        # if ("e2d" in pretrained_model_name_or_path and "e2d2" not in pretrained_model_name_or_path) and "gsm8k" in pretrained_model_name_or_path and "fsdp" in pretrained_model_name_or_path:
+        #     load_ema_weights = True
         super().__init__()
         self.generated_samples_output_path = generated_samples_output_path
         if not fsspec_exists(self.generated_samples_output_path):
@@ -300,6 +300,9 @@ class LMEvalHarnessModel(LM):
         total_accepted_tokens = 0
         total_accepted_lengths = []
         total_accept_counts = 0
+        total_draft_lengths = []
+        total_drafting_time_s = 0.0
+        total_all_time_s = 0.0
         total_draft_position_attempt_counts: List[int] = []
         total_draft_position_accept_counts: List[int] = []
         for i, elem in tqdm(
@@ -338,11 +341,17 @@ class LMEvalHarnessModel(LM):
 
             if (
                 isinstance(sample_output, tuple)
-                and len(sample_output) == 3
+                and len(sample_output) >= 3
                 and isinstance(sample_output[1], tuple)
                 and isinstance(sample_output[2], tuple)
             ):
-                sample, (generated_tokens, accepted_tokens), (accepted_lengths, accept_counts) = sample_output
+                if len(sample_output) == 4:
+                    sample, (generated_tokens, accepted_tokens), (accepted_lengths, accept_counts), (drafting_time_s, all_time_s) = sample_output
+                    total_drafting_time_s += drafting_time_s
+                    total_all_time_s += all_time_s
+                else:
+                    sample, (generated_tokens, accepted_tokens), (accepted_lengths, accept_counts) = sample_output
+                    drafting_time_s, all_time_s = 0.0, 0.0
                 draft_position_stats = getattr(self.model, "_last_draft_position_acceptance", None)
             else:
                 sample = sample_output
@@ -351,11 +360,21 @@ class LMEvalHarnessModel(LM):
                 accepted_lengths = [generated_tokens]
                 accept_counts = 1
                 draft_position_stats = None
+                drafting_time_s, all_time_s = 0.0, 0.0
+
+            if self.rank == 0 and all_time_s > 0:
+                print(f"[TIME STATS] Sample Drafting Time: {drafting_time_s:.4f}s / All Time: {all_time_s:.4f}s ({drafting_time_s/all_time_s:.2%})")
+                print(f"[TIME STATS] Total Drafting Time: {total_drafting_time_s:.4f}s / Total All Time: {total_all_time_s:.4f}s ({total_drafting_time_s/total_all_time_s:.2%})")
+
             total_generated_tokens += generated_tokens
             total_accepted_tokens += accepted_tokens
             total_accepted_lengths.extend(accepted_lengths)
             total_accept_counts += accept_counts
             if draft_position_stats is not None:
+                total_draft_lengths.extend(
+                    int(length)
+                    for length in draft_position_stats.get("draft_lengths", [])
+                )
                 attempt_counts = draft_position_stats.get("attempt_counts", [])
                 accept_counts_pos = draft_position_stats.get("accept_counts", [])
                 max_len = max(
@@ -460,8 +479,15 @@ class LMEvalHarnessModel(LM):
                     if total_accept_counts > 0
                     else 0.0
                 )
+                avg_draft_len = (
+                    np.mean(total_draft_lengths)
+                    if len(total_draft_lengths) > 0
+                    else 0.0
+                )
                 print(f"Total generated tokens: {total_generated_tokens}, Total accepted tokens: {total_accepted_tokens}, Acceptance rate: {acceptance_rate:.2%}")
                 print(f"Average accepted length: {avg_accepted_len:.2f}")
+                if len(total_draft_lengths) > 0:
+                    print(f"Running avg draft length: {avg_draft_len:.2f}")
                 if len(total_draft_position_attempt_counts) > 0:
                     per_pos_strings = []
                     for pos, (acc, att) in enumerate(
@@ -529,19 +555,47 @@ def main(cfg: DictConfig) -> None:
     if results is not None and (
         accelerator is None or accelerator.local_process_index == 0
     ):
-        samples = results.pop("samples")
-        evaluation_tracker = EvaluationTracker(output_path=cfg.output_path)
-        evaluation_tracker.save_results_aggregated(results=results, samples=samples)
-        for task_name, config in results["configs"].items():
-            evaluation_tracker.save_results_samples(
-                task_name=task_name, samples=samples[task_name]
+        if isinstance(results, DictConfig):
+            results = OmegaConf.to_container(results, resolve=True)
+        if not isinstance(results, dict):
+            raise RuntimeError(
+                f"Unexpected lm-eval return type: {type(results)}. "
+                "Expected a dict-like object."
             )
-        print(make_table(results))
+
+        # Some lm-eval versions/tasks may not return per-sample logs.
+        try:
+            samples = results.pop("samples")
+        except Exception:
+            samples = None
+
+        has_standard_schema = "results" in results and "configs" in results
+        if has_standard_schema:
+            evaluation_tracker = EvaluationTracker(output_path=cfg.output_path)
+            evaluation_tracker.save_results_aggregated(
+                results=results,
+                samples=samples if samples is not None else {},
+            )
+            if samples is not None:
+                for task_name, config in results["configs"].items():
+                    if task_name in samples:
+                        evaluation_tracker.save_results_samples(
+                            task_name=task_name,
+                            samples=samples[task_name],
+                        )
+            print(make_table(results))
+            if "groups" in results:
+                print(make_table(results, "groups"))
+        else:
+            print("Warning: lm-eval returned a non-standard result schema.")
+            print(json.dumps(results, indent=2, default=str))
+
         metrics_f = f"{cfg.task.model.generated_samples_output_path}/metrics.txt"
         with open(metrics_f, "w") as f:
-            f.write(make_table(results))
-        if "groups" in results:
-            print(make_table(results, "groups"))
+            if has_standard_schema:
+                f.write(make_table(results))
+            else:
+                f.write(json.dumps(results, indent=2, default=str))
 
 
 if __name__ == "__main__":

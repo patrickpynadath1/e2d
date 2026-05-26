@@ -79,5 +79,5 @@ for x, y in zip(block_sizes, throughput):
     ax1.text(x, y + 0.6, f"{y:.1f}", ha="center", va="bottom", fontsize=13, color=line_color)
 
 plt.tight_layout()
-plt.savefig("/home/hankun/tmp.png", dpi=300)
+plt.savefig("/home/hankun/tmp.pdf", dpi=300)
 plt.show()

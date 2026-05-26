@@ -18,14 +18,14 @@ QWEN_MODEL="Qwen/Qwen3-4B-Base"
 # USE_EMA=true
 
 ###########  E2D
-# Qwen3-1.7B-Base
-# MODEL_PATH="/data/shared_data/hankun/outputs/scienceqa-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260309_232246_tie-weights"
-# Qwen3-4B-Base
-# MODEL_PATH="/data/shared_data/hankun/outputs/scienceqa-0shot_block4_lr5e-6_bsz2_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc36_TOPdec2_e2d_20260324_025507_tie-weights"
-# BLOCK_SIZE=4
-# KV_CACHING=true
-# ALIGN_INPUTS_TO_BLOCKS=false
-# USE_EMA=true
+# Qwen3-1.7B-Base, block_size=10
+# MODEL_PATH="/data/shared_data/hankun/outputs/scienceqa-0shot_block10_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260507_200552_tie-weights"
+# Qwen3-4B-Base, block10
+MODEL_PATH="/data/shared_data/hankun/outputs/scienceqa-0shot_block10_lr5e-6_bsz2_warm100ba_max-dur30000ba_amp_bf16_enc36_TOPdec2_e2d_20260508_094944_tie-weights_fsdp"
+BLOCK_SIZE=4
+KV_CACHING=true
+ALIGN_INPUTS_TO_BLOCKS=false
+USE_EMA=true
 
 ###########  E2D2
 # Qwen3-1.7B-Base
@@ -41,12 +41,12 @@ QWEN_MODEL="Qwen/Qwen3-4B-Base"
 # Qwen3-1.7B-Base
 # MODEL_PATH="/data/shared_data/hankun/outputs/scienceqa-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_layerskip_20260310_084518"
 # Qwen3-4B-Base
-MODEL_PATH="/data/shared_data/hankun/outputs/scienceqa-0shot_lr5e-6_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers36_layerskip_20260324_104723"
-BLOCK_SIZE=1
-KV_CACHING=true
-ALIGN_INPUTS_TO_BLOCKS=true
-USE_EMA=true
-ASSISTANT_EARLY_EXIT=12  # Set >0 to enable self-speculative decoding
+# MODEL_PATH="/data/shared_data/hankun/outputs/scienceqa-0shot_lr5e-6_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers36_layerskip_20260324_104723"
+# BLOCK_SIZE=1
+# KV_CACHING=true
+# ALIGN_INPUTS_TO_BLOCKS=true
+# USE_EMA=true
+# ASSISTANT_EARLY_EXIT=12  # Set >0 to enable self-speculative decoding
 
 # ScienceQA evaluation settings
 SCIENCEQA_NUM_SAMPLES=null  # null for all, or integer to limit

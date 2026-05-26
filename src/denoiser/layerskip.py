@@ -576,6 +576,7 @@ class LayerSkip(AR):
             torch.LongTensor,
             Tuple[int, int],
             Tuple[List[int], int],
+            Tuple[float, float],
         ],
     ]:
         """Generate with optional self-speculative decoding via early exit.
@@ -617,6 +618,10 @@ class LayerSkip(AR):
             return outputs
 
         # --- Self-speculative decoding with acceptance tracking ---
+        import time
+        overall_start_t = time.perf_counter()
+        total_drafting_time_s = 0.0
+
         if inputs is None:
             inputs = torch.ones((batch_size or 1, 1), device=device, dtype=torch.long) * self.bos_token_id
         batch_size = inputs.shape[0]
@@ -685,6 +690,7 @@ class LayerSkip(AR):
 
         while tokens_generated < max_new_tokens and not done:
             # --- DRAFT PHASE: use early layers to draft tokens ---
+            draft_start_t = time.perf_counter()
             draft_tokens = []
             verify_input_exit_hiddens = []
             draft_cache = DynamicCache()
@@ -727,6 +733,7 @@ class LayerSkip(AR):
             )
             verify_input_exit_hiddens.append(exit_hidden_last_draft)
             verify_input_exit = torch.cat(verify_input_exit_hiddens, dim=1)
+            total_drafting_time_s += time.perf_counter() - draft_start_t
 
             # --- VERIFY PHASE: run only remaining layers on cached exit hidden states ---
             verify_cache = DynamicCache.from_legacy_cache(
@@ -852,8 +859,10 @@ class LayerSkip(AR):
             ],
         }
 
+        total_all_time_s = time.perf_counter() - overall_start_t
         return (
             generated,
             (total_generated_tokens, total_accepted_tokens),
             (total_accepted_lengths, accept_counts),
+            (total_drafting_time_s, total_all_time_s),
         )

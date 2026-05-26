@@ -16,11 +16,13 @@ REINIT_DECODER=false
 TIE_WEIGHTS=true
 FREEZE_ENCODER=false
 ENCODER_CAUSAL_MASK=false
+NULLIFY_SELF_ATTN=false
 
 # Hyperparameters
-LR=1e-4
+LR=1e-5
 WARMUP_DURATION="100ba"
 ALPHA_F=0.5
+DECODER_LOSS_LAMBDA=1.0
 BATCH_SIZE=1
 MAX_DURATION="30000ba"
 PRECISION="amp_bf16"
@@ -28,6 +30,7 @@ PRECISION="amp_bf16"
 PRETRAINED_MODEL_NAME_OR_PATH=Qwen/Qwen3-1.7B-Base
 NUM_SHOT=0
 TRAIN_ON_CONTEXT=false
+AR_CHECKPOINT_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_ar_20251201_061752/checkpoints/best-rank0_ema_weights_only.pt"
 
 TAG="e2d"
 if [ "${ENCODER_TOP_LAYERS}" == "true" ]; then
@@ -68,7 +71,7 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   train_dataset.num_shot=${NUM_SHOT} \
   composer.optimizer.lr=${LR} \
   composer.trainer.precision=${PRECISION} \
-  composer.trainer.eval_interval="2000ba" \
+  composer.trainer.eval_interval="1000ba" \
   composer.trainer.max_duration=${MAX_DURATION} \
   composer.trainer.save_num_checkpoints_to_keep=1 \
   composer/lr_scheduler=cosine_annealing_with_warmup \
@@ -78,7 +81,7 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   model.config.attn_backend="sdpa" \
   training.compile_backbone=false \
   model.config.length=768 \
-  model/backbone@model.config.backbone_config=llm_as_encoder_decoder_share_kv_adapter \
+  model/backbone@model.config.backbone_config=llm_as_encoder_decoder_share_kv_encoder_gen_frozen_bottom \
   model.config.backbone_config.use_encoder_causal_mask=${ENCODER_CAUSAL_MASK} \
   model.config.backbone_config.num_encoder_layers=${N_ENCODER_LAYERS} \
   model.config.backbone_config.num_decoder_layers=${N_DECODER_LAYERS} \
@@ -95,11 +98,12 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   eval_block_size=${EVAL_BLOCK_SIZE} \
   training.antithetic_sampling=false \
   hydra.run.dir=/data/shared_data/hankun/outputs/${RUN_NAME} \
-  composer.trainer.save_interval="2000ba" \
+  composer.trainer.save_interval="1000ba" \
   composer.loggers.name=${RUN_NAME} \
   train_dataloader.num_workers=${NUM_WORKERS} \
   composer.callbacks.hf_compatible_checkpointing.disable_hf=true \
   composer.callbacks.save_best_checkpointing.save_local=false \
   eval_dataloader.batch_size=2 \
   model.config.train_on_context=${TRAIN_ON_CONTEXT} \
-  +model.config.nullify_self_attn=false
+  model.config.decoder_loss_lambda=${DECODER_LOSS_LAMBDA} \
+  +model.config.nullify_self_attn=${NULLIFY_SELF_ATTN} \

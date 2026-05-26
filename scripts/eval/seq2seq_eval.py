@@ -165,7 +165,7 @@ def main(cfg: DictConfig) -> None:
                 "LayerSkip" in type(model).__name__
                 and gen_kwargs.get("assistant_early_exit") is not None
             ):
-                outputs, (generated_tokens, accepted_tokens), (accepted_lengths, accept_counts) = model.generate(
+                outputs, (generated_tokens, accepted_tokens), (accepted_lengths, accept_counts), _ = model.generate(
                     inputs=input_ids,
                     disable_pbar=(local_rank != 0),
                     # tokenizer=tokenizer,  # For debugging: prints intermediate generation

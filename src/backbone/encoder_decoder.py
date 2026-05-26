@@ -27,6 +27,14 @@ except ImportError:
 logger = logging.get_logger(__name__)
 
 
+def _unwrap_fsdp_module(module: nn.Module) -> nn.Module:
+    return getattr(module, "_fsdp_wrapped_module", module)
+
+
+def _get_layer_idx(module: nn.Module) -> int:
+    return _unwrap_fsdp_module(module).self_attn.layer_idx
+
+
 @dataclass
 class EncoderBaseModelOutputWithPast(ModelOutput):
     """Custom (encoder) model output.
@@ -320,7 +328,7 @@ class LLMasEncoderDecoder(nn.Module):
                 output_attentions=False,
             )
         for decoder_layer in self.decoder.model.layers:
-            layer_idx = decoder_layer.self_attn.layer_idx
+            layer_idx = _get_layer_idx(decoder_layer)
             if (
                 self.tie_encoder_decoder_weights
                 and layer_idx not in self.decoder_layer_idxs
@@ -773,7 +781,7 @@ class LLMasEncoderDecoderShareKV(nn.Module):
                 output_attentions=False,
             )
         for decoder_layer in self.decoder.model.layers:
-            layer_idx = decoder_layer.self_attn.layer_idx
+            layer_idx = _get_layer_idx(decoder_layer)
             if (
                 self.tie_encoder_decoder_weights
                 and layer_idx not in self.decoder_layer_idxs
@@ -910,7 +918,7 @@ class LLMasEncoderDecoderShareKVEncoderGen(LLMasEncoderDecoderShareKV):
                 output_attentions=False,
             )
         for decoder_layer in self.decoder.model.layers:
-            layer_idx = decoder_layer.self_attn.layer_idx
+            layer_idx = _get_layer_idx(decoder_layer)
             if (
                 self.tie_encoder_decoder_weights
                 and layer_idx not in self.decoder_layer_idxs
@@ -1095,7 +1103,7 @@ class LLMasEncoderDecoderShareKVAdapter(LLMasEncoderDecoderShareKV):
                 output_attentions=False,
             )
         for decoder_layer in self.decoder.model.layers:
-            layer_idx = decoder_layer.self_attn.layer_idx
+            layer_idx = _get_layer_idx(decoder_layer)
             if (
                 self.tie_encoder_decoder_weights
                 and layer_idx not in self.decoder_layer_idxs

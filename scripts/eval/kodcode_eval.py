@@ -556,7 +556,7 @@ def main(cfg: DictConfig) -> None:
             sample, (generated_tokens, accepted_tokens), (
                 accepted_lengths,
                 accept_counts,
-            ) = model.generate(
+            ), _ = model.generate(
                 inputs=prefix_tokens,
                 disable_pbar=False,
                 **gen_kwargs,

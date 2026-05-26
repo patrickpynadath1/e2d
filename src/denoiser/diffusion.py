@@ -1699,15 +1699,22 @@ class E2D(E2D2):
                     & attention_mask[..., None]
                 )[:, None, ...]  # Make attention mask 4D
 
-                # Set the last context token (EOS) to not be attended to
-                row = context_mask[0]
-                last_one_idx = (row == 1).nonzero()[-1]
-                context_mask[0, last_one_idx] = 0
+                # For encoder attention only, do not globally expose the final
+                # context token. Keep the original context_mask intact for loss.
+                encoder_context_mask = context_mask
+                has_context = context_mask.any(dim=-1)
+                if has_context.any():
+                    encoder_context_mask = context_mask.clone()
+                    last_context_idx = (
+                        encoder_context_mask.long().cumsum(dim=-1)
+                        == encoder_context_mask.sum(dim=-1, keepdim=True)
+                    ) & encoder_context_mask.bool()
+                    encoder_context_mask[last_context_idx & has_context[:, None]] = 0
                 
                 encoder_attention_mask = (
                     (
                         self.encoder_static_attention_mask[None, ...]
-                        | context_mask[:, None, :]
+                        | encoder_context_mask[:, None, :]
                     )
                     # self.encoder_static_attention_mask[None, ...]  # used for strictly causal encoder masking
                     & attention_mask[:, None, :]
@@ -1954,6 +1961,17 @@ class E2D(E2D2):
             dtype=torch.long,
         )], dim=-1)
 
+        use_cuda_events = inputs.device.type == "cuda"
+        if use_cuda_events:
+            overall_start = torch.cuda.Event(enable_timing=True)
+            overall_end = torch.cuda.Event(enable_timing=True)
+            overall_start.record()
+            draft_events = []
+        else:
+            import time
+            overall_start_t = time.perf_counter()
+            total_drafting_time_s = 0.0
+
         if generation_config.align_inputs_to_blocks:
             inputs_offset = block_size * (inputs.shape[-1] // block_size) if inputs.numel() > 0 else 0
         else:
@@ -1963,6 +1981,7 @@ class E2D(E2D2):
         total_generated_tokens = 0
         total_accepted_tokens = 0
         total_accepted_lengths = []
+        total_draft_lengths = []
         accept_counts = 0
         draft_position_attempt_counts = [0 for _ in range(block_size)]
         draft_position_accept_counts = [0 for _ in range(block_size)]
@@ -2017,6 +2036,13 @@ class E2D(E2D2):
                 actual_max_draft_len = max_draft_len
                 
             # --- DRAFTING PHASE ---
+            if use_cuda_events:
+                draft_start = torch.cuda.Event(enable_timing=True)
+                draft_start.record()
+            else:
+                import time
+                draft_start_t = time.perf_counter()
+
             draft_tree_candidates = [] 
             actual_draft_len = 0
             for step in range(actual_max_draft_len):
@@ -2123,6 +2149,14 @@ class E2D(E2D2):
                 if not is_share_kv or layer >= self.backbone.decoder_layer_idxs[0]:
                     cache['past_key_values'].key_cache[layer] = cache['past_key_values'].key_cache[layer][..., :-draft_len_to_truncate, :]
                     cache['past_key_values'].value_cache[layer] = cache['past_key_values'].value_cache[layer][..., :-draft_len_to_truncate, :]
+
+            if use_cuda_events:
+                draft_end = torch.cuda.Event(enable_timing=True)
+                draft_end.record()
+                draft_events.append((draft_start, draft_end))
+            else:
+                import time
+                total_drafting_time_s += time.perf_counter() - draft_start_t
 
             # --- VERIFICATION PHASE ---
             if generation_config.use_cache:
@@ -2284,6 +2318,7 @@ class E2D(E2D2):
                     total_accepted_tokens += (min_accepted + 1)
                     final_accepted_len = min_accepted + 1
                     total_accepted_lengths.append(final_accepted_len)
+                    total_draft_lengths.append(actual_draft_len)
                     accept_counts += 1
                     
                     indices_to_keep = list(range(min_accepted + 1)) 
@@ -2313,6 +2348,7 @@ class E2D(E2D2):
                 else:
                     total_accepted_tokens += min_accepted
                     total_accepted_lengths.append(min_accepted)
+                    total_draft_lengths.append(actual_draft_len)
                     accept_counts += 1
                     correction_token = greedy_logits[:, min_accepted].argmax(dim=-1)
                     
@@ -2423,15 +2459,31 @@ class E2D(E2D2):
             print(f"[STATS] Total forward passes: {total_generated_tokens}")
             print(f"[STATS] Total accepted tokens: {total_accepted_tokens}")
             print(f"[STATS] Acceptance rate: {acceptance_rate:.2%}")
+            avg_draft_len = (
+                sum(total_draft_lengths) / len(total_draft_lengths)
+                if len(total_draft_lengths) > 0
+                else 0.0
+            )
+            print(f"[STATS] Avg draft length: {avg_draft_len:.2f}")
             print("=" * 60 + "\n")
 
         self._last_draft_position_acceptance = {
             "attempt_counts": draft_position_attempt_counts,
             "accept_counts": draft_position_accept_counts,
+            "draft_lengths": total_draft_lengths,
             "acceptance_rates": [
                 (acc / att) if att > 0 else 0.0
                 for acc, att in zip(draft_position_accept_counts, draft_position_attempt_counts)
             ],
         }
 
-        return accumulated_samples, (total_generated_tokens, total_accepted_tokens), (total_accepted_lengths, accept_counts)
+        if use_cuda_events:
+            overall_end.record()
+            torch.cuda.synchronize()
+            total_all_time_s = overall_start.elapsed_time(overall_end) / 1000.0
+            total_drafting_time_s = sum([s.elapsed_time(e) for s, e in draft_events]) / 1000.0
+        else:
+            import time
+            total_all_time_s = time.perf_counter() - overall_start_t
+
+        return accumulated_samples, (total_generated_tokens, total_accepted_tokens), (total_accepted_lengths, accept_counts), (total_drafting_time_s, total_all_time_s)

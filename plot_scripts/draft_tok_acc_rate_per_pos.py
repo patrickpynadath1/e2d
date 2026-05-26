@@ -5,9 +5,10 @@ import numpy as np
 t_steps = np.array([1, 2, 3, 4, 5, 6])
 
 layerskip = np.array([59.06, 42.75, 32.84, 26.45, 21.29, 18.04])
-e2d = np.array([85.07, 73.87, 63.47, 54.65, 46.05, 38.31])
+# e2d = np.array([85.07, 73.87, 63.47, 54.65, 46.05, 38.31])
+e2d = np.array([84.28, 69.63, 58.54, 50.99, 44.80, 39.64])
 eagle3 = np.array([86.42, 64.30, 43.06, 28.37, 19.77, 14.43])
-mtp = np.array([76.57, 60.81, 49.45, 40.38])
+mtp = np.array([81.0, 70.0, 61.6, 54.2, 47.8, 42.0])
 
 # 2. Set up the plot style
 plt.rcParams['font.family'] = 'serif'
@@ -26,11 +27,11 @@ fig, ax = plt.subplots(figsize=(5.5, 4.5))
 
 # Ours: Dashed line with crosses
 ax.plot(t_steps, e2d, marker='x', color=c_ours, linestyle='--', linewidth=2, 
-        markersize=9, markeredgewidth=2.5, label='Dual Decoding')
+        markersize=9, markeredgewidth=2.5, label='SEED')
 
-# MTP: Dotted line with crosses (only 4 points, so we adjust t_steps accordingly)
-ax.plot(t_steps[:4], mtp, marker='x', color=c_mtp, linestyle=':', linewidth=2, 
-        markersize=9, markeredgewidth=2.5, label='MTP')
+# MTP: Dotted line with crosses
+ax.plot(t_steps, mtp, marker='x', color=c_mtp, linestyle=':', linewidth=2, 
+        markersize=9, markeredgewidth=2.5, label='Apple MTP')
 
 # Eagle3: Dotted line with crosses
 ax.plot(t_steps, eagle3, marker='x', color=c_eagle3, linestyle='-', linewidth=2, 
@@ -60,5 +61,5 @@ ax.spines['left'].set_linewidth(1.2)
 ax.legend(loc='lower left', fontsize=11, framealpha=1.0, edgecolor='#D3D3D3', borderpad=0.6)
 
 plt.tight_layout()
-plt.savefig('/home/hankun/tmp.png') #, dpi=300, bbox_inches='tight')
+plt.savefig('/home/hankun/tmp.pdf') #, dpi=300, bbox_inches='tight')
 plt.show()

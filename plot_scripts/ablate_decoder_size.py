@@ -12,10 +12,12 @@ mpl.rcParams.update({
 
 # Data
 decoder_sizes = [1, 2, 4, 6, 8, 10, 12, 14]
-accuracy = [56.0, 57.5, 57.9, 59.4, 58.8, 57.4, 57.0, 55.6]
-throughput = [75.7, 74.3, 66.1, 60.8, 56.3, 53.3, 48.8, 46.4]
-acc_length = [2.60, 2.89, 3.06, 3.24, 3.31, 3.47, 3.56, 3.63]
-acc_rate = [65.64, 73.00, 77.26, 81.85, 83.67, 87.80, 89.89, 91.99]
+# accuracy = [56.0, 57.5, 57.9, 59.4, 58.8, 57.4, 57.0, 55.6]
+# throughput = [75.7, 74.3, 66.1, 60.8, 56.3, 53.3, 48.8, 46.4]
+# acc_length = [2.60, 2.89, 3.06, 3.24, 3.31, 3.47, 3.56, 3.63]
+# acc_rate = [65.64, 73.00, 77.26, 81.85, 83.67, 87.80, 89.89, 91.99]
+throughput = [75.4, 76.9, 71.5, 66.6, 61.9, 60.3, 56.8, 52.4]
+acc_rate = [58.93, 69.45, 73.70, 79.41, 81.51, 87.02, 90.02, 91.82]
 
 fig, ax1 = plt.subplots(figsize=(9, 4.5))
 fig.subplots_adjust(left=0.12, right=0.88, bottom=0.16, top=0.95)
@@ -31,7 +33,7 @@ ax1.set_xlabel("Decoder Size (# Layers)", fontsize=17)
 ax1.set_ylabel("Throughput (tokens/s)", fontsize=17, color=line_color)
 ax1.tick_params(axis="y", labelcolor=line_color)
 ax1.set_xticks(decoder_sizes)
-ax1.set_ylim(40, 80)
+ax1.set_ylim(50, 80)
 
 # ---------------------------------------------------------
 # 2. Right Axis (ax2) - Acceptance Rate Bar Plot
@@ -40,7 +42,7 @@ ax2 = ax1.twinx()
 ax2.bar(decoder_sizes, acc_rate, width=1.2, color=bar_color, edgecolor="black", alpha=0.8, label="Acceptance Rate (%)")
 ax2.set_ylabel("Acceptance Rate (%)", fontsize=17, color="black")
 ax2.tick_params(axis="y", labelcolor="black")
-ax2.set_ylim(60, 95)
+ax2.set_ylim(50, 95)
 
 # ---------------------------------------------------------
 # 3. Z-Order Fix: Bring ax1 (Line) to the front
@@ -65,5 +67,5 @@ for x, y in zip(decoder_sizes, throughput):
     ax1.text(x, y + 0.8, f"{y:.1f}", ha="center", va="bottom", fontsize=13, color=line_color)
 
 plt.tight_layout()
-plt.savefig('/home/hankun/tmp2.png')
+plt.savefig('/home/hankun/tmp.pdf')
 plt.show()

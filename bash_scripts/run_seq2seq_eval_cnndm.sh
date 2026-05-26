@@ -22,27 +22,27 @@ source setup_env.sh
 # Qwen3-1.7B-Base
 # MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr1e-5_bsz32_warm100ba_enc28_dec4_hidden2048_inter6144_e2d2_20260317_052211"
 # Qwen3-4B-Base
-MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr5e-6_bsz32_warm100ba_enc36_dec4_hidden2560_inter9728_e2d2_20260324_154042_fsdp"
-BLOCK_SIZE=4
-PROMPT_TEXT="Summary: "
-KV_CACHING=true
-ALIGN_INPUTS_TO_BLOCKS=false
-LEN_PENALTY=1.0
-REGULATION_START=0
-REPETITION_PENALTY=1.0
-
-########### E2D
-# Qwen3-1.7B-Base
-# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr1e-5_bsz32_warm100ba_enc28_dec2_hidden2048_inter6144_e2d_20260314_003028"
-# Qwen3-4B-Base
-# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr5e-6_bsz32_warm100ba_enc36_dec2_hidden2560_inter9728_e2d_20260323_034605"
-# PROMPT_TEXT=null
+# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block4_lr5e-6_bsz32_warm100ba_enc36_dec4_hidden2560_inter9728_e2d2_20260324_154042_fsdp"
 # BLOCK_SIZE=4
+# PROMPT_TEXT="Summary: "
 # KV_CACHING=true
 # ALIGN_INPUTS_TO_BLOCKS=false
 # LEN_PENALTY=1.0
 # REGULATION_START=0
 # REPETITION_PENALTY=1.0
+
+########### E2D
+# Qwen3-1.7B-Base, block10
+MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block10_lr1e-5_bsz32_warm100ba_enc28_dec2_hidden2048_inter6144_e2d_20260507_200639"
+# Qwen3-4B-Base, block10
+# MODEL_PATH="/data/shared_data/hankun/outputs/cnn_block10_lr5e-6_bsz32_warm100ba_enc36_dec2_hidden2560_inter9728_e2d_20260508_134624_fsdp"
+PROMPT_TEXT=null
+BLOCK_SIZE=4
+KV_CACHING=true
+ALIGN_INPUTS_TO_BLOCKS=false
+LEN_PENALTY=1.0
+REGULATION_START=0
+REPETITION_PENALTY=1.0
 
 ########### LayerSkip
 # Qwen3-1.7B-Base

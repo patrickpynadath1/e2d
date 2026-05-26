@@ -192,7 +192,7 @@ def main(cfg: DictConfig) -> None:
             sample, (generated_tokens, accepted_tokens), (
                 accepted_lengths,
                 accept_counts,
-            ) = model.generate(
+            ), (draft_time_s, all_time_s) = model.generate(
                 inputs=prefix_tokens,
                 disable_pbar=False,
                 **gen_kwargs,
@@ -288,7 +288,7 @@ def main(cfg: DictConfig) -> None:
             )
         print(f"  Gold: ({gold_letter})  Predicted: ({predicted_letter})")
         print(f"  Question: {ctx}")
-        print(f"  Generated: {generated_text[:200]}...")
+        print(f"  Generated: {generated_text}")
 
     # --- Aggregate metrics ---
     final_accuracy = total_correct / total_problems if total_problems > 0 else 0.0

@@ -183,6 +183,16 @@ class Denoiser(ABC, PreTrainedModel):
         # e.g., registered buffers for static attention masks
         self.skip_params_for_push = []
 
+    @staticmethod
+    def _is_transformer_layer(module: torch.nn.Module) -> bool:
+        return module.__class__.__name__ in {
+            "Qwen3DecoderLayer",
+            "CustomQwen3DecoderLayer",
+        }
+
+    def fsdp_wrap_fn(self, module: torch.nn.Module) -> bool:
+        return self._is_transformer_layer(module)
+
     @abstractmethod
     def _prepare_inputs(
         self,

@@ -1,0 +1,40 @@
+{
+  "config": {
+    "layerskip_ckpt_dir": "/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_layerskip_20260213_193059",
+    "ar_ckpt_dir": "/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_ar_20251201_061752",
+    "ckpt_file": "best-rank0.pt",
+    "load_ema_layerskip": true,
+    "load_ema_ar": true,
+    "tokenizer_name": "Qwen/Qwen3-1.7B-Base",
+    "dataset_path": "openai/gsm8k",
+    "dataset_config": "main",
+    "split": "test",
+    "max_length": 768,
+    "num_examples": 200,
+    "example_subset_seed": 1,
+    "num_sampled_tokens": 5000,
+    "token_sample_seed": 7,
+    "device": "cuda",
+    "cka_device": null,
+    "seed": 1,
+    "output_dir": "probe_outputs/gsm8k_linear_cka_ar_vs_layerskip",
+    "eps": 1e-12,
+    "heatmap_dpi": 180
+  },
+  "num_examples_used": 200,
+  "num_sampled_tokens": 5000,
+  "total_response_tokens_before_sampling": 25981,
+  "ar_num_layers": 28,
+  "layerskip_num_layers": 28,
+  "ar_hidden_dim": 2048,
+  "layerskip_hidden_dim": 2048,
+  "matrix_shape": [
+    28,
+    28
+  ],
+  "matrix_npy": "probe_outputs/gsm8k_linear_cka_ar_vs_layerskip/linear_cka_matrix.npy",
+  "matrix_csv": "probe_outputs/gsm8k_linear_cka_ar_vs_layerskip/linear_cka_matrix.csv",
+  "heatmap_png": "probe_outputs/gsm8k_linear_cka_ar_vs_layerskip/linear_cka_heatmap_ar_layerskip.pdf",
+  "selected_dataset_indices_json": "probe_outputs/gsm8k_linear_cka_ar_vs_layerskip/selected_dataset_indices.json",
+  "sampled_response_global_indices_npy": "probe_outputs/gsm8k_linear_cka_ar_vs_layerskip/sampled_response_global_indices.npy"
+}

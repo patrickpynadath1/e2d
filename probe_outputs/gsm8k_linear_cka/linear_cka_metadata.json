@@ -1,6 +1,6 @@
 {
   "config": {
-    "e2d_ckpt_dir": "/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20251228_064711_tie-weights",
+    "e2d_ckpt_dir": "/data/shared_data/hankun/outputs/gsm8k-0shot_block10_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260405_003211_tie-weights",
     "ar_ckpt_dir": "/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_ar_20251201_061752",
     "ckpt_file": "best-rank0.pt",
     "load_ema_e2d": true,
@@ -34,7 +34,7 @@
   ],
   "matrix_npy": "probe_outputs/gsm8k_linear_cka/linear_cka_matrix.npy",
   "matrix_csv": "probe_outputs/gsm8k_linear_cka/linear_cka_matrix.csv",
-  "heatmap_png": "probe_outputs/gsm8k_linear_cka/linear_cka_heatmap.png",
+  "heatmap_png": "probe_outputs/gsm8k_linear_cka/linear_cka_heatmap.pdf",
   "selected_dataset_indices_json": "probe_outputs/gsm8k_linear_cka/selected_dataset_indices.json",
   "sampled_response_global_indices_npy": "probe_outputs/gsm8k_linear_cka/sampled_response_global_indices.npy"
 }

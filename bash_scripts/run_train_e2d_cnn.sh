@@ -5,8 +5,8 @@ cd ../ || exit  # Go to the root directory of the repo
 source setup_env.sh
 
 # Model arch
-BLOCK_SIZE=4
-EVAL_BLOCK_SIZE=4
+BLOCK_SIZE=10
+EVAL_BLOCK_SIZE=10
 HIDDEN_SIZE=2048
 INTERMEDIATE_SIZE=6144
 N_ENCODER_LAYERS=28

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-layer linear CKA analysis for GSM8K AR vs E2D checkpoints.
+"""Cross-layer linear CKA analysis for GSM8K AR vs LayerSkip checkpoints.
 
 This script:
 1. Loads a fixed-size GSM8K subset with the exact tokenization/formatting used by
@@ -7,8 +7,8 @@ This script:
 2. Builds full prompt+response token sequences.
 3. Keeps response-token positions only.
 4. Samples one shared set of response-token positions across all examples.
-5. Extracts hidden states at all transformer layers for AR and E2D.
-6. Computes the full cross-layer linear CKA matrix (rows=AR, cols=E2D).
+5. Extracts hidden states at all transformer layers for AR and LayerSkip.
+6. Computes the full cross-layer linear CKA matrix (rows=AR, cols=LayerSkip).
 7. Saves the raw matrix and a heatmap.
 """
 
@@ -42,11 +42,13 @@ from src.datasets.tokenize_on_demand import GSM8KDataset
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Cross-layer linear CKA for GSM8K AR vs E2D.")
-    parser.add_argument("--e2d_ckpt_dir", type=str, required=True)
+    parser = argparse.ArgumentParser(
+        description="Cross-layer linear CKA for GSM8K AR vs LayerSkip."
+    )
+    parser.add_argument("--layerskip_ckpt_dir", type=str, required=True)
     parser.add_argument("--ar_ckpt_dir", type=str, required=True)
     parser.add_argument("--ckpt_file", type=str, default="best-rank0.pt")
-    parser.add_argument("--load_ema_e2d", action="store_true", default=False)
+    parser.add_argument("--load_ema_layerskip", action="store_true", default=False)
     parser.add_argument("--load_ema_ar", action="store_true", default=False)
 
     parser.add_argument("--tokenizer_name", type=str, default="Qwen/Qwen3-1.7B-Base")
@@ -69,7 +71,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--seed", type=int, default=1)
 
-    parser.add_argument("--output_dir", type=str, default="probe_outputs/gsm8k_linear_cka")
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default="probe_outputs/gsm8k_linear_cka_ar_vs_layerskip",
+    )
     parser.add_argument("--eps", type=float, default=1e-12)
     parser.add_argument("--heatmap_dpi", type=int, default=180)
     return parser.parse_args()
@@ -188,16 +194,9 @@ def sample_shared_response_positions(
 def forward_hidden_states(model_name: str, model, input_ids: torch.Tensor, device: torch.device):
     attention_mask = torch.ones_like(input_ids, device=device)
     with torch.no_grad():
-        if model_name == "ar":
+        if model_name in {"ar", "layerskip"}:
+            # LayerSkip is an AR subclass and uses the same backbone path.
             outputs = model.backbone.model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                use_cache=False,
-                output_hidden_states=True,
-                return_dict=True,
-            )
-        elif model_name == "e2d":
-            outputs = model.backbone.encoder.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 use_cache=False,
@@ -293,29 +292,29 @@ def gram_fro_norm(x_centered: torch.Tensor, device: torch.device) -> float:
 
 def compute_linear_cka_matrix(
     ar_layers: Sequence[torch.Tensor],
-    e2d_layers: Sequence[torch.Tensor],
+    layerskip_layers: Sequence[torch.Tensor],
     cka_device: torch.device,
     eps: float,
 ) -> np.ndarray:
     print("Centering activations...")
     center_layers_in_place(ar_layers)
-    center_layers_in_place(e2d_layers)
+    center_layers_in_place(layerskip_layers)
 
     print("Computing per-layer self norms...")
     ar_norms = [gram_fro_norm(x, cka_device) for x in ar_layers]
-    e2d_norms = [gram_fro_norm(y, cka_device) for y in e2d_layers]
+    layerskip_norms = [gram_fro_norm(y, cka_device) for y in layerskip_layers]
 
     num_ar = len(ar_layers)
-    num_e2d = len(e2d_layers)
-    out = np.zeros((num_ar, num_e2d), dtype=np.float64)
+    num_layerskip = len(layerskip_layers)
+    out = np.zeros((num_ar, num_layerskip), dtype=np.float64)
 
     for i in range(num_ar):
         x = ar_layers[i].to(device=cka_device, dtype=torch.float32)
-        for j in range(num_e2d):
-            y = e2d_layers[j].to(device=cka_device, dtype=torch.float32)
+        for j in range(num_layerskip):
+            y = layerskip_layers[j].to(device=cka_device, dtype=torch.float32)
             cross = x.transpose(0, 1).matmul(y)
             numerator = float((cross * cross).sum().item())
-            denom = max(ar_norms[i] * e2d_norms[j], eps)
+            denom = max(ar_norms[i] * layerskip_norms[j], eps)
             out[i, j] = numerator / denom
         print(f"Computed CKA row {i + 1}/{num_ar}")
 
@@ -329,9 +328,9 @@ def save_heatmap(
     dpi: int,
     tick_interval: int = 4,   # show every 4th layer index
 ) -> None:
-    n_ar, n_e2d = cka.shape
+    n_ar, n_layerskip = cka.shape
 
-    # Make figure square
+    # Make figure square.
     fig_size = 4.5
     fig, ax = plt.subplots(figsize=(fig_size, fig_size))
 
@@ -344,11 +343,11 @@ def save_heatmap(
         vmax=1.0,
     )
 
-    ax.set_xlabel("SEED Layer", fontsize=11)
+    ax.set_xlabel("LayerSkip Layer", fontsize=11)
     ax.set_ylabel("AR Layer", fontsize=11)
 
-    # Show ticks only at a chosen interval
-    xticks = np.unique(np.append(np.arange(0, n_e2d, tick_interval), n_e2d - 1))
+    # Show ticks only at a chosen interval.
+    xticks = np.unique(np.append(np.arange(0, n_layerskip, tick_interval), n_layerskip - 1))
     yticks = np.unique(np.append(np.arange(0, n_ar, tick_interval), n_ar - 1))
 
     ax.set_xticks(xticks)
@@ -364,6 +363,7 @@ def save_heatmap(
     fig.tight_layout()
     fig.savefig(out_path, dpi=dpi, bbox_inches="tight", pad_inches=0)
     plt.close(fig)
+
 
 def main() -> None:
     args = parse_args()
@@ -424,22 +424,22 @@ def main() -> None:
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    print("Loading E2D model...")
-    e2d_model = load_model_from_ckpt_dir_path(
-        path_to_ckpt_dir=args.e2d_ckpt_dir,
+    print("Loading LayerSkip model...")
+    layerskip_model = load_model_from_ckpt_dir_path(
+        path_to_ckpt_dir=args.layerskip_ckpt_dir,
         ckpt_file=args.ckpt_file,
-        load_ema_weights=args.load_ema_e2d,
+        load_ema_weights=args.load_ema_layerskip,
         device=device,
     )
-    print("Collecting E2D layerwise response hidden states...")
-    e2d_layers = collect_layerwise_response_hidden_states(
-        model_name="e2d",
-        model=e2d_model,
+    print("Collecting LayerSkip layerwise response hidden states...")
+    layerskip_layers = collect_layerwise_response_hidden_states(
+        model_name="layerskip",
+        model=layerskip_model,
         examples=examples,
         sampled_local_resp_indices=sampled_local_resp_indices,
         device=device,
     )
-    del e2d_model
+    del layerskip_model
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
@@ -448,23 +448,24 @@ def main() -> None:
             raise RuntimeError(
                 f"AR layer {i} has {mat.shape[0]} sampled tokens, expected {n_sampled_tokens}."
             )
-    for i, mat in enumerate(e2d_layers, start=1):
+    for i, mat in enumerate(layerskip_layers, start=1):
         if mat.shape[0] != n_sampled_tokens:
             raise RuntimeError(
-                f"E2D layer {i} has {mat.shape[0]} sampled tokens, expected {n_sampled_tokens}."
+                "LayerSkip layer "
+                f"{i} has {mat.shape[0]} sampled tokens, expected {n_sampled_tokens}."
             )
 
     print("Computing cross-layer linear CKA matrix...")
     cka = compute_linear_cka_matrix(
         ar_layers=ar_layers,
-        e2d_layers=e2d_layers,
+        layerskip_layers=layerskip_layers,
         cka_device=cka_device,
         eps=args.eps,
     )
 
     matrix_npy = os.path.join(args.output_dir, "linear_cka_matrix.npy")
     matrix_csv = os.path.join(args.output_dir, "linear_cka_matrix.csv")
-    heatmap_png = os.path.join(args.output_dir, "linear_cka_heatmap.pdf")
+    heatmap_png = os.path.join(args.output_dir, "linear_cka_heatmap_ar_layerskip.pdf")
     meta_json = os.path.join(args.output_dir, "linear_cka_metadata.json")
     subset_idx_path = os.path.join(args.output_dir, "selected_dataset_indices.json")
     sampled_global_idx_path = os.path.join(
@@ -486,9 +487,9 @@ def main() -> None:
         "num_sampled_tokens": n_sampled_tokens,
         "total_response_tokens_before_sampling": total_response_tokens,
         "ar_num_layers": len(ar_layers),
-        "e2d_num_layers": len(e2d_layers),
+        "layerskip_num_layers": len(layerskip_layers),
         "ar_hidden_dim": int(ar_layers[0].shape[1]),
-        "e2d_hidden_dim": int(e2d_layers[0].shape[1]),
+        "layerskip_hidden_dim": int(layerskip_layers[0].shape[1]),
         "matrix_shape": [int(cka.shape[0]), int(cka.shape[1])],
         "matrix_npy": matrix_npy,
         "matrix_csv": matrix_csv,
