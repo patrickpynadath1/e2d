@@ -1,0 +1,621 @@
+nohup: ignoring input
+Logging into W&B as 'hankun2004-purdue-university'.
+Token is valid (permission: fineGrained).
+The token `Hankun` has been saved to /data/shared_data/hankun/huggingface/stored_tokens
+Your token has been saved in your configured git credential helpers (store).
+Your token has been saved to /data/shared_data/hankun/huggingface/token
+Login successful.
+Note: Environment variable`HF_TOKEN` is set and is the current active token independently from the token you've just configured.
+[33m⚠️  Warning: 'huggingface-cli login' is deprecated. Use 'hf auth login' instead.[0m
+HuggingFace cache set to '/home/hankun/e2d/.hf_cache'.
+[Self-Distill] Reusing existing preprocessed datasets:
+  train: /data/shared_data/hankun/datasets/gsm8k_qwen3_1p7b_selfdistill_evalprompt_maxlen1024/train_preprocessed
+  eval : /data/shared_data/hankun/datasets/gsm8k_qwen3_1p7b_selfdistill_evalprompt_maxlen1024/eval_preprocessed
+Initializing dist
+CONFIG
+├── composer
+│   └── trainer:                                                                
+│         _target_: composer.Trainer                                            
+│         run_name: gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max
+│         seed: 1                                                               
+│         device: gpu                                                           
+│         train_subset_num_batches: -1                                          
+│         eval_subset_num_batches: -1                                           
+│         max_duration: 6ep                                                     
+│         eval_interval: 50ba                                                   
+│         progress_bar: false                                                   
+│         log_to_console: true                                                  
+│         console_log_interval: 10ba                                            
+│         precision: amp_bf16                                                   
+│         device_train_microbatch_size: 1                                       
+│         save_folder: /data/shared_data/hankun/outputs/gsm8k_selfdistill_block4
+│         save_filename: ep{epoch}-ba{batch}-rank{rank}.pt                      
+│         save_latest_filename: latest-rank{rank}.pt                            
+│         save_interval: 50ba                                                   
+│         save_num_checkpoints_to_keep: 1                                       
+│         save_overwrite: false                                                 
+│         save_metrics: false                                                   
+│         load_path: null                                                       
+│         load_weights_only: false                                              
+│         autoresume: true                                                      
+│         python_log_level: null                                                
+│         dist_timeout: 600.0                                                   
+│       algorithms:                                                             
+│         ema:                                                                  
+│           _target_: src.custom_composer.algorithms.EMA                        
+│           half_life: null                                                     
+│           smoothing: 0.9999                                                   
+│           ema_start: 0.0dur                                                   
+│           update_interval: 1ba                                                
+│           use_num_updates: true                                               
+│         gradient_clipping:                                                    
+│           _target_: composer.algorithms.GradientClipping                      
+│           clipping_type: norm                                                 
+│           clipping_threshold: 1.0                                             
+│       callbacks:                                                              
+│         hf_compatible_checkpointing:                                          
+│           _target_: src.custom_composer.callbacks.HuggingFaceCompatibleCheckpo
+│           folder: /data/shared_data/hankun/outputs/gsm8k_selfdistill_block4_wa
+│           filename: ep{epoch}-ba{batch}-rank{rank}.pt                         
+│           latest_filename: latest-rank{rank}.pt                               
+│           save_interval: 50ba                                                 
+│           num_checkpoints_to_keep: 1                                          
+│           overwrite: false                                                    
+│           disable_hf: true                                                    
+│           save_local: true                                                    
+│           save_to_hub: true                                                   
+│           hub_repo_id: kuleshov-group/gsm8k_selfdistill_block4_warm10ba_lr3e-5
+│         lr_monitor:                                                           
+│           _target_: composer.callbacks.LRMonitor                              
+│         runtime_estimator:                                                    
+│           _target_: composer.callbacks.RuntimeEstimator                       
+│         save_best_checkpointing:                                              
+│           _target_: src.custom_composer.callbacks.SaveBestCheckpointing       
+│           folder: /data/shared_data/hankun/outputs/gsm8k_selfdistill_block4_wa
+│           filename: best-rank{rank}.pt                                        
+│           num_checkpoints_to_keep: -1                                         
+│           metric_to_monitor: eval/loss                                        
+│           mode: min                                                           
+│           disable_hf: true                                                    
+│           save_local: false                                                   
+│           save_to_hub: false                                                  
+│           hub_repo_id: null                                                   
+│         speed_monitor:                                                        
+│           _target_: composer.callbacks.SpeedMonitor                           
+│           gpu_flops_available: null                                           
+│           window_size: 500                                                    
+│       loggers:                                                                
+│         _target_: composer.loggers.WandBLogger                                
+│         project: e2d                                                          
+│         group: null                                                           
+│         name: gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur
+│         init_kwargs:                                                          
+│           id: gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur
+│       lr_scheduler:                                                           
+│         _target_: composer.optim.scheduler.CosineAnnealingWithWarmupScheduler 
+│         t_warmup: 10ba                                                        
+│         t_max: 6ep                                                            
+│         alpha_f: 0.5                                                          
+│       optimizer:                                                              
+│         _target_: composer.optim.DecoupledAdamW                               
+│         lr: 3.0e-05                                                           
+│         betas:                                                                
+│         - 0.9                                                                 
+│         - 0.98                                                                
+│         eps: 1.0e-08                                                          
+│         weight_decay: 1.0e-05                                                 
+│                                                                               
+├── tokenizer
+│   └── _target_: transformers.AutoTokenizer.from_pretrained                    
+│       pretrained_model_name_or_path: Qwen/Qwen3-1.7B-Base                     
+│       revision: null                                                          
+│       trust_remote_code: true                                                 
+│       padding_side: right                                                     
+│                                                                               
+├── collator
+│   └── _target_: src.datasets.collator.DenoisingCollator                       
+│       global_batch_size: 32                                                   
+│       padding: max_length                                                     
+│       max_length: 1024                                                        
+│       pad_to_multiple_of: null                                                
+│       return_tensors: pt                                                      
+│       predict_padding: false                                                  
+│       restricted_t_range: null                                                
+│       sampling_eps: 0.001                                                     
+│       antithetic_sampling: false                                              
+│       block_size: 4                                                           
+│                                                                               
+├── eval_collator
+│   └── _target_: src.datasets.collator.DenoisingCollator                       
+│       global_batch_size: 32                                                   
+│       padding: max_length                                                     
+│       max_length: 1024                                                        
+│       pad_to_multiple_of: null                                                
+│       return_tensors: pt                                                      
+│       predict_padding: false                                                  
+│       restricted_t_range: null                                                
+│       sampling_eps: 0.001                                                     
+│       antithetic_sampling: false                                              
+│       block_size: 4                                                           
+│                                                                               
+├── train_dataset
+│   └── _target_: src.datasets.preprocessed_dataset.load_preprocessed_dataset   
+│       dataset_path: /data/shared_data/hankun/datasets/gsm8k_qwen3_1p7b_selfdis
+│                                                                               
+├── eval_dataset
+│   └── _target_: src.datasets.preprocessed_dataset.load_preprocessed_dataset   
+│       dataset_path: /data/shared_data/hankun/datasets/gsm8k_qwen3_1p7b_selfdis
+│                                                                               
+├── metrics
+│   └── loss:                                                                   
+│         _target_: src.tasks.metrics.Loss                                      
+│       nll:                                                                    
+│         _target_: src.tasks.metrics.NLL                                       
+│       bpd:                                                                    
+│         _target_: src.tasks.metrics.BPD                                       
+│       perplexity:                                                             
+│         _target_: src.tasks.metrics.Perplexity                                
+│                                                                               
+├── eval_metrics
+│   └── loss:                                                                   
+│         _target_: src.tasks.metrics.Loss                                      
+│       nll:                                                                    
+│         _target_: src.tasks.metrics.NLL                                       
+│       bpd:                                                                    
+│         _target_: src.tasks.metrics.BPD                                       
+│       perplexity:                                                             
+│         _target_: src.tasks.metrics.Perplexity                                
+│                                                                               
+├── model
+│   └── _target_: src.denoiser.diffusion.E2D                                    
+│       config:                                                                 
+│         _target_: src.denoiser.diffusion.E2DConfig                            
+│         _recursive_: false                                                    
+│         length: 1024                                                          
+│         time_conditioned_backbone: false                                      
+│         tokenization_config:                                                  
+│           vocab_size: 151669                                                  
+│           mask_token_id: 151660                                               
+│           bos_token_id: 151643                                                
+│           pad_token_id: 151643                                                
+│           eos_token_id: 151643                                                
+│           pad_vocab_size_multiple: 1                                          
+│         tokenizer_name: Qwen/Qwen3-1.7B-Base                                  
+│         attn_backend: sdpa                                                    
+│         train_on_context: false                                               
+│         keep_clean_bos: true                                                  
+│         T: 0                                                                  
+│         diffusion_type: absorbing                                             
+│         block_size: 4                                                         
+│         eval_block_size: 4                                                    
+│         decoder_loss_lambda: 0.5                                              
+│         noise_config:                                                         
+│           _target_: src.noise_schedule.noise_schedules.LinearNoise            
+│         backbone_config:                                                      
+│           _target_: src.backbone.encoder_decoder.LLMasEncoderDecoderShareKVEnc
+│           pretrained_model_name_or_path: Qwen/Qwen3-1.7B-Base                 
+│           max_length: 1024                                                    
+│           attn_backend: sdpa                                                  
+│           freeze_encoder: false                                               
+│           reinit_decoder: false                                               
+│           reinit_encoder: false                                               
+│           tie_encoder_decoder_weights: true                                   
+│           use_encoder_causal_mask: false                                      
+│           num_encoder_layers: 28                                              
+│           num_decoder_layers: 2                                               
+│           keep_top_decoder_layers: true                                       
+│           keep_top_encoder_layers: false                                      
+│           use_gradient_checkpointing: false                                   
+│           train_on_ar: false                                                  
+│           ar_checkpoint_path: ''                                              
+│         nullify_self_attn: false                                              
+│                                                                               
+├── run_name
+│   └── gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur6ep_enc2
+├── seed
+│   └── 1                                                                       
+├── backend
+│   └── gpu                                                                     
+├── pretrained_model_name_or_path
+│   └── Qwen/Qwen3-1.7B-Base                                                    
+├── block_size
+│   └── 4                                                                       
+├── eval_block_size
+│   └── 4                                                                       
+├── train_dataloader
+│   └── _target_: torch.utils.data.DataLoader                                   
+│       batch_size: 32                                                          
+│       num_workers: 0                                                          
+│       pin_memory: true                                                        
+│                                                                               
+├── eval_dataloader
+│   └── _target_: torch.utils.data.DataLoader                                   
+│       batch_size: 1                                                           
+│       num_workers: 0                                                          
+│       pin_memory: true                                                        
+│                                                                               
+├── training
+│   └── autoresume: true                                                        
+│       load_path: null                                                         
+│       ema: 0.9999                                                             
+│       lr: 0.0003                                                              
+│       global_batch_size: 32                                                   
+│       grad_accum: 32                                                          
+│       antithetic_sampling: false                                              
+│       sampling_eps: 0.001                                                     
+│       restricted_t_range: null                                                
+│       compile_backbone: false                                                 
+│                                                                               
+└── checkpointing
+    └── save_dir: /data/shared_data/hankun/outputs/gsm8k_selfdistill_block4_warm
+                                                                                
+[2026-07-01 07:54:28,662][composer.utils.reproducibility][INFO] - Setting seed to 1
+E2D(
+  (backbone): LLMasEncoderDecoderShareKVEncoderGen(
+    (encoder): Qwen3ForCausalLM(
+      (model): Qwen3Model(
+        (embed_tokens): Embedding(151936, 2048)
+        (layers): ModuleList(
+          (0-27): 28 x Qwen3DecoderLayer(
+            (self_attn): Qwen3Attention(
+              (q_proj): Linear(in_features=2048, out_features=2048, bias=False)
+              (k_proj): Linear(in_features=2048, out_features=1024, bias=False)
+              (v_proj): Linear(in_features=2048, out_features=1024, bias=False)
+              (o_proj): Linear(in_features=2048, out_features=2048, bias=False)
+              (q_norm): Qwen3RMSNorm((128,), eps=1e-06)
+              (k_norm): Qwen3RMSNorm((128,), eps=1e-06)
+            )
+            (mlp): Qwen3MLP(
+              (gate_proj): Linear(in_features=2048, out_features=6144, bias=False)
+              (up_proj): Linear(in_features=2048, out_features=6144, bias=False)
+              (down_proj): Linear(in_features=6144, out_features=2048, bias=False)
+              (act_fn): SiLU()
+            )
+            (input_layernorm): Qwen3RMSNorm((2048,), eps=1e-06)
+            (post_attention_layernorm): Qwen3RMSNorm((2048,), eps=1e-06)
+          )
+        )
+        (norm): Qwen3RMSNorm((2048,), eps=1e-06)
+        (rotary_emb): Qwen3RotaryEmbedding()
+      )
+      (lm_head): Linear(in_features=2048, out_features=151936, bias=False)
+    )
+    (decoder): Qwen3ForCausalLM(
+      (model): Qwen3Model(
+        (embed_tokens): Embedding(151936, 2048)
+        (layers): ModuleList(
+          (0-27): 28 x Qwen3DecoderLayer(
+            (self_attn): Qwen3Attention(
+              (q_proj): Linear(in_features=2048, out_features=2048, bias=False)
+              (k_proj): Linear(in_features=2048, out_features=1024, bias=False)
+              (v_proj): Linear(in_features=2048, out_features=1024, bias=False)
+              (o_proj): Linear(in_features=2048, out_features=2048, bias=False)
+              (q_norm): Qwen3RMSNorm((128,), eps=1e-06)
+              (k_norm): Qwen3RMSNorm((128,), eps=1e-06)
+            )
+            (mlp): Qwen3MLP(
+              (gate_proj): Linear(in_features=2048, out_features=6144, bias=False)
+              (up_proj): Linear(in_features=2048, out_features=6144, bias=False)
+              (down_proj): Linear(in_features=6144, out_features=2048, bias=False)
+              (act_fn): SiLU()
+            )
+            (input_layernorm): Qwen3RMSNorm((2048,), eps=1e-06)
+            (post_attention_layernorm): Qwen3RMSNorm((2048,), eps=1e-06)
+          )
+        )
+        (norm): Qwen3RMSNorm((2048,), eps=1e-06)
+        (rotary_emb): Qwen3RotaryEmbedding()
+      )
+      (lm_head): Linear(in_features=2048, out_features=151936, bias=False)
+    )
+  )
+)
+[2026-07-01 07:54:32,097][__main__][INFO] - Num. parameters: 1.7B
+[2026-07-01 07:54:32,098][__main__][INFO] - Num. trainable parameters: 1.7B
+[2026-07-01 07:54:32,098][__main__][INFO] - All nodes connected
+[2026-07-01 07:54:33,434][composer.utils.reproducibility][INFO] - Setting seed to 1
+[2026-07-01 07:54:35,696][composer.trainer.trainer][INFO] - Run name: gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075416
+[2026-07-01 07:54:35,698][composer.trainer.trainer][INFO] - Multiple CheckpointSaver provided as callbacks. Using the first one as reference.
+wandb: Currently logged in as: hankun2004 (hankun2004-purdue-university) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075416
+wandb: Tracking run with wandb version 0.22.2
+wandb: Run data is saved locally in /data/shared_data/hankun/outputs/gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075416/wandb/run-20260701_075435-gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075416
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075416
+wandb: ⭐️ View project at https://wandb.ai/hankun2004-purdue-university/e2d
+wandb: 🚀 View run at https://wandb.ai/hankun2004-purdue-university/e2d/runs/gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075416
+wandb: WARNING The get_url method is deprecated and will be removed in a future release. Please use `run.url` instead.
+/home/hankun/anaconda3/envs/e2d-env/lib/python3.12/site-packages/composer/callbacks/speed_monitor.py:298: UserWarning: gpu_flop count not found for nvidia rtx a6000 with precision=amp_bf16 so MFU cannot be calculated and reported. gpu_flops_available can be manually overridden by setting gpu_flops_available in SpeedMonitor or nvidia rtx a6000 can be added to GPU_AVAILABLE_FLOPS in composer/callbacks/speed_monitor.py
+  self.gpu_flops_available = get_gpu_flops_available(state)
+[2026-07-01 07:54:39,856][composer.trainer.trainer][INFO] - Stepping schedulers every batch. To step schedulers every epoch, set `step_schedulers_every_batch=False`.
+[2026-07-01 07:54:39,857][composer.trainer.trainer][INFO] - Searching for a previous checkpoint to autoresume
+[2026-07-01 07:54:39,858][composer.trainer.trainer][INFO] - Looking for autoresume checkpoint: gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075416/checkpoints/latest-rank0.pt (remote), /data/shared_data/hankun/outputs/gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075416/checkpoints/latest-rank0.pt (local)
+/home/hankun/anaconda3/envs/e2d-env/lib/python3.12/site-packages/composer/loggers/wandb_logger.py:286: UserWarning: WandB permits only alpha-numeric, periods, hyphens, and underscores in file names. The file with name 'gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075416/checkpoints/latest-rank0.pt:latest' will be stored as 'gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075416.checkpoints.latest-rank0.pt:latest'.
+  warnings.warn((
+/home/hankun/anaconda3/envs/e2d-env/lib/python3.12/site-packages/composer/loggers/wandb_logger.py:286: UserWarning: WandB permits only alpha-numeric, periods, hyphens, and underscores in file names. The file with name 'gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075416/checkpoints/latest-rank0.pt.symlink:latest' will be stored as 'gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075416.checkpoints.latest-rank0.pt.symlink:latest'.
+  warnings.warn((
+[2026-07-01 07:54:41,644][composer.trainer.trainer][INFO] - Checkpoint not found in: <composer.loggers.wandb_logger.WandBLogger object at 0x7f50a14d4d40>
+[2026-07-01 07:54:41,645][composer.trainer.trainer][INFO] - Checkpoint not found in: <composer.loggers.console_logger.ConsoleLogger object at 0x7f50600e1e50>
+[2026-07-01 07:54:41,669][composer.trainer.trainer][INFO] - No previous autoresume checkpoint found
+[2026-07-01 07:54:41,671][composer.trainer.trainer][INFO] - Setting seed to 1
+[2026-07-01 07:54:41,672][composer.utils.reproducibility][INFO] - Setting seed to 1
+[2026-07-01 07:54:41,674][composer.trainer.trainer][INFO] - Using precision Precision.AMP_BF16
+******************************
+Config:
+composer_commit_hash: None
+composer_version: 0.32.1
+enabled_algorithms/EMA: true
+enabled_algorithms/GradientClipping: true
+node_name: unknown because NODENAME environment variable not set
+num_gpus_per_node: 1
+num_nodes: 1
+rank_zero_seed: 1
+time/remaining_estimate_unit: hours
+
+******************************
+[epoch=1][batch=1/229]:
+	 Train time/epoch: 0
+	 Train time/batch: 0
+	 Train time/sample: 0
+	 Train time/batch_in_epoch: 0
+	 Train time/sample_in_epoch: 0
+	 Train time/token: 0
+	 Train time/token_in_epoch: 0
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 5.4970
+	 Train metrics/train/Loss: 5.4970
+	 Train metrics/train/NLL: 7.6413
+	 Train metrics/train/BPD: 11.0241
+	 Train metrics/train/Perplexity: 2082.4316
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/train: 0.0039
+	 Train time/val: 0.0000
+	 Train time/total: 0.0039
+[epoch=1][batch=10/229]:
+	 Train time/batch: 9
+	 Train time/sample: 288
+	 Train time/batch_in_epoch: 9
+	 Train time/sample_in_epoch: 288
+	 Train time/token: 294912
+	 Train time/token_in_epoch: 294912
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 2.7549
+	 Train metrics/train/Loss: 2.7549
+	 Train metrics/train/NLL: 3.7651
+	 Train metrics/train/BPD: 5.4319
+	 Train metrics/train/Perplexity: 43.1685
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 4.4739
+	 Train time/train: 0.0367
+	 Train time/val: 0.0000
+	 Train time/total: 0.0367
+[epoch=1][batch=20/229]:
+	 Train time/batch: 19
+	 Train time/sample: 608
+	 Train time/batch_in_epoch: 19
+	 Train time/sample_in_epoch: 608
+	 Train time/token: 622592
+	 Train time/token_in_epoch: 622592
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.5558
+	 Train metrics/train/Loss: 1.5558
+	 Train metrics/train/NLL: 2.1596
+	 Train metrics/train/BPD: 3.1157
+	 Train metrics/train/Perplexity: 8.6680
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 4.7014
+	 Train time/train: 0.0733
+	 Train time/val: 0.0000
+	 Train time/total: 0.0733
+[epoch=1][batch=30/229]:
+	 Train time/batch: 29
+	 Train time/sample: 928
+	 Train time/batch_in_epoch: 29
+	 Train time/sample_in_epoch: 928
+	 Train time/token: 950272
+	 Train time/token_in_epoch: 950272
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.2948
+	 Train metrics/train/Loss: 1.2948
+	 Train metrics/train/NLL: 1.8001
+	 Train metrics/train/BPD: 2.5969
+	 Train metrics/train/Perplexity: 6.0500
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 4.7602
+	 Train time/train: 0.1101
+	 Train time/val: 0.0000
+	 Train time/total: 0.1101
+[epoch=1][batch=40/229]:
+	 Train time/batch: 39
+	 Train time/sample: 1248
+	 Train time/batch_in_epoch: 39
+	 Train time/sample_in_epoch: 1248
+	 Train time/token: 1277952
+	 Train time/token_in_epoch: 1277952
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0145
+	 Train metrics/train/Loss: 1.0145
+	 Train metrics/train/NLL: 1.3999
+	 Train metrics/train/BPD: 2.0196
+	 Train metrics/train/Perplexity: 4.0548
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 4.7700
+	 Train time/train: 0.1469
+	 Train time/val: 0.0000
+	 Train time/total: 0.1469
+[epoch=1][batch=50/229]:
+	 Train time/batch: 49
+	 Train time/sample: 1568
+	 Train time/batch_in_epoch: 49
+	 Train time/sample_in_epoch: 1568
+	 Train time/token: 1605632
+	 Train time/token_in_epoch: 1605632
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9136
+	 Train metrics/train/Loss: 0.9136
+	 Train metrics/train/NLL: 1.2766
+	 Train metrics/train/BPD: 1.8417
+	 Train metrics/train/Perplexity: 3.5844
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 4.7612
+	 Train time/train: 0.1837
+	 Train time/val: 0.0000
+	 Train time/total: 0.1837
+[Eval batch=1/149] Eval on eval data
+[Eval batch=16/149] Eval on eval data
+[Eval batch=31/149] Eval on eval data
+[Eval batch=45/149] Eval on eval data
+[Eval batch=60/149] Eval on eval data
+[Eval batch=75/149] Eval on eval data
+[Eval batch=90/149] Eval on eval data
+[Eval batch=105/149] Eval on eval data
+[Eval batch=119/149] Eval on eval data
+[Eval batch=134/149] Eval on eval data
+[2026-07-01 08:06:00,267][src.custom_composer.callbacks][INFO] - Best loss attained: 0.9190719127655029. Saving checkpoint to /data/shared_data/hankun/outputs/gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075416/checkpoints/best-rank0.pt.
+[Eval batch=149/149] Eval on eval data:
+	 Eval metrics/eval/Loss: 0.9191
+	 Eval metrics/eval/NLL: 1.2972
+	 Eval metrics/eval/BPD: 1.8715
+	 Eval metrics/eval/Perplexity: 3.6591
+[epoch=1][batch=60/229]:
+	 Train time/batch: 59
+	 Train time/sample: 1888
+	 Train time/batch_in_epoch: 59
+	 Train time/sample_in_epoch: 1888
+	 Train time/token: 1933312
+	 Train time/token_in_epoch: 1933312
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8318
+	 Train metrics/train/Loss: 0.8318
+	 Train metrics/train/NLL: 1.1753
+	 Train metrics/train/BPD: 1.6955
+	 Train metrics/train/Perplexity: 3.2390
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 5.3003
+	 Train time/train: 0.2301
+	 Train time/val: 0.0047
+	 Train time/total: 0.2348
+[epoch=1][batch=70/229]:
+	 Train time/batch: 69
+	 Train time/sample: 2208
+	 Train time/batch_in_epoch: 69
+	 Train time/sample_in_epoch: 2208
+	 Train time/token: 2260992
+	 Train time/token_in_epoch: 2260992
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.7153
+	 Train metrics/train/Loss: 0.7153
+	 Train metrics/train/NLL: 0.9628
+	 Train metrics/train/BPD: 1.3890
+	 Train metrics/train/Perplexity: 2.6190
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 5.2130
+	 Train time/train: 0.2669
+	 Train time/val: 0.0047
+	 Train time/total: 0.2716
+[epoch=1][batch=80/229]:
+	 Train time/batch: 79
+	 Train time/sample: 2528
+	 Train time/batch_in_epoch: 79
+	 Train time/sample_in_epoch: 2528
+	 Train time/token: 2588672
+	 Train time/token_in_epoch: 2588672
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.7219
+	 Train metrics/train/Loss: 0.7219
+	 Train metrics/train/NLL: 1.0117
+	 Train metrics/train/BPD: 1.4595
+	 Train metrics/train/Perplexity: 2.7502
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 5.1371
+	 Train time/train: 0.3036
+	 Train time/val: 0.0047
+	 Train time/total: 0.3084
+[epoch=1][batch=90/229]:
+	 Train time/batch: 89
+	 Train time/sample: 2848
+	 Train time/batch_in_epoch: 89
+	 Train time/sample_in_epoch: 2848
+	 Train time/token: 2916352
+	 Train time/token_in_epoch: 2916352
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6522
+	 Train metrics/train/Loss: 0.6522
+	 Train metrics/train/NLL: 0.9017
+	 Train metrics/train/BPD: 1.3008
+	 Train metrics/train/Perplexity: 2.4637
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 5.0701
+	 Train time/train: 0.3404
+	 Train time/val: 0.0047
+	 Train time/total: 0.3451
+[epoch=1][batch=100/229]:
+	 Train time/batch: 99
+	 Train time/sample: 3168
+	 Train time/batch_in_epoch: 99
+	 Train time/sample_in_epoch: 3168
+	 Train time/token: 3244032
+	 Train time/token_in_epoch: 3244032
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6974
+	 Train metrics/train/Loss: 0.6974
+	 Train metrics/train/NLL: 0.9565
+	 Train metrics/train/BPD: 1.3800
+	 Train metrics/train/Perplexity: 2.6027
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 5.0090
+	 Train time/train: 0.3771
+	 Train time/val: 0.0047
+	 Train time/total: 0.3819
+[Eval batch=1/149] Eval on eval data
+[Eval batch=16/149] Eval on eval data
+[Eval batch=31/149] Eval on eval data
+[Eval batch=45/149] Eval on eval data
+[Eval batch=60/149] Eval on eval data
+[Eval batch=75/149] Eval on eval data
+[Eval batch=90/149] Eval on eval data
+[Eval batch=105/149] Eval on eval data
+[Eval batch=119/149] Eval on eval data
+[Eval batch=134/149] Eval on eval data
+[2026-07-01 08:18:29,950][src.custom_composer.callbacks][INFO] - Best loss attained: 0.6148414015769958. Saving checkpoint to /data/shared_data/hankun/outputs/gsm8k_selfdistill_block4_warm10ba_lr3e-5_bsz32_lambda0.5_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075416/checkpoints/best-rank0.pt.
+[Eval batch=149/149] Eval on eval data:
+	 Eval metrics/eval/Loss: 0.6148
+	 Eval metrics/eval/NLL: 0.8598
+	 Eval metrics/eval/BPD: 1.2404
+	 Eval metrics/eval/Perplexity: 2.3626
+[epoch=1][batch=110/229]:
+	 Train time/batch: 109
+	 Train time/sample: 3488
+	 Train time/batch_in_epoch: 109
+	 Train time/sample_in_epoch: 3488
+	 Train time/token: 3571712
+	 Train time/token_in_epoch: 3571712
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6116
+	 Train metrics/train/Loss: 0.6116
+	 Train metrics/train/NLL: 0.8368
+	 Train metrics/train/BPD: 1.2072
+	 Train metrics/train/Perplexity: 2.3090
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 5.1876
+	 Train time/train: 0.4240
+	 Train time/val: 0.0095
+	 Train time/total: 0.4335
+[epoch=1][batch=120/229]:
+	 Train time/batch: 119
+	 Train time/sample: 3808
+	 Train time/batch_in_epoch: 119
+	 Train time/sample_in_epoch: 3808
+	 Train time/token: 3899392
+	 Train time/token_in_epoch: 3899392
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5281
+	 Train metrics/train/Loss: 0.5281
+	 Train metrics/train/NLL: 0.7409
+	 Train metrics/train/BPD: 1.0688
+	 Train metrics/train/Perplexity: 2.0977
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 5.1127
+	 Train time/train: 0.4608
+	 Train time/val: 0.0095
+	 Train time/total: 0.4702

@@ -1,0 +1,4793 @@
+nohup: ignoring input
+Logging into W&B as 'hankun2004-purdue-university'.
+Token is valid (permission: fineGrained).
+The token `Hankun` has been saved to /data/shared_data/hankun/huggingface/stored_tokens
+Your token has been saved in your configured git credential helpers (store).
+Your token has been saved to /data/shared_data/hankun/huggingface/token
+Login successful.
+Note: Environment variable`HF_TOKEN` is set and is the current active token independently from the token you've just configured.
+[33m⚠️  Warning: 'huggingface-cli login' is deprecated. Use 'hf auth login' instead.[0m
+HuggingFace cache set to '/home/hankun/e2d/.hf_cache'.
+[Self-Distill] Reusing existing preprocessed datasets:
+  train: /data/shared_data/hankun/datasets/gsm8k_qwen3_1p7b_selfdistill_evalprompt_maxlen1024/train_preprocessed
+  eval : /data/shared_data/hankun/datasets/gsm8k_qwen3_1p7b_selfdistill_evalprompt_maxlen1024/eval_preprocessed
+Initializing dist
+CONFIG
+├── composer
+│   └── trainer:                                                                
+│         _target_: composer.Trainer                                            
+│         run_name: gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max
+│         seed: 1                                                               
+│         device: gpu                                                           
+│         train_subset_num_batches: -1                                          
+│         eval_subset_num_batches: -1                                           
+│         max_duration: 6ep                                                     
+│         eval_interval: 1000ba                                                 
+│         progress_bar: false                                                   
+│         log_to_console: true                                                  
+│         console_log_interval: 10ba                                            
+│         precision: amp_bf16                                                   
+│         device_train_microbatch_size: 1                                       
+│         save_folder: /data/shared_data/hankun/outputs/gsm8k_selfdistill_block4
+│         save_filename: ep{epoch}-ba{batch}-rank{rank}.pt                      
+│         save_latest_filename: latest-rank{rank}.pt                            
+│         save_interval: 1000ba                                                 
+│         save_num_checkpoints_to_keep: 1                                       
+│         save_overwrite: false                                                 
+│         save_metrics: false                                                   
+│         load_path: null                                                       
+│         load_weights_only: false                                              
+│         autoresume: true                                                      
+│         python_log_level: null                                                
+│         dist_timeout: 600.0                                                   
+│       algorithms:                                                             
+│         ema:                                                                  
+│           _target_: src.custom_composer.algorithms.EMA                        
+│           half_life: null                                                     
+│           smoothing: 0.9999                                                   
+│           ema_start: 0.0dur                                                   
+│           update_interval: 1ba                                                
+│           use_num_updates: true                                               
+│         gradient_clipping:                                                    
+│           _target_: composer.algorithms.GradientClipping                      
+│           clipping_type: norm                                                 
+│           clipping_threshold: 1.0                                             
+│       callbacks:                                                              
+│         hf_compatible_checkpointing:                                          
+│           _target_: src.custom_composer.callbacks.HuggingFaceCompatibleCheckpo
+│           folder: /data/shared_data/hankun/outputs/gsm8k_selfdistill_block4_wa
+│           filename: ep{epoch}-ba{batch}-rank{rank}.pt                         
+│           latest_filename: latest-rank{rank}.pt                               
+│           save_interval: 1000ba                                               
+│           num_checkpoints_to_keep: 1                                          
+│           overwrite: false                                                    
+│           disable_hf: true                                                    
+│           save_local: true                                                    
+│           save_to_hub: true                                                   
+│           hub_repo_id: kuleshov-group/gsm8k_selfdistill_block4_warm100ba_lr1e-
+│         lr_monitor:                                                           
+│           _target_: composer.callbacks.LRMonitor                              
+│         runtime_estimator:                                                    
+│           _target_: composer.callbacks.RuntimeEstimator                       
+│         save_best_checkpointing:                                              
+│           _target_: src.custom_composer.callbacks.SaveBestCheckpointing       
+│           folder: /data/shared_data/hankun/outputs/gsm8k_selfdistill_block4_wa
+│           filename: best-rank{rank}.pt                                        
+│           num_checkpoints_to_keep: -1                                         
+│           metric_to_monitor: eval/loss                                        
+│           mode: min                                                           
+│           disable_hf: true                                                    
+│           save_local: false                                                   
+│           save_to_hub: false                                                  
+│           hub_repo_id: null                                                   
+│         speed_monitor:                                                        
+│           _target_: composer.callbacks.SpeedMonitor                           
+│           gpu_flops_available: null                                           
+│           window_size: 500                                                    
+│       loggers:                                                                
+│         _target_: composer.loggers.WandBLogger                                
+│         project: e2d                                                          
+│         group: null                                                           
+│         name: gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max-dur
+│         init_kwargs:                                                          
+│           id: gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max-dur
+│       lr_scheduler:                                                           
+│         _target_: composer.optim.scheduler.CosineAnnealingWithWarmupScheduler 
+│         t_warmup: 100ba                                                       
+│         t_max: 6ep                                                            
+│         alpha_f: 0.5                                                          
+│       optimizer:                                                              
+│         _target_: composer.optim.DecoupledAdamW                               
+│         lr: 1.0e-05                                                           
+│         betas:                                                                
+│         - 0.9                                                                 
+│         - 0.98                                                                
+│         eps: 1.0e-08                                                          
+│         weight_decay: 1.0e-05                                                 
+│                                                                               
+├── tokenizer
+│   └── _target_: transformers.AutoTokenizer.from_pretrained                    
+│       pretrained_model_name_or_path: Qwen/Qwen3-1.7B-Base                     
+│       revision: null                                                          
+│       trust_remote_code: true                                                 
+│       padding_side: right                                                     
+│                                                                               
+├── collator
+│   └── _target_: src.datasets.collator.DenoisingCollator                       
+│       global_batch_size: 1                                                    
+│       padding: max_length                                                     
+│       max_length: 1024                                                        
+│       pad_to_multiple_of: null                                                
+│       return_tensors: pt                                                      
+│       predict_padding: false                                                  
+│       restricted_t_range: null                                                
+│       sampling_eps: 0.001                                                     
+│       antithetic_sampling: false                                              
+│       block_size: 4                                                           
+│                                                                               
+├── eval_collator
+│   └── _target_: src.datasets.collator.DenoisingCollator                       
+│       global_batch_size: 1                                                    
+│       padding: max_length                                                     
+│       max_length: 1024                                                        
+│       pad_to_multiple_of: null                                                
+│       return_tensors: pt                                                      
+│       predict_padding: false                                                  
+│       restricted_t_range: null                                                
+│       sampling_eps: 0.001                                                     
+│       antithetic_sampling: false                                              
+│       block_size: 4                                                           
+│                                                                               
+├── train_dataset
+│   └── _target_: src.datasets.preprocessed_dataset.load_preprocessed_dataset   
+│       dataset_path: /data/shared_data/hankun/datasets/gsm8k_qwen3_1p7b_selfdis
+│                                                                               
+├── eval_dataset
+│   └── _target_: src.datasets.preprocessed_dataset.load_preprocessed_dataset   
+│       dataset_path: /data/shared_data/hankun/datasets/gsm8k_qwen3_1p7b_selfdis
+│                                                                               
+├── metrics
+│   └── loss:                                                                   
+│         _target_: src.tasks.metrics.Loss                                      
+│       nll:                                                                    
+│         _target_: src.tasks.metrics.NLL                                       
+│       bpd:                                                                    
+│         _target_: src.tasks.metrics.BPD                                       
+│       perplexity:                                                             
+│         _target_: src.tasks.metrics.Perplexity                                
+│                                                                               
+├── eval_metrics
+│   └── loss:                                                                   
+│         _target_: src.tasks.metrics.Loss                                      
+│       nll:                                                                    
+│         _target_: src.tasks.metrics.NLL                                       
+│       bpd:                                                                    
+│         _target_: src.tasks.metrics.BPD                                       
+│       perplexity:                                                             
+│         _target_: src.tasks.metrics.Perplexity                                
+│                                                                               
+├── model
+│   └── _target_: src.denoiser.diffusion.E2D                                    
+│       config:                                                                 
+│         _target_: src.denoiser.diffusion.E2DConfig                            
+│         _recursive_: false                                                    
+│         length: 1024                                                          
+│         time_conditioned_backbone: false                                      
+│         tokenization_config:                                                  
+│           vocab_size: 151669                                                  
+│           mask_token_id: 151660                                               
+│           bos_token_id: 151643                                                
+│           pad_token_id: 151643                                                
+│           eos_token_id: 151643                                                
+│           pad_vocab_size_multiple: 1                                          
+│         tokenizer_name: Qwen/Qwen3-1.7B-Base                                  
+│         attn_backend: sdpa                                                    
+│         train_on_context: false                                               
+│         keep_clean_bos: true                                                  
+│         T: 0                                                                  
+│         diffusion_type: absorbing                                             
+│         block_size: 4                                                         
+│         eval_block_size: 4                                                    
+│         decoder_loss_lambda: 1.0                                              
+│         noise_config:                                                         
+│           _target_: src.noise_schedule.noise_schedules.LinearNoise            
+│         backbone_config:                                                      
+│           _target_: src.backbone.encoder_decoder.LLMasEncoderDecoderShareKVEnc
+│           pretrained_model_name_or_path: Qwen/Qwen3-1.7B-Base                 
+│           max_length: 1024                                                    
+│           attn_backend: sdpa                                                  
+│           freeze_encoder: false                                               
+│           reinit_decoder: false                                               
+│           reinit_encoder: false                                               
+│           tie_encoder_decoder_weights: true                                   
+│           use_encoder_causal_mask: false                                      
+│           num_encoder_layers: 28                                              
+│           num_decoder_layers: 2                                               
+│           keep_top_decoder_layers: true                                       
+│           keep_top_encoder_layers: false                                      
+│           use_gradient_checkpointing: false                                   
+│           train_on_ar: false                                                  
+│           ar_checkpoint_path: ''                                              
+│         nullify_self_attn: false                                              
+│                                                                               
+├── run_name
+│   └── gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max-dur6ep_enc2
+├── seed
+│   └── 1                                                                       
+├── backend
+│   └── gpu                                                                     
+├── pretrained_model_name_or_path
+│   └── Qwen/Qwen3-1.7B-Base                                                    
+├── block_size
+│   └── 4                                                                       
+├── eval_block_size
+│   └── 4                                                                       
+├── train_dataloader
+│   └── _target_: torch.utils.data.DataLoader                                   
+│       batch_size: 1                                                           
+│       num_workers: 0                                                          
+│       pin_memory: true                                                        
+│                                                                               
+├── eval_dataloader
+│   └── _target_: torch.utils.data.DataLoader                                   
+│       batch_size: 1                                                           
+│       num_workers: 0                                                          
+│       pin_memory: true                                                        
+│                                                                               
+├── training
+│   └── autoresume: true                                                        
+│       load_path: null                                                         
+│       ema: 0.9999                                                             
+│       lr: 0.0003                                                              
+│       global_batch_size: 1                                                    
+│       grad_accum: 1                                                           
+│       antithetic_sampling: false                                              
+│       sampling_eps: 0.001                                                     
+│       restricted_t_range: null                                                
+│       compile_backbone: false                                                 
+│                                                                               
+└── checkpointing
+    └── save_dir: /data/shared_data/hankun/outputs/gsm8k_selfdistill_block4_warm
+                                                                                
+[2026-07-01 07:59:31,815][composer.utils.reproducibility][INFO] - Setting seed to 1
+E2D(
+  (backbone): LLMasEncoderDecoderShareKVEncoderGen(
+    (encoder): Qwen3ForCausalLM(
+      (model): Qwen3Model(
+        (embed_tokens): Embedding(151936, 2048)
+        (layers): ModuleList(
+          (0-27): 28 x Qwen3DecoderLayer(
+            (self_attn): Qwen3Attention(
+              (q_proj): Linear(in_features=2048, out_features=2048, bias=False)
+              (k_proj): Linear(in_features=2048, out_features=1024, bias=False)
+              (v_proj): Linear(in_features=2048, out_features=1024, bias=False)
+              (o_proj): Linear(in_features=2048, out_features=2048, bias=False)
+              (q_norm): Qwen3RMSNorm((128,), eps=1e-06)
+              (k_norm): Qwen3RMSNorm((128,), eps=1e-06)
+            )
+            (mlp): Qwen3MLP(
+              (gate_proj): Linear(in_features=2048, out_features=6144, bias=False)
+              (up_proj): Linear(in_features=2048, out_features=6144, bias=False)
+              (down_proj): Linear(in_features=6144, out_features=2048, bias=False)
+              (act_fn): SiLU()
+            )
+            (input_layernorm): Qwen3RMSNorm((2048,), eps=1e-06)
+            (post_attention_layernorm): Qwen3RMSNorm((2048,), eps=1e-06)
+          )
+        )
+        (norm): Qwen3RMSNorm((2048,), eps=1e-06)
+        (rotary_emb): Qwen3RotaryEmbedding()
+      )
+      (lm_head): Linear(in_features=2048, out_features=151936, bias=False)
+    )
+    (decoder): Qwen3ForCausalLM(
+      (model): Qwen3Model(
+        (embed_tokens): Embedding(151936, 2048)
+        (layers): ModuleList(
+          (0-27): 28 x Qwen3DecoderLayer(
+            (self_attn): Qwen3Attention(
+              (q_proj): Linear(in_features=2048, out_features=2048, bias=False)
+              (k_proj): Linear(in_features=2048, out_features=1024, bias=False)
+              (v_proj): Linear(in_features=2048, out_features=1024, bias=False)
+              (o_proj): Linear(in_features=2048, out_features=2048, bias=False)
+              (q_norm): Qwen3RMSNorm((128,), eps=1e-06)
+              (k_norm): Qwen3RMSNorm((128,), eps=1e-06)
+            )
+            (mlp): Qwen3MLP(
+              (gate_proj): Linear(in_features=2048, out_features=6144, bias=False)
+              (up_proj): Linear(in_features=2048, out_features=6144, bias=False)
+              (down_proj): Linear(in_features=6144, out_features=2048, bias=False)
+              (act_fn): SiLU()
+            )
+            (input_layernorm): Qwen3RMSNorm((2048,), eps=1e-06)
+            (post_attention_layernorm): Qwen3RMSNorm((2048,), eps=1e-06)
+          )
+        )
+        (norm): Qwen3RMSNorm((2048,), eps=1e-06)
+        (rotary_emb): Qwen3RotaryEmbedding()
+      )
+      (lm_head): Linear(in_features=2048, out_features=151936, bias=False)
+    )
+  )
+)
+[2026-07-01 07:59:35,256][__main__][INFO] - Num. parameters: 1.7B
+[2026-07-01 07:59:35,257][__main__][INFO] - Num. trainable parameters: 1.7B
+[2026-07-01 07:59:35,257][__main__][INFO] - All nodes connected
+[2026-07-01 07:59:36,451][composer.utils.reproducibility][INFO] - Setting seed to 1
+[2026-07-01 07:59:39,293][composer.trainer.trainer][INFO] - Run name: gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075919
+[2026-07-01 07:59:39,295][composer.trainer.trainer][INFO] - Multiple CheckpointSaver provided as callbacks. Using the first one as reference.
+wandb: Currently logged in as: hankun2004 (hankun2004-purdue-university) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075919
+wandb: Tracking run with wandb version 0.22.2
+wandb: Run data is saved locally in /data/shared_data/hankun/outputs/gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075919/wandb/run-20260701_075939-gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075919
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075919
+wandb: ⭐️ View project at https://wandb.ai/hankun2004-purdue-university/e2d
+wandb: 🚀 View run at https://wandb.ai/hankun2004-purdue-university/e2d/runs/gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075919
+wandb: WARNING The get_url method is deprecated and will be removed in a future release. Please use `run.url` instead.
+/home/hankun/anaconda3/envs/e2d-env/lib/python3.12/site-packages/composer/callbacks/speed_monitor.py:298: UserWarning: gpu_flop count not found for nvidia rtx a6000 with precision=amp_bf16 so MFU cannot be calculated and reported. gpu_flops_available can be manually overridden by setting gpu_flops_available in SpeedMonitor or nvidia rtx a6000 can be added to GPU_AVAILABLE_FLOPS in composer/callbacks/speed_monitor.py
+  self.gpu_flops_available = get_gpu_flops_available(state)
+[2026-07-01 07:59:43,365][composer.trainer.trainer][INFO] - Stepping schedulers every batch. To step schedulers every epoch, set `step_schedulers_every_batch=False`.
+[2026-07-01 07:59:43,366][composer.trainer.trainer][INFO] - Searching for a previous checkpoint to autoresume
+[2026-07-01 07:59:43,366][composer.trainer.trainer][INFO] - Looking for autoresume checkpoint: gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075919/checkpoints/latest-rank0.pt (remote), /data/shared_data/hankun/outputs/gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075919/checkpoints/latest-rank0.pt (local)
+/home/hankun/anaconda3/envs/e2d-env/lib/python3.12/site-packages/composer/loggers/wandb_logger.py:286: UserWarning: WandB permits only alpha-numeric, periods, hyphens, and underscores in file names. The file with name 'gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075919/checkpoints/latest-rank0.pt:latest' will be stored as 'gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075919.checkpoints.latest-rank0.pt:latest'.
+  warnings.warn((
+/home/hankun/anaconda3/envs/e2d-env/lib/python3.12/site-packages/composer/loggers/wandb_logger.py:286: UserWarning: WandB permits only alpha-numeric, periods, hyphens, and underscores in file names. The file with name 'gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075919/checkpoints/latest-rank0.pt.symlink:latest' will be stored as 'gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075919.checkpoints.latest-rank0.pt.symlink:latest'.
+  warnings.warn((
+[2026-07-01 07:59:45,711][composer.trainer.trainer][INFO] - Checkpoint not found in: <composer.loggers.wandb_logger.WandBLogger object at 0x7f423100cc20>
+[2026-07-01 07:59:45,712][composer.trainer.trainer][INFO] - Checkpoint not found in: <composer.loggers.console_logger.ConsoleLogger object at 0x7f418082e390>
+[2026-07-01 07:59:45,733][composer.trainer.trainer][INFO] - No previous autoresume checkpoint found
+[2026-07-01 07:59:45,735][composer.trainer.trainer][INFO] - Setting seed to 1
+[2026-07-01 07:59:45,736][composer.utils.reproducibility][INFO] - Setting seed to 1
+[2026-07-01 07:59:45,738][composer.trainer.trainer][INFO] - Using precision Precision.AMP_BF16
+******************************
+Config:
+composer_commit_hash: None
+composer_version: 0.32.1
+enabled_algorithms/EMA: true
+enabled_algorithms/GradientClipping: true
+node_name: unknown because NODENAME environment variable not set
+num_gpus_per_node: 1
+num_nodes: 1
+rank_zero_seed: 1
+time/remaining_estimate_unit: hours
+
+******************************
+[epoch=1][batch=1/7324]:
+	 Train time/epoch: 0
+	 Train time/batch: 0
+	 Train time/sample: 0
+	 Train time/batch_in_epoch: 0
+	 Train time/sample_in_epoch: 0
+	 Train time/token: 0
+	 Train time/token_in_epoch: 0
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 7.5230
+	 Train metrics/train/Loss: 7.5230
+	 Train metrics/train/NLL: 7.5226
+	 Train metrics/train/BPD: 10.8528
+	 Train metrics/train/Perplexity: 1849.2833
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/train: 0.0005
+	 Train time/val: 0.0000
+	 Train time/total: 0.0005
+[epoch=1][batch=10/7324]:
+	 Train time/batch: 9
+	 Train time/sample: 9
+	 Train time/batch_in_epoch: 9
+	 Train time/sample_in_epoch: 9
+	 Train time/token: 9216
+	 Train time/token_in_epoch: 9216
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 7.5928
+	 Train metrics/train/Loss: 7.5928
+	 Train metrics/train/NLL: 7.5918
+	 Train metrics/train/BPD: 10.9526
+	 Train metrics/train/Perplexity: 1981.8062
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.0374
+	 Train time/train: 0.0023
+	 Train time/val: 0.0000
+	 Train time/total: 0.0023
+[epoch=1][batch=20/7324]:
+	 Train time/batch: 19
+	 Train time/sample: 19
+	 Train time/batch_in_epoch: 19
+	 Train time/sample_in_epoch: 19
+	 Train time/token: 19456
+	 Train time/token_in_epoch: 19456
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 7.2142
+	 Train metrics/train/Loss: 7.2142
+	 Train metrics/train/NLL: 7.2147
+	 Train metrics/train/BPD: 10.4086
+	 Train metrics/train/Perplexity: 1359.2959
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.5273
+	 Train time/train: 0.0044
+	 Train time/val: 0.0000
+	 Train time/total: 0.0044
+[epoch=1][batch=30/7324]:
+	 Train time/batch: 29
+	 Train time/sample: 29
+	 Train time/batch_in_epoch: 29
+	 Train time/sample_in_epoch: 29
+	 Train time/token: 29696
+	 Train time/token_in_epoch: 29696
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 5.5093
+	 Train metrics/train/Loss: 5.5093
+	 Train metrics/train/NLL: 5.5084
+	 Train metrics/train/BPD: 7.9469
+	 Train metrics/train/Perplexity: 246.7555
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.6904
+	 Train time/train: 0.0064
+	 Train time/val: 0.0000
+	 Train time/total: 0.0064
+[epoch=1][batch=40/7324]:
+	 Train time/batch: 39
+	 Train time/sample: 39
+	 Train time/batch_in_epoch: 39
+	 Train time/sample_in_epoch: 39
+	 Train time/token: 39936
+	 Train time/token_in_epoch: 39936
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 4.3397
+	 Train metrics/train/Loss: 4.3397
+	 Train metrics/train/NLL: 4.3402
+	 Train metrics/train/BPD: 6.2615
+	 Train metrics/train/Perplexity: 76.7204
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.7692
+	 Train time/train: 0.0085
+	 Train time/val: 0.0000
+	 Train time/total: 0.0085
+[epoch=1][batch=50/7324]:
+	 Train time/batch: 49
+	 Train time/sample: 49
+	 Train time/batch_in_epoch: 49
+	 Train time/sample_in_epoch: 49
+	 Train time/token: 50176
+	 Train time/token_in_epoch: 50176
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 3.4171
+	 Train metrics/train/Loss: 3.4171
+	 Train metrics/train/NLL: 3.4171
+	 Train metrics/train/BPD: 4.9299
+	 Train metrics/train/Perplexity: 30.4823
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8186
+	 Train time/train: 0.0105
+	 Train time/val: 0.0000
+	 Train time/total: 0.0105
+[epoch=1][batch=60/7324]:
+	 Train time/batch: 59
+	 Train time/sample: 59
+	 Train time/batch_in_epoch: 59
+	 Train time/sample_in_epoch: 59
+	 Train time/token: 60416
+	 Train time/token_in_epoch: 60416
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 2.9041
+	 Train metrics/train/Loss: 2.9041
+	 Train metrics/train/NLL: 2.9040
+	 Train metrics/train/BPD: 4.1896
+	 Train metrics/train/Perplexity: 18.2467
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8527
+	 Train time/train: 0.0126
+	 Train time/val: 0.0000
+	 Train time/total: 0.0126
+[epoch=1][batch=70/7324]:
+	 Train time/batch: 69
+	 Train time/sample: 69
+	 Train time/batch_in_epoch: 69
+	 Train time/sample_in_epoch: 69
+	 Train time/token: 70656
+	 Train time/token_in_epoch: 70656
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 2.9988
+	 Train metrics/train/Loss: 2.9988
+	 Train metrics/train/NLL: 2.9988
+	 Train metrics/train/BPD: 4.3263
+	 Train metrics/train/Perplexity: 20.0606
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8739
+	 Train time/train: 0.0147
+	 Train time/val: 0.0000
+	 Train time/total: 0.0147
+[epoch=1][batch=80/7324]:
+	 Train time/batch: 79
+	 Train time/sample: 79
+	 Train time/batch_in_epoch: 79
+	 Train time/sample_in_epoch: 79
+	 Train time/token: 80896
+	 Train time/token_in_epoch: 80896
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 2.2918
+	 Train metrics/train/Loss: 2.2918
+	 Train metrics/train/NLL: 2.2922
+	 Train metrics/train/BPD: 3.3069
+	 Train metrics/train/Perplexity: 9.8967
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8939
+	 Train time/train: 0.0167
+	 Train time/val: 0.0000
+	 Train time/total: 0.0167
+[epoch=1][batch=90/7324]:
+	 Train time/batch: 89
+	 Train time/sample: 89
+	 Train time/batch_in_epoch: 89
+	 Train time/sample_in_epoch: 89
+	 Train time/token: 91136
+	 Train time/token_in_epoch: 91136
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.9378
+	 Train metrics/train/Loss: 1.9378
+	 Train metrics/train/NLL: 1.9376
+	 Train metrics/train/BPD: 2.7954
+	 Train metrics/train/Perplexity: 6.9423
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9051
+	 Train time/train: 0.0188
+	 Train time/val: 0.0000
+	 Train time/total: 0.0188
+[epoch=1][batch=100/7324]:
+	 Train time/batch: 99
+	 Train time/sample: 99
+	 Train time/batch_in_epoch: 99
+	 Train time/sample_in_epoch: 99
+	 Train time/token: 101376
+	 Train time/token_in_epoch: 101376
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 2.0543
+	 Train metrics/train/Loss: 2.0543
+	 Train metrics/train/NLL: 2.0542
+	 Train metrics/train/BPD: 2.9636
+	 Train metrics/train/Perplexity: 7.8005
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9138
+	 Train time/train: 0.0208
+	 Train time/val: 0.0000
+	 Train time/total: 0.0208
+[epoch=1][batch=110/7324]:
+	 Train time/batch: 109
+	 Train time/sample: 109
+	 Train time/batch_in_epoch: 109
+	 Train time/sample_in_epoch: 109
+	 Train time/token: 111616
+	 Train time/token_in_epoch: 111616
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 2.4220
+	 Train metrics/train/Loss: 2.4220
+	 Train metrics/train/NLL: 2.4221
+	 Train metrics/train/BPD: 3.4943
+	 Train metrics/train/Perplexity: 11.2691
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9198
+	 Train time/train: 0.0229
+	 Train time/val: 0.0000
+	 Train time/total: 0.0229
+[epoch=1][batch=120/7324]:
+	 Train time/batch: 119
+	 Train time/sample: 119
+	 Train time/batch_in_epoch: 119
+	 Train time/sample_in_epoch: 119
+	 Train time/token: 121856
+	 Train time/token_in_epoch: 121856
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 2.0675
+	 Train metrics/train/Loss: 2.0675
+	 Train metrics/train/NLL: 2.0673
+	 Train metrics/train/BPD: 2.9824
+	 Train metrics/train/Perplexity: 7.9032
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9243
+	 Train time/train: 0.0249
+	 Train time/val: 0.0000
+	 Train time/total: 0.0249
+[epoch=1][batch=130/7324]:
+	 Train time/batch: 129
+	 Train time/sample: 129
+	 Train time/batch_in_epoch: 129
+	 Train time/sample_in_epoch: 129
+	 Train time/token: 132096
+	 Train time/token_in_epoch: 132096
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.8727
+	 Train metrics/train/Loss: 1.8727
+	 Train metrics/train/NLL: 1.8725
+	 Train metrics/train/BPD: 2.7015
+	 Train metrics/train/Perplexity: 6.5046
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9294
+	 Train time/train: 0.0270
+	 Train time/val: 0.0000
+	 Train time/total: 0.0270
+[epoch=1][batch=140/7324]:
+	 Train time/batch: 139
+	 Train time/sample: 139
+	 Train time/batch_in_epoch: 139
+	 Train time/sample_in_epoch: 139
+	 Train time/token: 142336
+	 Train time/token_in_epoch: 142336
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.6389
+	 Train metrics/train/Loss: 1.6389
+	 Train metrics/train/NLL: 1.6385
+	 Train metrics/train/BPD: 2.3639
+	 Train metrics/train/Perplexity: 5.1475
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9323
+	 Train time/train: 0.0291
+	 Train time/val: 0.0000
+	 Train time/total: 0.0291
+[epoch=1][batch=150/7324]:
+	 Train time/batch: 149
+	 Train time/sample: 149
+	 Train time/batch_in_epoch: 149
+	 Train time/sample_in_epoch: 149
+	 Train time/token: 152576
+	 Train time/token_in_epoch: 152576
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.7247
+	 Train metrics/train/Loss: 1.7247
+	 Train metrics/train/NLL: 1.7243
+	 Train metrics/train/BPD: 2.4877
+	 Train metrics/train/Perplexity: 5.6087
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9342
+	 Train time/train: 0.0311
+	 Train time/val: 0.0000
+	 Train time/total: 0.0311
+[epoch=1][batch=160/7324]:
+	 Train time/batch: 159
+	 Train time/sample: 159
+	 Train time/batch_in_epoch: 159
+	 Train time/sample_in_epoch: 159
+	 Train time/token: 162816
+	 Train time/token_in_epoch: 162816
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 2.7816
+	 Train metrics/train/Loss: 2.7816
+	 Train metrics/train/NLL: 2.7814
+	 Train metrics/train/BPD: 4.0127
+	 Train metrics/train/Perplexity: 16.1417
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9363
+	 Train time/train: 0.0332
+	 Train time/val: 0.0000
+	 Train time/total: 0.0332
+[epoch=1][batch=170/7324]:
+	 Train time/batch: 169
+	 Train time/sample: 169
+	 Train time/batch_in_epoch: 169
+	 Train time/sample_in_epoch: 169
+	 Train time/token: 173056
+	 Train time/token_in_epoch: 173056
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.9518
+	 Train metrics/train/Loss: 1.9518
+	 Train metrics/train/NLL: 1.9518
+	 Train metrics/train/BPD: 2.8158
+	 Train metrics/train/Perplexity: 7.0412
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9379
+	 Train time/train: 0.0352
+	 Train time/val: 0.0000
+	 Train time/total: 0.0352
+[epoch=1][batch=180/7324]:
+	 Train time/batch: 179
+	 Train time/sample: 179
+	 Train time/batch_in_epoch: 179
+	 Train time/sample_in_epoch: 179
+	 Train time/token: 183296
+	 Train time/token_in_epoch: 183296
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.7177
+	 Train metrics/train/Loss: 1.7177
+	 Train metrics/train/NLL: 1.7174
+	 Train metrics/train/BPD: 2.4777
+	 Train metrics/train/Perplexity: 5.5702
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9387
+	 Train time/train: 0.0373
+	 Train time/val: 0.0000
+	 Train time/total: 0.0373
+[epoch=1][batch=190/7324]:
+	 Train time/batch: 189
+	 Train time/sample: 189
+	 Train time/batch_in_epoch: 189
+	 Train time/sample_in_epoch: 189
+	 Train time/token: 193536
+	 Train time/token_in_epoch: 193536
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 2.1091
+	 Train metrics/train/Loss: 2.1091
+	 Train metrics/train/NLL: 2.1092
+	 Train metrics/train/BPD: 3.0430
+	 Train metrics/train/Perplexity: 8.2419
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9393
+	 Train time/train: 0.0393
+	 Train time/val: 0.0000
+	 Train time/total: 0.0393
+[epoch=1][batch=200/7324]:
+	 Train time/batch: 199
+	 Train time/sample: 199
+	 Train time/batch_in_epoch: 199
+	 Train time/sample_in_epoch: 199
+	 Train time/token: 203776
+	 Train time/token_in_epoch: 203776
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 2.0074
+	 Train metrics/train/Loss: 2.0074
+	 Train metrics/train/NLL: 2.0077
+	 Train metrics/train/BPD: 2.8965
+	 Train metrics/train/Perplexity: 7.4464
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9404
+	 Train time/train: 0.0414
+	 Train time/val: 0.0000
+	 Train time/total: 0.0414
+[epoch=1][batch=210/7324]:
+	 Train time/batch: 209
+	 Train time/sample: 209
+	 Train time/batch_in_epoch: 209
+	 Train time/sample_in_epoch: 209
+	 Train time/token: 214016
+	 Train time/token_in_epoch: 214016
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 2.1255
+	 Train metrics/train/Loss: 2.1255
+	 Train metrics/train/NLL: 2.1260
+	 Train metrics/train/BPD: 3.0671
+	 Train metrics/train/Perplexity: 8.3809
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9415
+	 Train time/train: 0.0434
+	 Train time/val: 0.0000
+	 Train time/total: 0.0434
+[epoch=1][batch=220/7324]:
+	 Train time/batch: 219
+	 Train time/sample: 219
+	 Train time/batch_in_epoch: 219
+	 Train time/sample_in_epoch: 219
+	 Train time/token: 224256
+	 Train time/token_in_epoch: 224256
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.8646
+	 Train metrics/train/Loss: 1.8646
+	 Train metrics/train/NLL: 1.8644
+	 Train metrics/train/BPD: 2.6898
+	 Train metrics/train/Perplexity: 6.4522
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9413
+	 Train time/train: 0.0455
+	 Train time/val: 0.0000
+	 Train time/total: 0.0455
+[epoch=1][batch=230/7324]:
+	 Train time/batch: 229
+	 Train time/sample: 229
+	 Train time/batch_in_epoch: 229
+	 Train time/sample_in_epoch: 229
+	 Train time/token: 234496
+	 Train time/token_in_epoch: 234496
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9523
+	 Train metrics/train/Loss: 0.9523
+	 Train metrics/train/NLL: 0.9530
+	 Train metrics/train/BPD: 1.3748
+	 Train metrics/train/Perplexity: 2.5934
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9411
+	 Train time/train: 0.0475
+	 Train time/val: 0.0000
+	 Train time/total: 0.0475
+[epoch=1][batch=240/7324]:
+	 Train time/batch: 239
+	 Train time/sample: 239
+	 Train time/batch_in_epoch: 239
+	 Train time/sample_in_epoch: 239
+	 Train time/token: 244736
+	 Train time/token_in_epoch: 244736
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 2.0928
+	 Train metrics/train/Loss: 2.0928
+	 Train metrics/train/NLL: 2.0928
+	 Train metrics/train/BPD: 3.0192
+	 Train metrics/train/Perplexity: 8.1073
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9412
+	 Train time/train: 0.0496
+	 Train time/val: 0.0000
+	 Train time/total: 0.0496
+[epoch=1][batch=250/7324]:
+	 Train time/batch: 249
+	 Train time/sample: 249
+	 Train time/batch_in_epoch: 249
+	 Train time/sample_in_epoch: 249
+	 Train time/token: 254976
+	 Train time/token_in_epoch: 254976
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.4000
+	 Train metrics/train/Loss: 1.4000
+	 Train metrics/train/NLL: 1.4001
+	 Train metrics/train/BPD: 2.0199
+	 Train metrics/train/Perplexity: 4.0555
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9412
+	 Train time/train: 0.0517
+	 Train time/val: 0.0000
+	 Train time/total: 0.0517
+[epoch=1][batch=260/7324]:
+	 Train time/batch: 259
+	 Train time/sample: 259
+	 Train time/batch_in_epoch: 259
+	 Train time/sample_in_epoch: 259
+	 Train time/token: 265216
+	 Train time/token_in_epoch: 265216
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.2879
+	 Train metrics/train/Loss: 1.2879
+	 Train metrics/train/NLL: 1.2881
+	 Train metrics/train/BPD: 1.8583
+	 Train metrics/train/Perplexity: 3.6258
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9410
+	 Train time/train: 0.0537
+	 Train time/val: 0.0000
+	 Train time/total: 0.0537
+[epoch=1][batch=270/7324]:
+	 Train time/batch: 269
+	 Train time/sample: 269
+	 Train time/batch_in_epoch: 269
+	 Train time/sample_in_epoch: 269
+	 Train time/token: 275456
+	 Train time/token_in_epoch: 275456
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.2763
+	 Train metrics/train/Loss: 1.2763
+	 Train metrics/train/NLL: 1.2764
+	 Train metrics/train/BPD: 1.8415
+	 Train metrics/train/Perplexity: 3.5838
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9404
+	 Train time/train: 0.0558
+	 Train time/val: 0.0000
+	 Train time/total: 0.0558
+[epoch=1][batch=280/7324]:
+	 Train time/batch: 279
+	 Train time/sample: 279
+	 Train time/batch_in_epoch: 279
+	 Train time/sample_in_epoch: 279
+	 Train time/token: 285696
+	 Train time/token_in_epoch: 285696
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.4117
+	 Train metrics/train/Loss: 1.4117
+	 Train metrics/train/NLL: 1.4117
+	 Train metrics/train/BPD: 2.0367
+	 Train metrics/train/Perplexity: 4.1031
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9396
+	 Train time/train: 0.0578
+	 Train time/val: 0.0000
+	 Train time/total: 0.0578
+[epoch=1][batch=290/7324]:
+	 Train time/batch: 289
+	 Train time/sample: 289
+	 Train time/batch_in_epoch: 289
+	 Train time/sample_in_epoch: 289
+	 Train time/token: 295936
+	 Train time/token_in_epoch: 295936
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.5846
+	 Train metrics/train/Loss: 1.5846
+	 Train metrics/train/NLL: 1.5844
+	 Train metrics/train/BPD: 2.2858
+	 Train metrics/train/Perplexity: 4.8763
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9383
+	 Train time/train: 0.0599
+	 Train time/val: 0.0000
+	 Train time/total: 0.0599
+[epoch=1][batch=300/7324]:
+	 Train time/batch: 299
+	 Train time/sample: 299
+	 Train time/batch_in_epoch: 299
+	 Train time/sample_in_epoch: 299
+	 Train time/token: 306176
+	 Train time/token_in_epoch: 306176
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.5173
+	 Train metrics/train/Loss: 1.5173
+	 Train metrics/train/NLL: 1.5173
+	 Train metrics/train/BPD: 2.1890
+	 Train metrics/train/Perplexity: 4.5600
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9374
+	 Train time/train: 0.0619
+	 Train time/val: 0.0000
+	 Train time/total: 0.0619
+[epoch=1][batch=310/7324]:
+	 Train time/batch: 309
+	 Train time/sample: 309
+	 Train time/batch_in_epoch: 309
+	 Train time/sample_in_epoch: 309
+	 Train time/token: 316416
+	 Train time/token_in_epoch: 316416
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.8205
+	 Train metrics/train/Loss: 1.8205
+	 Train metrics/train/NLL: 1.8206
+	 Train metrics/train/BPD: 2.6265
+	 Train metrics/train/Perplexity: 6.1753
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9366
+	 Train time/train: 0.0640
+	 Train time/val: 0.0000
+	 Train time/total: 0.0640
+[epoch=1][batch=320/7324]:
+	 Train time/batch: 319
+	 Train time/sample: 319
+	 Train time/batch_in_epoch: 319
+	 Train time/sample_in_epoch: 319
+	 Train time/token: 326656
+	 Train time/token_in_epoch: 326656
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.4734
+	 Train metrics/train/Loss: 1.4734
+	 Train metrics/train/NLL: 1.4733
+	 Train metrics/train/BPD: 2.1256
+	 Train metrics/train/Perplexity: 4.3638
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9358
+	 Train time/train: 0.0660
+	 Train time/val: 0.0000
+	 Train time/total: 0.0660
+[epoch=1][batch=330/7324]:
+	 Train time/batch: 329
+	 Train time/sample: 329
+	 Train time/batch_in_epoch: 329
+	 Train time/sample_in_epoch: 329
+	 Train time/token: 336896
+	 Train time/token_in_epoch: 336896
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.4862
+	 Train metrics/train/Loss: 1.4862
+	 Train metrics/train/NLL: 1.4863
+	 Train metrics/train/BPD: 2.1442
+	 Train metrics/train/Perplexity: 4.4205
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9350
+	 Train time/train: 0.0681
+	 Train time/val: 0.0000
+	 Train time/total: 0.0681
+[epoch=1][batch=340/7324]:
+	 Train time/batch: 339
+	 Train time/sample: 339
+	 Train time/batch_in_epoch: 339
+	 Train time/sample_in_epoch: 339
+	 Train time/token: 347136
+	 Train time/token_in_epoch: 347136
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 2.2052
+	 Train metrics/train/Loss: 2.2052
+	 Train metrics/train/NLL: 2.2048
+	 Train metrics/train/BPD: 3.1808
+	 Train metrics/train/Perplexity: 9.0681
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9337
+	 Train time/train: 0.0702
+	 Train time/val: 0.0000
+	 Train time/total: 0.0702
+[epoch=1][batch=350/7324]:
+	 Train time/batch: 349
+	 Train time/sample: 349
+	 Train time/batch_in_epoch: 349
+	 Train time/sample_in_epoch: 349
+	 Train time/token: 357376
+	 Train time/token_in_epoch: 357376
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6457
+	 Train metrics/train/Loss: 0.6457
+	 Train metrics/train/NLL: 0.6458
+	 Train metrics/train/BPD: 0.9317
+	 Train metrics/train/Perplexity: 1.9075
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9328
+	 Train time/train: 0.0722
+	 Train time/val: 0.0000
+	 Train time/total: 0.0722
+[epoch=1][batch=360/7324]:
+	 Train time/batch: 359
+	 Train time/sample: 359
+	 Train time/batch_in_epoch: 359
+	 Train time/sample_in_epoch: 359
+	 Train time/token: 367616
+	 Train time/token_in_epoch: 367616
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.4087
+	 Train metrics/train/Loss: 1.4087
+	 Train metrics/train/NLL: 1.4086
+	 Train metrics/train/BPD: 2.0321
+	 Train metrics/train/Perplexity: 4.0901
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9316
+	 Train time/train: 0.0743
+	 Train time/val: 0.0000
+	 Train time/total: 0.0743
+[epoch=1][batch=370/7324]:
+	 Train time/batch: 369
+	 Train time/sample: 369
+	 Train time/batch_in_epoch: 369
+	 Train time/sample_in_epoch: 369
+	 Train time/token: 377856
+	 Train time/token_in_epoch: 377856
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0994
+	 Train metrics/train/Loss: 1.0994
+	 Train metrics/train/NLL: 1.0998
+	 Train metrics/train/BPD: 1.5867
+	 Train metrics/train/Perplexity: 3.0036
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9308
+	 Train time/train: 0.0763
+	 Train time/val: 0.0000
+	 Train time/total: 0.0763
+[epoch=1][batch=380/7324]:
+	 Train time/batch: 379
+	 Train time/sample: 379
+	 Train time/batch_in_epoch: 379
+	 Train time/sample_in_epoch: 379
+	 Train time/token: 388096
+	 Train time/token_in_epoch: 388096
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8091
+	 Train metrics/train/Loss: 0.8091
+	 Train metrics/train/NLL: 0.8092
+	 Train metrics/train/BPD: 1.1675
+	 Train metrics/train/Perplexity: 2.2462
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9292
+	 Train time/train: 0.0784
+	 Train time/val: 0.0000
+	 Train time/total: 0.0784
+[epoch=1][batch=390/7324]:
+	 Train time/batch: 389
+	 Train time/sample: 389
+	 Train time/batch_in_epoch: 389
+	 Train time/sample_in_epoch: 389
+	 Train time/token: 398336
+	 Train time/token_in_epoch: 398336
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.3419
+	 Train metrics/train/Loss: 1.3419
+	 Train metrics/train/NLL: 1.3418
+	 Train metrics/train/BPD: 1.9358
+	 Train metrics/train/Perplexity: 3.8259
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9279
+	 Train time/train: 0.0804
+	 Train time/val: 0.0000
+	 Train time/total: 0.0804
+[epoch=1][batch=400/7324]:
+	 Train time/batch: 399
+	 Train time/sample: 399
+	 Train time/batch_in_epoch: 399
+	 Train time/sample_in_epoch: 399
+	 Train time/token: 408576
+	 Train time/token_in_epoch: 408576
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.4365
+	 Train metrics/train/Loss: 1.4365
+	 Train metrics/train/NLL: 1.4367
+	 Train metrics/train/BPD: 2.0727
+	 Train metrics/train/Perplexity: 4.2067
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9266
+	 Train time/train: 0.0825
+	 Train time/val: 0.0000
+	 Train time/total: 0.0825
+[epoch=1][batch=410/7324]:
+	 Train time/batch: 409
+	 Train time/sample: 409
+	 Train time/batch_in_epoch: 409
+	 Train time/sample_in_epoch: 409
+	 Train time/token: 418816
+	 Train time/token_in_epoch: 418816
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.7962
+	 Train metrics/train/Loss: 1.7962
+	 Train metrics/train/NLL: 1.7963
+	 Train metrics/train/BPD: 2.5914
+	 Train metrics/train/Perplexity: 6.0270
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9251
+	 Train time/train: 0.0846
+	 Train time/val: 0.0000
+	 Train time/total: 0.0846
+[epoch=1][batch=420/7324]:
+	 Train time/batch: 419
+	 Train time/sample: 419
+	 Train time/batch_in_epoch: 419
+	 Train time/sample_in_epoch: 419
+	 Train time/token: 429056
+	 Train time/token_in_epoch: 429056
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.6437
+	 Train metrics/train/Loss: 1.6437
+	 Train metrics/train/NLL: 1.6437
+	 Train metrics/train/BPD: 2.3713
+	 Train metrics/train/Perplexity: 5.1742
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9237
+	 Train time/train: 0.0866
+	 Train time/val: 0.0000
+	 Train time/total: 0.0866
+[epoch=1][batch=430/7324]:
+	 Train time/batch: 429
+	 Train time/sample: 429
+	 Train time/batch_in_epoch: 429
+	 Train time/sample_in_epoch: 429
+	 Train time/token: 439296
+	 Train time/token_in_epoch: 439296
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0726
+	 Train metrics/train/Loss: 1.0726
+	 Train metrics/train/NLL: 1.0726
+	 Train metrics/train/BPD: 1.5475
+	 Train metrics/train/Perplexity: 2.9230
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9221
+	 Train time/train: 0.0887
+	 Train time/val: 0.0000
+	 Train time/total: 0.0887
+[epoch=1][batch=440/7324]:
+	 Train time/batch: 439
+	 Train time/sample: 439
+	 Train time/batch_in_epoch: 439
+	 Train time/sample_in_epoch: 439
+	 Train time/token: 449536
+	 Train time/token_in_epoch: 449536
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0729
+	 Train metrics/train/Loss: 1.0729
+	 Train metrics/train/NLL: 1.0731
+	 Train metrics/train/BPD: 1.5482
+	 Train metrics/train/Perplexity: 2.9245
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9207
+	 Train time/train: 0.0907
+	 Train time/val: 0.0000
+	 Train time/total: 0.0907
+[epoch=1][batch=450/7324]:
+	 Train time/batch: 449
+	 Train time/sample: 449
+	 Train time/batch_in_epoch: 449
+	 Train time/sample_in_epoch: 449
+	 Train time/token: 459776
+	 Train time/token_in_epoch: 459776
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.3632
+	 Train metrics/train/Loss: 1.3632
+	 Train metrics/train/NLL: 1.3631
+	 Train metrics/train/BPD: 1.9665
+	 Train metrics/train/Perplexity: 3.9083
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9197
+	 Train time/train: 0.0928
+	 Train time/val: 0.0000
+	 Train time/total: 0.0928
+[epoch=1][batch=460/7324]:
+	 Train time/batch: 459
+	 Train time/sample: 459
+	 Train time/batch_in_epoch: 459
+	 Train time/sample_in_epoch: 459
+	 Train time/token: 470016
+	 Train time/token_in_epoch: 470016
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.1318
+	 Train metrics/train/Loss: 1.1318
+	 Train metrics/train/NLL: 1.1319
+	 Train metrics/train/BPD: 1.6330
+	 Train metrics/train/Perplexity: 3.1017
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9185
+	 Train time/train: 0.0948
+	 Train time/val: 0.0000
+	 Train time/total: 0.0948
+[epoch=1][batch=470/7324]:
+	 Train time/batch: 469
+	 Train time/sample: 469
+	 Train time/batch_in_epoch: 469
+	 Train time/sample_in_epoch: 469
+	 Train time/token: 480256
+	 Train time/token_in_epoch: 480256
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.7802
+	 Train metrics/train/Loss: 0.7802
+	 Train metrics/train/NLL: 0.7802
+	 Train metrics/train/BPD: 1.1256
+	 Train metrics/train/Perplexity: 2.1819
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9168
+	 Train time/train: 0.0969
+	 Train time/val: 0.0000
+	 Train time/total: 0.0969
+[epoch=1][batch=480/7324]:
+	 Train time/batch: 479
+	 Train time/sample: 479
+	 Train time/batch_in_epoch: 479
+	 Train time/sample_in_epoch: 479
+	 Train time/token: 490496
+	 Train time/token_in_epoch: 490496
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.7457
+	 Train metrics/train/Loss: 0.7457
+	 Train metrics/train/NLL: 0.7458
+	 Train metrics/train/BPD: 1.0759
+	 Train metrics/train/Perplexity: 2.1081
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9151
+	 Train time/train: 0.0990
+	 Train time/val: 0.0000
+	 Train time/total: 0.0990
+[epoch=1][batch=490/7324]:
+	 Train time/batch: 489
+	 Train time/sample: 489
+	 Train time/batch_in_epoch: 489
+	 Train time/sample_in_epoch: 489
+	 Train time/token: 500736
+	 Train time/token_in_epoch: 500736
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.1253
+	 Train metrics/train/Loss: 1.1253
+	 Train metrics/train/NLL: 1.1253
+	 Train metrics/train/BPD: 1.6235
+	 Train metrics/train/Perplexity: 3.0812
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9137
+	 Train time/train: 0.1010
+	 Train time/val: 0.0000
+	 Train time/total: 0.1010
+[epoch=1][batch=500/7324]:
+	 Train time/batch: 499
+	 Train time/sample: 499
+	 Train time/batch_in_epoch: 499
+	 Train time/sample_in_epoch: 499
+	 Train time/token: 510976
+	 Train time/token_in_epoch: 510976
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.2540
+	 Train metrics/train/Loss: 1.2540
+	 Train metrics/train/NLL: 1.2541
+	 Train metrics/train/BPD: 1.8092
+	 Train metrics/train/Perplexity: 3.5046
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9123
+	 Train time/train: 0.1031
+	 Train time/val: 0.0000
+	 Train time/total: 0.1031
+[epoch=1][batch=510/7324]:
+	 Train time/batch: 509
+	 Train time/sample: 509
+	 Train time/batch_in_epoch: 509
+	 Train time/sample_in_epoch: 509
+	 Train time/token: 521216
+	 Train time/token_in_epoch: 521216
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.4753
+	 Train metrics/train/Loss: 0.4753
+	 Train metrics/train/NLL: 0.4753
+	 Train metrics/train/BPD: 0.6857
+	 Train metrics/train/Perplexity: 1.6085
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9110
+	 Train throughput/batches_per_sec: 1.3511
+	 Train throughput/samples_per_sec: 1.3511
+	 Train throughput/device/batches_per_sec: 1.3511
+	 Train throughput/device/samples_per_sec: 1.3511
+	 Train throughput/tokens_per_sec: 1383.5089
+	 Train throughput/device/tokens_per_sec: 1383.5089
+	 Train time/train: 0.1051
+	 Train time/val: 0.0000
+	 Train time/total: 0.1051
+[epoch=1][batch=520/7324]:
+	 Train time/batch: 519
+	 Train time/sample: 519
+	 Train time/batch_in_epoch: 519
+	 Train time/sample_in_epoch: 519
+	 Train time/token: 531456
+	 Train time/token_in_epoch: 531456
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.6582
+	 Train metrics/train/Loss: 1.6582
+	 Train metrics/train/NLL: 1.6584
+	 Train metrics/train/BPD: 2.3926
+	 Train metrics/train/Perplexity: 5.2509
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9092
+	 Train throughput/batches_per_sec: 1.3511
+	 Train throughput/samples_per_sec: 1.3511
+	 Train throughput/device/batches_per_sec: 1.3511
+	 Train throughput/device/samples_per_sec: 1.3511
+	 Train throughput/tokens_per_sec: 1383.4894
+	 Train throughput/device/tokens_per_sec: 1383.4894
+	 Train time/train: 0.1072
+	 Train time/val: 0.0000
+	 Train time/total: 0.1072
+[epoch=1][batch=530/7324]:
+	 Train time/batch: 529
+	 Train time/sample: 529
+	 Train time/batch_in_epoch: 529
+	 Train time/sample_in_epoch: 529
+	 Train time/token: 541696
+	 Train time/token_in_epoch: 541696
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.1613
+	 Train metrics/train/Loss: 1.1613
+	 Train metrics/train/NLL: 1.1614
+	 Train metrics/train/BPD: 1.6756
+	 Train metrics/train/Perplexity: 3.1945
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9077
+	 Train throughput/batches_per_sec: 1.3510
+	 Train throughput/samples_per_sec: 1.3510
+	 Train throughput/device/batches_per_sec: 1.3510
+	 Train throughput/device/samples_per_sec: 1.3510
+	 Train throughput/tokens_per_sec: 1383.4304
+	 Train throughput/device/tokens_per_sec: 1383.4304
+	 Train time/train: 0.1092
+	 Train time/val: 0.0000
+	 Train time/total: 0.1092
+[epoch=1][batch=540/7324]:
+	 Train time/batch: 539
+	 Train time/sample: 539
+	 Train time/batch_in_epoch: 539
+	 Train time/sample_in_epoch: 539
+	 Train time/token: 551936
+	 Train time/token_in_epoch: 551936
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.4252
+	 Train metrics/train/Loss: 1.4252
+	 Train metrics/train/NLL: 1.4254
+	 Train metrics/train/BPD: 2.0564
+	 Train metrics/train/Perplexity: 4.1594
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9066
+	 Train throughput/batches_per_sec: 1.3509
+	 Train throughput/samples_per_sec: 1.3509
+	 Train throughput/device/batches_per_sec: 1.3509
+	 Train throughput/device/samples_per_sec: 1.3509
+	 Train throughput/tokens_per_sec: 1383.2902
+	 Train throughput/device/tokens_per_sec: 1383.2902
+	 Train time/train: 0.1113
+	 Train time/val: 0.0000
+	 Train time/total: 0.1113
+[epoch=1][batch=550/7324]:
+	 Train time/batch: 549
+	 Train time/sample: 549
+	 Train time/batch_in_epoch: 549
+	 Train time/sample_in_epoch: 549
+	 Train time/token: 562176
+	 Train time/token_in_epoch: 562176
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.1086
+	 Train metrics/train/Loss: 1.1086
+	 Train metrics/train/NLL: 1.1087
+	 Train metrics/train/BPD: 1.5995
+	 Train metrics/train/Perplexity: 3.0304
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9050
+	 Train throughput/batches_per_sec: 1.3508
+	 Train throughput/samples_per_sec: 1.3508
+	 Train throughput/device/batches_per_sec: 1.3508
+	 Train throughput/device/samples_per_sec: 1.3508
+	 Train throughput/tokens_per_sec: 1383.2668
+	 Train throughput/device/tokens_per_sec: 1383.2668
+	 Train time/train: 0.1134
+	 Train time/val: 0.0000
+	 Train time/total: 0.1134
+[epoch=1][batch=560/7324]:
+	 Train time/batch: 559
+	 Train time/sample: 559
+	 Train time/batch_in_epoch: 559
+	 Train time/sample_in_epoch: 559
+	 Train time/token: 572416
+	 Train time/token_in_epoch: 572416
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8692
+	 Train metrics/train/Loss: 0.8692
+	 Train metrics/train/NLL: 0.8691
+	 Train metrics/train/BPD: 1.2539
+	 Train metrics/train/Perplexity: 2.3849
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9035
+	 Train throughput/batches_per_sec: 1.3508
+	 Train throughput/samples_per_sec: 1.3508
+	 Train throughput/device/batches_per_sec: 1.3508
+	 Train throughput/device/samples_per_sec: 1.3508
+	 Train throughput/tokens_per_sec: 1383.2535
+	 Train throughput/device/tokens_per_sec: 1383.2535
+	 Train time/train: 0.1154
+	 Train time/val: 0.0000
+	 Train time/total: 0.1154
+[epoch=1][batch=570/7324]:
+	 Train time/batch: 569
+	 Train time/sample: 569
+	 Train time/batch_in_epoch: 569
+	 Train time/sample_in_epoch: 569
+	 Train time/token: 582656
+	 Train time/token_in_epoch: 582656
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.7363
+	 Train metrics/train/Loss: 0.7363
+	 Train metrics/train/NLL: 0.7361
+	 Train metrics/train/BPD: 1.0619
+	 Train metrics/train/Perplexity: 2.0877
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9018
+	 Train throughput/batches_per_sec: 1.3508
+	 Train throughput/samples_per_sec: 1.3508
+	 Train throughput/device/batches_per_sec: 1.3508
+	 Train throughput/device/samples_per_sec: 1.3508
+	 Train throughput/tokens_per_sec: 1383.2150
+	 Train throughput/device/tokens_per_sec: 1383.2150
+	 Train time/train: 0.1175
+	 Train time/val: 0.0000
+	 Train time/total: 0.1175
+[epoch=1][batch=580/7324]:
+	 Train time/batch: 579
+	 Train time/sample: 579
+	 Train time/batch_in_epoch: 579
+	 Train time/sample_in_epoch: 579
+	 Train time/token: 592896
+	 Train time/token_in_epoch: 592896
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9228
+	 Train metrics/train/Loss: 0.9228
+	 Train metrics/train/NLL: 0.9232
+	 Train metrics/train/BPD: 1.3319
+	 Train metrics/train/Perplexity: 2.5173
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9001
+	 Train throughput/batches_per_sec: 1.3509
+	 Train throughput/samples_per_sec: 1.3509
+	 Train throughput/device/batches_per_sec: 1.3509
+	 Train throughput/device/samples_per_sec: 1.3509
+	 Train throughput/tokens_per_sec: 1383.2925
+	 Train throughput/device/tokens_per_sec: 1383.2925
+	 Train time/train: 0.1195
+	 Train time/val: 0.0000
+	 Train time/total: 0.1195
+[epoch=1][batch=590/7324]:
+	 Train time/batch: 589
+	 Train time/sample: 589
+	 Train time/batch_in_epoch: 589
+	 Train time/sample_in_epoch: 589
+	 Train time/token: 603136
+	 Train time/token_in_epoch: 603136
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.3348
+	 Train metrics/train/Loss: 1.3348
+	 Train metrics/train/NLL: 1.3354
+	 Train metrics/train/BPD: 1.9265
+	 Train metrics/train/Perplexity: 3.8014
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8987
+	 Train throughput/batches_per_sec: 1.3508
+	 Train throughput/samples_per_sec: 1.3508
+	 Train throughput/device/batches_per_sec: 1.3508
+	 Train throughput/device/samples_per_sec: 1.3508
+	 Train throughput/tokens_per_sec: 1383.1991
+	 Train throughput/device/tokens_per_sec: 1383.1991
+	 Train time/train: 0.1216
+	 Train time/val: 0.0000
+	 Train time/total: 0.1216
+[epoch=1][batch=600/7324]:
+	 Train time/batch: 599
+	 Train time/sample: 599
+	 Train time/batch_in_epoch: 599
+	 Train time/sample_in_epoch: 599
+	 Train time/token: 613376
+	 Train time/token_in_epoch: 613376
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.4251
+	 Train metrics/train/Loss: 1.4251
+	 Train metrics/train/NLL: 1.4253
+	 Train metrics/train/BPD: 2.0563
+	 Train metrics/train/Perplexity: 4.1591
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8976
+	 Train throughput/batches_per_sec: 1.3507
+	 Train throughput/samples_per_sec: 1.3507
+	 Train throughput/device/batches_per_sec: 1.3507
+	 Train throughput/device/samples_per_sec: 1.3507
+	 Train throughput/tokens_per_sec: 1383.0700
+	 Train throughput/device/tokens_per_sec: 1383.0700
+	 Train time/train: 0.1237
+	 Train time/val: 0.0000
+	 Train time/total: 0.1237
+[epoch=1][batch=610/7324]:
+	 Train time/batch: 609
+	 Train time/sample: 609
+	 Train time/batch_in_epoch: 609
+	 Train time/sample_in_epoch: 609
+	 Train time/token: 623616
+	 Train time/token_in_epoch: 623616
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0107
+	 Train metrics/train/Loss: 1.0107
+	 Train metrics/train/NLL: 1.0108
+	 Train metrics/train/BPD: 1.4583
+	 Train metrics/train/Perplexity: 2.7478
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9018
+	 Train throughput/batches_per_sec: 1.3495
+	 Train throughput/samples_per_sec: 1.3495
+	 Train throughput/device/batches_per_sec: 1.3495
+	 Train throughput/device/samples_per_sec: 1.3495
+	 Train throughput/tokens_per_sec: 1381.8869
+	 Train throughput/device/tokens_per_sec: 1381.8869
+	 Train time/train: 0.1258
+	 Train time/val: 0.0000
+	 Train time/total: 0.1258
+[epoch=1][batch=620/7324]:
+	 Train time/batch: 619
+	 Train time/sample: 619
+	 Train time/batch_in_epoch: 619
+	 Train time/sample_in_epoch: 619
+	 Train time/token: 633856
+	 Train time/token_in_epoch: 633856
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.6125
+	 Train metrics/train/Loss: 1.6125
+	 Train metrics/train/NLL: 1.6120
+	 Train metrics/train/BPD: 2.3257
+	 Train metrics/train/Perplexity: 5.0130
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.9000
+	 Train throughput/batches_per_sec: 1.3494
+	 Train throughput/samples_per_sec: 1.3494
+	 Train throughput/device/batches_per_sec: 1.3494
+	 Train throughput/device/samples_per_sec: 1.3494
+	 Train throughput/tokens_per_sec: 1381.8060
+	 Train throughput/device/tokens_per_sec: 1381.8060
+	 Train time/train: 0.1279
+	 Train time/val: 0.0000
+	 Train time/total: 0.1279
+[epoch=1][batch=630/7324]:
+	 Train time/batch: 629
+	 Train time/sample: 629
+	 Train time/batch_in_epoch: 629
+	 Train time/sample_in_epoch: 629
+	 Train time/token: 644096
+	 Train time/token_in_epoch: 644096
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8854
+	 Train metrics/train/Loss: 0.8854
+	 Train metrics/train/NLL: 0.8855
+	 Train metrics/train/BPD: 1.2775
+	 Train metrics/train/Perplexity: 2.4242
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8982
+	 Train throughput/batches_per_sec: 1.3494
+	 Train throughput/samples_per_sec: 1.3494
+	 Train throughput/device/batches_per_sec: 1.3494
+	 Train throughput/device/samples_per_sec: 1.3494
+	 Train throughput/tokens_per_sec: 1381.8097
+	 Train throughput/device/tokens_per_sec: 1381.8097
+	 Train time/train: 0.1299
+	 Train time/val: 0.0000
+	 Train time/total: 0.1299
+[epoch=1][batch=640/7324]:
+	 Train time/batch: 639
+	 Train time/sample: 639
+	 Train time/batch_in_epoch: 639
+	 Train time/sample_in_epoch: 639
+	 Train time/token: 654336
+	 Train time/token_in_epoch: 654336
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6065
+	 Train metrics/train/Loss: 0.6065
+	 Train metrics/train/NLL: 0.6064
+	 Train metrics/train/BPD: 0.8748
+	 Train metrics/train/Perplexity: 1.8338
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8963
+	 Train throughput/batches_per_sec: 1.3494
+	 Train throughput/samples_per_sec: 1.3494
+	 Train throughput/device/batches_per_sec: 1.3494
+	 Train throughput/device/samples_per_sec: 1.3494
+	 Train throughput/tokens_per_sec: 1381.7682
+	 Train throughput/device/tokens_per_sec: 1381.7682
+	 Train time/train: 0.1320
+	 Train time/val: 0.0000
+	 Train time/total: 0.1320
+[epoch=1][batch=650/7324]:
+	 Train time/batch: 649
+	 Train time/sample: 649
+	 Train time/batch_in_epoch: 649
+	 Train time/sample_in_epoch: 649
+	 Train time/token: 664576
+	 Train time/token_in_epoch: 664576
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0773
+	 Train metrics/train/Loss: 1.0773
+	 Train metrics/train/NLL: 1.0774
+	 Train metrics/train/BPD: 1.5544
+	 Train metrics/train/Perplexity: 2.9371
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8943
+	 Train throughput/batches_per_sec: 1.3493
+	 Train throughput/samples_per_sec: 1.3493
+	 Train throughput/device/batches_per_sec: 1.3493
+	 Train throughput/device/samples_per_sec: 1.3493
+	 Train throughput/tokens_per_sec: 1381.7299
+	 Train throughput/device/tokens_per_sec: 1381.7299
+	 Train time/train: 0.1340
+	 Train time/val: 0.0000
+	 Train time/total: 0.1340
+[epoch=1][batch=660/7324]:
+	 Train time/batch: 659
+	 Train time/sample: 659
+	 Train time/batch_in_epoch: 659
+	 Train time/sample_in_epoch: 659
+	 Train time/token: 674816
+	 Train time/token_in_epoch: 674816
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0737
+	 Train metrics/train/Loss: 1.0737
+	 Train metrics/train/NLL: 1.0738
+	 Train metrics/train/BPD: 1.5491
+	 Train metrics/train/Perplexity: 2.9264
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8928
+	 Train throughput/batches_per_sec: 1.3493
+	 Train throughput/samples_per_sec: 1.3493
+	 Train throughput/device/batches_per_sec: 1.3493
+	 Train throughput/device/samples_per_sec: 1.3493
+	 Train throughput/tokens_per_sec: 1381.6367
+	 Train throughput/device/tokens_per_sec: 1381.6367
+	 Train time/train: 0.1361
+	 Train time/val: 0.0000
+	 Train time/total: 0.1361
+[epoch=1][batch=670/7324]:
+	 Train time/batch: 669
+	 Train time/sample: 669
+	 Train time/batch_in_epoch: 669
+	 Train time/sample_in_epoch: 669
+	 Train time/token: 685056
+	 Train time/token_in_epoch: 685056
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.3324
+	 Train metrics/train/Loss: 1.3324
+	 Train metrics/train/NLL: 1.3325
+	 Train metrics/train/BPD: 1.9223
+	 Train metrics/train/Perplexity: 3.7904
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8914
+	 Train throughput/batches_per_sec: 1.3491
+	 Train throughput/samples_per_sec: 1.3491
+	 Train throughput/device/batches_per_sec: 1.3491
+	 Train throughput/device/samples_per_sec: 1.3491
+	 Train throughput/tokens_per_sec: 1381.5068
+	 Train throughput/device/tokens_per_sec: 1381.5068
+	 Train time/train: 0.1382
+	 Train time/val: 0.0000
+	 Train time/total: 0.1382
+[epoch=1][batch=680/7324]:
+	 Train time/batch: 679
+	 Train time/sample: 679
+	 Train time/batch_in_epoch: 679
+	 Train time/sample_in_epoch: 679
+	 Train time/token: 695296
+	 Train time/token_in_epoch: 695296
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.2263
+	 Train metrics/train/Loss: 1.2263
+	 Train metrics/train/NLL: 1.2260
+	 Train metrics/train/BPD: 1.7688
+	 Train metrics/train/Perplexity: 3.4076
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8900
+	 Train throughput/batches_per_sec: 1.3490
+	 Train throughput/samples_per_sec: 1.3490
+	 Train throughput/device/batches_per_sec: 1.3490
+	 Train throughput/device/samples_per_sec: 1.3490
+	 Train throughput/tokens_per_sec: 1381.3514
+	 Train throughput/device/tokens_per_sec: 1381.3514
+	 Train time/train: 0.1402
+	 Train time/val: 0.0000
+	 Train time/total: 0.1402
+[epoch=1][batch=690/7324]:
+	 Train time/batch: 689
+	 Train time/sample: 689
+	 Train time/batch_in_epoch: 689
+	 Train time/sample_in_epoch: 689
+	 Train time/token: 705536
+	 Train time/token_in_epoch: 705536
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6826
+	 Train metrics/train/Loss: 0.6826
+	 Train metrics/train/NLL: 0.6829
+	 Train metrics/train/BPD: 0.9852
+	 Train metrics/train/Perplexity: 1.9796
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8882
+	 Train throughput/batches_per_sec: 1.3489
+	 Train throughput/samples_per_sec: 1.3489
+	 Train throughput/device/batches_per_sec: 1.3489
+	 Train throughput/device/samples_per_sec: 1.3489
+	 Train throughput/tokens_per_sec: 1381.2773
+	 Train throughput/device/tokens_per_sec: 1381.2773
+	 Train time/train: 0.1423
+	 Train time/val: 0.0000
+	 Train time/total: 0.1423
+[epoch=1][batch=700/7324]:
+	 Train time/batch: 699
+	 Train time/sample: 699
+	 Train time/batch_in_epoch: 699
+	 Train time/sample_in_epoch: 699
+	 Train time/token: 715776
+	 Train time/token_in_epoch: 715776
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8885
+	 Train metrics/train/Loss: 0.8885
+	 Train metrics/train/NLL: 0.8886
+	 Train metrics/train/BPD: 1.2820
+	 Train metrics/train/Perplexity: 2.4318
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8861
+	 Train throughput/batches_per_sec: 1.3489
+	 Train throughput/samples_per_sec: 1.3489
+	 Train throughput/device/batches_per_sec: 1.3489
+	 Train throughput/device/samples_per_sec: 1.3489
+	 Train throughput/tokens_per_sec: 1381.3207
+	 Train throughput/device/tokens_per_sec: 1381.3207
+	 Train time/train: 0.1443
+	 Train time/val: 0.0000
+	 Train time/total: 0.1443
+[epoch=1][batch=710/7324]:
+	 Train time/batch: 709
+	 Train time/sample: 709
+	 Train time/batch_in_epoch: 709
+	 Train time/sample_in_epoch: 709
+	 Train time/token: 726016
+	 Train time/token_in_epoch: 726016
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0563
+	 Train metrics/train/Loss: 1.0563
+	 Train metrics/train/NLL: 1.0568
+	 Train metrics/train/BPD: 1.5246
+	 Train metrics/train/Perplexity: 2.8771
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8842
+	 Train throughput/batches_per_sec: 1.3490
+	 Train throughput/samples_per_sec: 1.3490
+	 Train throughput/device/batches_per_sec: 1.3490
+	 Train throughput/device/samples_per_sec: 1.3490
+	 Train throughput/tokens_per_sec: 1381.3556
+	 Train throughput/device/tokens_per_sec: 1381.3556
+	 Train time/train: 0.1464
+	 Train time/val: 0.0000
+	 Train time/total: 0.1464
+[epoch=1][batch=720/7324]:
+	 Train time/batch: 719
+	 Train time/sample: 719
+	 Train time/batch_in_epoch: 719
+	 Train time/sample_in_epoch: 719
+	 Train time/token: 736256
+	 Train time/token_in_epoch: 736256
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9173
+	 Train metrics/train/Loss: 0.9173
+	 Train metrics/train/NLL: 0.9174
+	 Train metrics/train/BPD: 1.3236
+	 Train metrics/train/Perplexity: 2.5028
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8823
+	 Train throughput/batches_per_sec: 1.3489
+	 Train throughput/samples_per_sec: 1.3489
+	 Train throughput/device/batches_per_sec: 1.3489
+	 Train throughput/device/samples_per_sec: 1.3489
+	 Train throughput/tokens_per_sec: 1381.2909
+	 Train throughput/device/tokens_per_sec: 1381.2909
+	 Train time/train: 0.1485
+	 Train time/val: 0.0000
+	 Train time/total: 0.1485
+[epoch=1][batch=730/7324]:
+	 Train time/batch: 729
+	 Train time/sample: 729
+	 Train time/batch_in_epoch: 729
+	 Train time/sample_in_epoch: 729
+	 Train time/token: 746496
+	 Train time/token_in_epoch: 746496
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8829
+	 Train metrics/train/Loss: 0.8829
+	 Train metrics/train/NLL: 0.8831
+	 Train metrics/train/BPD: 1.2741
+	 Train metrics/train/Perplexity: 2.4185
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8811
+	 Train throughput/batches_per_sec: 1.3487
+	 Train throughput/samples_per_sec: 1.3487
+	 Train throughput/device/batches_per_sec: 1.3487
+	 Train throughput/device/samples_per_sec: 1.3487
+	 Train throughput/tokens_per_sec: 1381.0998
+	 Train throughput/device/tokens_per_sec: 1381.0998
+	 Train time/train: 0.1505
+	 Train time/val: 0.0000
+	 Train time/total: 0.1505
+[epoch=1][batch=740/7324]:
+	 Train time/batch: 739
+	 Train time/sample: 739
+	 Train time/batch_in_epoch: 739
+	 Train time/sample_in_epoch: 739
+	 Train time/token: 756736
+	 Train time/token_in_epoch: 756736
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.1021
+	 Train metrics/train/Loss: 1.1021
+	 Train metrics/train/NLL: 1.1021
+	 Train metrics/train/BPD: 1.5900
+	 Train metrics/train/Perplexity: 3.0106
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8796
+	 Train throughput/batches_per_sec: 1.3486
+	 Train throughput/samples_per_sec: 1.3486
+	 Train throughput/device/batches_per_sec: 1.3486
+	 Train throughput/device/samples_per_sec: 1.3486
+	 Train throughput/tokens_per_sec: 1381.0085
+	 Train throughput/device/tokens_per_sec: 1381.0085
+	 Train time/train: 0.1526
+	 Train time/val: 0.0000
+	 Train time/total: 0.1526
+[epoch=1][batch=750/7324]:
+	 Train time/batch: 749
+	 Train time/sample: 749
+	 Train time/batch_in_epoch: 749
+	 Train time/sample_in_epoch: 749
+	 Train time/token: 766976
+	 Train time/token_in_epoch: 766976
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9941
+	 Train metrics/train/Loss: 0.9941
+	 Train metrics/train/NLL: 0.9943
+	 Train metrics/train/BPD: 1.4345
+	 Train metrics/train/Perplexity: 2.7028
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8780
+	 Train throughput/batches_per_sec: 1.3486
+	 Train throughput/samples_per_sec: 1.3486
+	 Train throughput/device/batches_per_sec: 1.3486
+	 Train throughput/device/samples_per_sec: 1.3486
+	 Train throughput/tokens_per_sec: 1380.9260
+	 Train throughput/device/tokens_per_sec: 1380.9260
+	 Train time/train: 0.1547
+	 Train time/val: 0.0000
+	 Train time/total: 0.1547
+[epoch=1][batch=760/7324]:
+	 Train time/batch: 759
+	 Train time/sample: 759
+	 Train time/batch_in_epoch: 759
+	 Train time/sample_in_epoch: 759
+	 Train time/token: 777216
+	 Train time/token_in_epoch: 777216
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8989
+	 Train metrics/train/Loss: 0.8989
+	 Train metrics/train/NLL: 0.8990
+	 Train metrics/train/BPD: 1.2970
+	 Train metrics/train/Perplexity: 2.4571
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8764
+	 Train throughput/batches_per_sec: 1.3485
+	 Train throughput/samples_per_sec: 1.3485
+	 Train throughput/device/batches_per_sec: 1.3485
+	 Train throughput/device/samples_per_sec: 1.3485
+	 Train throughput/tokens_per_sec: 1380.8442
+	 Train throughput/device/tokens_per_sec: 1380.8442
+	 Train time/train: 0.1567
+	 Train time/val: 0.0000
+	 Train time/total: 0.1567
+[epoch=1][batch=770/7324]:
+	 Train time/batch: 769
+	 Train time/sample: 769
+	 Train time/batch_in_epoch: 769
+	 Train time/sample_in_epoch: 769
+	 Train time/token: 787456
+	 Train time/token_in_epoch: 787456
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.7390
+	 Train metrics/train/Loss: 0.7390
+	 Train metrics/train/NLL: 0.7389
+	 Train metrics/train/BPD: 1.0661
+	 Train metrics/train/Perplexity: 2.0937
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8748
+	 Train throughput/batches_per_sec: 1.3484
+	 Train throughput/samples_per_sec: 1.3484
+	 Train throughput/device/batches_per_sec: 1.3484
+	 Train throughput/device/samples_per_sec: 1.3484
+	 Train throughput/tokens_per_sec: 1380.7369
+	 Train throughput/device/tokens_per_sec: 1380.7369
+	 Train time/train: 0.1588
+	 Train time/val: 0.0000
+	 Train time/total: 0.1588
+[epoch=1][batch=780/7324]:
+	 Train time/batch: 779
+	 Train time/sample: 779
+	 Train time/batch_in_epoch: 779
+	 Train time/sample_in_epoch: 779
+	 Train time/token: 797696
+	 Train time/token_in_epoch: 797696
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8939
+	 Train metrics/train/Loss: 0.8939
+	 Train metrics/train/NLL: 0.8938
+	 Train metrics/train/BPD: 1.2894
+	 Train metrics/train/Perplexity: 2.4443
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8733
+	 Train throughput/batches_per_sec: 1.3483
+	 Train throughput/samples_per_sec: 1.3483
+	 Train throughput/device/batches_per_sec: 1.3483
+	 Train throughput/device/samples_per_sec: 1.3483
+	 Train throughput/tokens_per_sec: 1380.6098
+	 Train throughput/device/tokens_per_sec: 1380.6098
+	 Train time/train: 0.1608
+	 Train time/val: 0.0000
+	 Train time/total: 0.1608
+[epoch=1][batch=790/7324]:
+	 Train time/batch: 789
+	 Train time/sample: 789
+	 Train time/batch_in_epoch: 789
+	 Train time/sample_in_epoch: 789
+	 Train time/token: 807936
+	 Train time/token_in_epoch: 807936
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.2142
+	 Train metrics/train/Loss: 1.2142
+	 Train metrics/train/NLL: 1.2144
+	 Train metrics/train/BPD: 1.7520
+	 Train metrics/train/Perplexity: 3.3681
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8716
+	 Train throughput/batches_per_sec: 1.3481
+	 Train throughput/samples_per_sec: 1.3481
+	 Train throughput/device/batches_per_sec: 1.3481
+	 Train throughput/device/samples_per_sec: 1.3481
+	 Train throughput/tokens_per_sec: 1380.4600
+	 Train throughput/device/tokens_per_sec: 1380.4600
+	 Train time/train: 0.1629
+	 Train time/val: 0.0000
+	 Train time/total: 0.1629
+[epoch=1][batch=800/7324]:
+	 Train time/batch: 799
+	 Train time/sample: 799
+	 Train time/batch_in_epoch: 799
+	 Train time/sample_in_epoch: 799
+	 Train time/token: 818176
+	 Train time/token_in_epoch: 818176
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6166
+	 Train metrics/train/Loss: 0.6166
+	 Train metrics/train/NLL: 0.6166
+	 Train metrics/train/BPD: 0.8896
+	 Train metrics/train/Perplexity: 1.8526
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8701
+	 Train throughput/batches_per_sec: 1.3480
+	 Train throughput/samples_per_sec: 1.3480
+	 Train throughput/device/batches_per_sec: 1.3480
+	 Train throughput/device/samples_per_sec: 1.3480
+	 Train throughput/tokens_per_sec: 1380.3135
+	 Train throughput/device/tokens_per_sec: 1380.3135
+	 Train time/train: 0.1650
+	 Train time/val: 0.0000
+	 Train time/total: 0.1650
+[epoch=1][batch=810/7324]:
+	 Train time/batch: 809
+	 Train time/sample: 809
+	 Train time/batch_in_epoch: 809
+	 Train time/sample_in_epoch: 809
+	 Train time/token: 828416
+	 Train time/token_in_epoch: 828416
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0890
+	 Train metrics/train/Loss: 1.0890
+	 Train metrics/train/NLL: 1.0890
+	 Train metrics/train/BPD: 1.5712
+	 Train metrics/train/Perplexity: 2.9714
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8685
+	 Train throughput/batches_per_sec: 1.3479
+	 Train throughput/samples_per_sec: 1.3479
+	 Train throughput/device/batches_per_sec: 1.3479
+	 Train throughput/device/samples_per_sec: 1.3479
+	 Train throughput/tokens_per_sec: 1380.2332
+	 Train throughput/device/tokens_per_sec: 1380.2332
+	 Train time/train: 0.1670
+	 Train time/val: 0.0000
+	 Train time/total: 0.1670
+[epoch=1][batch=820/7324]:
+	 Train time/batch: 819
+	 Train time/sample: 819
+	 Train time/batch_in_epoch: 819
+	 Train time/sample_in_epoch: 819
+	 Train time/token: 838656
+	 Train time/token_in_epoch: 838656
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.2991
+	 Train metrics/train/Loss: 1.2991
+	 Train metrics/train/NLL: 1.2993
+	 Train metrics/train/BPD: 1.8745
+	 Train metrics/train/Perplexity: 3.6669
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8669
+	 Train throughput/batches_per_sec: 1.3478
+	 Train throughput/samples_per_sec: 1.3478
+	 Train throughput/device/batches_per_sec: 1.3478
+	 Train throughput/device/samples_per_sec: 1.3478
+	 Train throughput/tokens_per_sec: 1380.1089
+	 Train throughput/device/tokens_per_sec: 1380.1089
+	 Train time/train: 0.1691
+	 Train time/val: 0.0000
+	 Train time/total: 0.1691
+[epoch=1][batch=830/7324]:
+	 Train time/batch: 829
+	 Train time/sample: 829
+	 Train time/batch_in_epoch: 829
+	 Train time/sample_in_epoch: 829
+	 Train time/token: 848896
+	 Train time/token_in_epoch: 848896
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9060
+	 Train metrics/train/Loss: 0.9060
+	 Train metrics/train/NLL: 0.9062
+	 Train metrics/train/BPD: 1.3074
+	 Train metrics/train/Perplexity: 2.4749
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8651
+	 Train throughput/batches_per_sec: 1.3477
+	 Train throughput/samples_per_sec: 1.3477
+	 Train throughput/device/batches_per_sec: 1.3477
+	 Train throughput/device/samples_per_sec: 1.3477
+	 Train throughput/tokens_per_sec: 1380.0779
+	 Train throughput/device/tokens_per_sec: 1380.0779
+	 Train time/train: 0.1712
+	 Train time/val: 0.0000
+	 Train time/total: 0.1712
+[epoch=1][batch=840/7324]:
+	 Train time/batch: 839
+	 Train time/sample: 839
+	 Train time/batch_in_epoch: 839
+	 Train time/sample_in_epoch: 839
+	 Train time/token: 859136
+	 Train time/token_in_epoch: 859136
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.4135
+	 Train metrics/train/Loss: 0.4135
+	 Train metrics/train/NLL: 0.4135
+	 Train metrics/train/BPD: 0.5965
+	 Train metrics/train/Perplexity: 1.5121
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8632
+	 Train throughput/batches_per_sec: 1.3477
+	 Train throughput/samples_per_sec: 1.3477
+	 Train throughput/device/batches_per_sec: 1.3477
+	 Train throughput/device/samples_per_sec: 1.3477
+	 Train throughput/tokens_per_sec: 1379.9946
+	 Train throughput/device/tokens_per_sec: 1379.9946
+	 Train time/train: 0.1732
+	 Train time/val: 0.0000
+	 Train time/total: 0.1732
+[epoch=1][batch=850/7324]:
+	 Train time/batch: 849
+	 Train time/sample: 849
+	 Train time/batch_in_epoch: 849
+	 Train time/sample_in_epoch: 849
+	 Train time/token: 869376
+	 Train time/token_in_epoch: 869376
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0596
+	 Train metrics/train/Loss: 1.0596
+	 Train metrics/train/NLL: 1.0596
+	 Train metrics/train/BPD: 1.5286
+	 Train metrics/train/Perplexity: 2.8851
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8615
+	 Train throughput/batches_per_sec: 1.3476
+	 Train throughput/samples_per_sec: 1.3476
+	 Train throughput/device/batches_per_sec: 1.3476
+	 Train throughput/device/samples_per_sec: 1.3476
+	 Train throughput/tokens_per_sec: 1379.9289
+	 Train throughput/device/tokens_per_sec: 1379.9289
+	 Train time/train: 0.1753
+	 Train time/val: 0.0000
+	 Train time/total: 0.1753
+[epoch=1][batch=860/7324]:
+	 Train time/batch: 859
+	 Train time/sample: 859
+	 Train time/batch_in_epoch: 859
+	 Train time/sample_in_epoch: 859
+	 Train time/token: 879616
+	 Train time/token_in_epoch: 879616
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5673
+	 Train metrics/train/Loss: 0.5673
+	 Train metrics/train/NLL: 0.5672
+	 Train metrics/train/BPD: 0.8183
+	 Train metrics/train/Perplexity: 1.7633
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8598
+	 Train throughput/batches_per_sec: 1.3475
+	 Train throughput/samples_per_sec: 1.3475
+	 Train throughput/device/batches_per_sec: 1.3475
+	 Train throughput/device/samples_per_sec: 1.3475
+	 Train throughput/tokens_per_sec: 1379.8315
+	 Train throughput/device/tokens_per_sec: 1379.8315
+	 Train time/train: 0.1773
+	 Train time/val: 0.0000
+	 Train time/total: 0.1773
+[epoch=1][batch=870/7324]:
+	 Train time/batch: 869
+	 Train time/sample: 869
+	 Train time/batch_in_epoch: 869
+	 Train time/sample_in_epoch: 869
+	 Train time/token: 889856
+	 Train time/token_in_epoch: 889856
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0227
+	 Train metrics/train/Loss: 1.0227
+	 Train metrics/train/NLL: 1.0226
+	 Train metrics/train/BPD: 1.4753
+	 Train metrics/train/Perplexity: 2.7805
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8579
+	 Train throughput/batches_per_sec: 1.3475
+	 Train throughput/samples_per_sec: 1.3475
+	 Train throughput/device/batches_per_sec: 1.3475
+	 Train throughput/device/samples_per_sec: 1.3475
+	 Train throughput/tokens_per_sec: 1379.8378
+	 Train throughput/device/tokens_per_sec: 1379.8378
+	 Train time/train: 0.1794
+	 Train time/val: 0.0000
+	 Train time/total: 0.1794
+[epoch=1][batch=880/7324]:
+	 Train time/batch: 879
+	 Train time/sample: 879
+	 Train time/batch_in_epoch: 879
+	 Train time/sample_in_epoch: 879
+	 Train time/token: 900096
+	 Train time/token_in_epoch: 900096
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.1542
+	 Train metrics/train/Loss: 1.1542
+	 Train metrics/train/NLL: 1.1543
+	 Train metrics/train/BPD: 1.6653
+	 Train metrics/train/Perplexity: 3.1717
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8561
+	 Train throughput/batches_per_sec: 1.3474
+	 Train throughput/samples_per_sec: 1.3474
+	 Train throughput/device/batches_per_sec: 1.3474
+	 Train throughput/device/samples_per_sec: 1.3474
+	 Train throughput/tokens_per_sec: 1379.7469
+	 Train throughput/device/tokens_per_sec: 1379.7469
+	 Train time/train: 0.1815
+	 Train time/val: 0.0000
+	 Train time/total: 0.1815
+[epoch=1][batch=890/7324]:
+	 Train time/batch: 889
+	 Train time/sample: 889
+	 Train time/batch_in_epoch: 889
+	 Train time/sample_in_epoch: 889
+	 Train time/token: 910336
+	 Train time/token_in_epoch: 910336
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.2028
+	 Train metrics/train/Loss: 1.2028
+	 Train metrics/train/NLL: 1.2027
+	 Train metrics/train/BPD: 1.7351
+	 Train metrics/train/Perplexity: 3.3290
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8543
+	 Train throughput/batches_per_sec: 1.3473
+	 Train throughput/samples_per_sec: 1.3473
+	 Train throughput/device/batches_per_sec: 1.3473
+	 Train throughput/device/samples_per_sec: 1.3473
+	 Train throughput/tokens_per_sec: 1379.6772
+	 Train throughput/device/tokens_per_sec: 1379.6772
+	 Train time/train: 0.1835
+	 Train time/val: 0.0000
+	 Train time/total: 0.1835
+[epoch=1][batch=900/7324]:
+	 Train time/batch: 899
+	 Train time/sample: 899
+	 Train time/batch_in_epoch: 899
+	 Train time/sample_in_epoch: 899
+	 Train time/token: 920576
+	 Train time/token_in_epoch: 920576
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8544
+	 Train metrics/train/Loss: 0.8544
+	 Train metrics/train/NLL: 0.8546
+	 Train metrics/train/BPD: 1.2330
+	 Train metrics/train/Perplexity: 2.3505
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8522
+	 Train throughput/batches_per_sec: 1.3473
+	 Train throughput/samples_per_sec: 1.3473
+	 Train throughput/device/batches_per_sec: 1.3473
+	 Train throughput/device/samples_per_sec: 1.3473
+	 Train throughput/tokens_per_sec: 1379.6631
+	 Train throughput/device/tokens_per_sec: 1379.6631
+	 Train time/train: 0.1856
+	 Train time/val: 0.0000
+	 Train time/total: 0.1856
+[epoch=1][batch=910/7324]:
+	 Train time/batch: 909
+	 Train time/sample: 909
+	 Train time/batch_in_epoch: 909
+	 Train time/sample_in_epoch: 909
+	 Train time/token: 930816
+	 Train time/token_in_epoch: 930816
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.6033
+	 Train metrics/train/Loss: 1.6033
+	 Train metrics/train/NLL: 1.6033
+	 Train metrics/train/BPD: 2.3131
+	 Train metrics/train/Perplexity: 4.9695
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8503
+	 Train throughput/batches_per_sec: 1.3473
+	 Train throughput/samples_per_sec: 1.3473
+	 Train throughput/device/batches_per_sec: 1.3473
+	 Train throughput/device/samples_per_sec: 1.3473
+	 Train throughput/tokens_per_sec: 1379.6191
+	 Train throughput/device/tokens_per_sec: 1379.6191
+	 Train time/train: 0.1876
+	 Train time/val: 0.0000
+	 Train time/total: 0.1876
+[epoch=1][batch=920/7324]:
+	 Train time/batch: 919
+	 Train time/sample: 919
+	 Train time/batch_in_epoch: 919
+	 Train time/sample_in_epoch: 919
+	 Train time/token: 941056
+	 Train time/token_in_epoch: 941056
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9108
+	 Train metrics/train/Loss: 0.9108
+	 Train metrics/train/NLL: 0.9108
+	 Train metrics/train/BPD: 1.3141
+	 Train metrics/train/Perplexity: 2.4864
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8483
+	 Train throughput/batches_per_sec: 1.3473
+	 Train throughput/samples_per_sec: 1.3473
+	 Train throughput/device/batches_per_sec: 1.3473
+	 Train throughput/device/samples_per_sec: 1.3473
+	 Train throughput/tokens_per_sec: 1379.5973
+	 Train throughput/device/tokens_per_sec: 1379.5973
+	 Train time/train: 0.1897
+	 Train time/val: 0.0000
+	 Train time/total: 0.1897
+[epoch=1][batch=930/7324]:
+	 Train time/batch: 929
+	 Train time/sample: 929
+	 Train time/batch_in_epoch: 929
+	 Train time/sample_in_epoch: 929
+	 Train time/token: 951296
+	 Train time/token_in_epoch: 951296
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9648
+	 Train metrics/train/Loss: 0.9648
+	 Train metrics/train/NLL: 0.9648
+	 Train metrics/train/BPD: 1.3920
+	 Train metrics/train/Perplexity: 2.6244
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8462
+	 Train throughput/batches_per_sec: 1.3473
+	 Train throughput/samples_per_sec: 1.3473
+	 Train throughput/device/batches_per_sec: 1.3473
+	 Train throughput/device/samples_per_sec: 1.3473
+	 Train throughput/tokens_per_sec: 1379.5893
+	 Train throughput/device/tokens_per_sec: 1379.5893
+	 Train time/train: 0.1918
+	 Train time/val: 0.0000
+	 Train time/total: 0.1918
+[epoch=1][batch=940/7324]:
+	 Train time/batch: 939
+	 Train time/sample: 939
+	 Train time/batch_in_epoch: 939
+	 Train time/sample_in_epoch: 939
+	 Train time/token: 961536
+	 Train time/token_in_epoch: 961536
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0726
+	 Train metrics/train/Loss: 1.0726
+	 Train metrics/train/NLL: 1.0728
+	 Train metrics/train/BPD: 1.5477
+	 Train metrics/train/Perplexity: 2.9234
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8440
+	 Train throughput/batches_per_sec: 1.3473
+	 Train throughput/samples_per_sec: 1.3473
+	 Train throughput/device/batches_per_sec: 1.3473
+	 Train throughput/device/samples_per_sec: 1.3473
+	 Train throughput/tokens_per_sec: 1379.6391
+	 Train throughput/device/tokens_per_sec: 1379.6391
+	 Train time/train: 0.1938
+	 Train time/val: 0.0000
+	 Train time/total: 0.1938
+[epoch=1][batch=950/7324]:
+	 Train time/batch: 949
+	 Train time/sample: 949
+	 Train time/batch_in_epoch: 949
+	 Train time/sample_in_epoch: 949
+	 Train time/token: 971776
+	 Train time/token_in_epoch: 971776
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.1833
+	 Train metrics/train/Loss: 1.1833
+	 Train metrics/train/NLL: 1.1832
+	 Train metrics/train/BPD: 1.7070
+	 Train metrics/train/Perplexity: 3.2648
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8418
+	 Train throughput/batches_per_sec: 1.3474
+	 Train throughput/samples_per_sec: 1.3474
+	 Train throughput/device/batches_per_sec: 1.3474
+	 Train throughput/device/samples_per_sec: 1.3474
+	 Train throughput/tokens_per_sec: 1379.7319
+	 Train throughput/device/tokens_per_sec: 1379.7319
+	 Train time/train: 0.1959
+	 Train time/val: 0.0000
+	 Train time/total: 0.1959
+[epoch=1][batch=960/7324]:
+	 Train time/batch: 959
+	 Train time/sample: 959
+	 Train time/batch_in_epoch: 959
+	 Train time/sample_in_epoch: 959
+	 Train time/token: 982016
+	 Train time/token_in_epoch: 982016
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.4736
+	 Train metrics/train/Loss: 0.4736
+	 Train metrics/train/NLL: 0.4736
+	 Train metrics/train/BPD: 0.6832
+	 Train metrics/train/Perplexity: 1.6057
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8398
+	 Train throughput/batches_per_sec: 1.3474
+	 Train throughput/samples_per_sec: 1.3474
+	 Train throughput/device/batches_per_sec: 1.3474
+	 Train throughput/device/samples_per_sec: 1.3474
+	 Train throughput/tokens_per_sec: 1379.7645
+	 Train throughput/device/tokens_per_sec: 1379.7645
+	 Train time/train: 0.1979
+	 Train time/val: 0.0000
+	 Train time/total: 0.1979
+[epoch=1][batch=970/7324]:
+	 Train time/batch: 969
+	 Train time/sample: 969
+	 Train time/batch_in_epoch: 969
+	 Train time/sample_in_epoch: 969
+	 Train time/token: 992256
+	 Train time/token_in_epoch: 992256
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6135
+	 Train metrics/train/Loss: 0.6135
+	 Train metrics/train/NLL: 0.6134
+	 Train metrics/train/BPD: 0.8850
+	 Train metrics/train/Perplexity: 1.8467
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8378
+	 Train throughput/batches_per_sec: 1.3474
+	 Train throughput/samples_per_sec: 1.3474
+	 Train throughput/device/batches_per_sec: 1.3474
+	 Train throughput/device/samples_per_sec: 1.3474
+	 Train throughput/tokens_per_sec: 1379.7152
+	 Train throughput/device/tokens_per_sec: 1379.7152
+	 Train time/train: 0.2000
+	 Train time/val: 0.0000
+	 Train time/total: 0.2000
+[epoch=1][batch=980/7324]:
+	 Train time/batch: 979
+	 Train time/sample: 979
+	 Train time/batch_in_epoch: 979
+	 Train time/sample_in_epoch: 979
+	 Train time/token: 1002496
+	 Train time/token_in_epoch: 1002496
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.1482
+	 Train metrics/train/Loss: 1.1482
+	 Train metrics/train/NLL: 1.1480
+	 Train metrics/train/BPD: 1.6563
+	 Train metrics/train/Perplexity: 3.1520
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8362
+	 Train throughput/batches_per_sec: 1.3472
+	 Train throughput/samples_per_sec: 1.3472
+	 Train throughput/device/batches_per_sec: 1.3472
+	 Train throughput/device/samples_per_sec: 1.3472
+	 Train throughput/tokens_per_sec: 1379.5718
+	 Train throughput/device/tokens_per_sec: 1379.5718
+	 Train time/train: 0.2020
+	 Train time/val: 0.0000
+	 Train time/total: 0.2020
+[epoch=1][batch=990/7324]:
+	 Train time/batch: 989
+	 Train time/sample: 989
+	 Train time/batch_in_epoch: 989
+	 Train time/sample_in_epoch: 989
+	 Train time/token: 1012736
+	 Train time/token_in_epoch: 1012736
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8291
+	 Train metrics/train/Loss: 0.8291
+	 Train metrics/train/NLL: 0.8289
+	 Train metrics/train/BPD: 1.1959
+	 Train metrics/train/Perplexity: 2.2908
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8343
+	 Train throughput/batches_per_sec: 1.3472
+	 Train throughput/samples_per_sec: 1.3472
+	 Train throughput/device/batches_per_sec: 1.3472
+	 Train throughput/device/samples_per_sec: 1.3472
+	 Train throughput/tokens_per_sec: 1379.5522
+	 Train throughput/device/tokens_per_sec: 1379.5522
+	 Train time/train: 0.2041
+	 Train time/val: 0.0000
+	 Train time/total: 0.2041
+[epoch=1][batch=1000/7324]:
+	 Train time/batch: 999
+	 Train time/sample: 999
+	 Train time/batch_in_epoch: 999
+	 Train time/sample_in_epoch: 999
+	 Train time/token: 1022976
+	 Train time/token_in_epoch: 1022976
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9232
+	 Train metrics/train/Loss: 0.9232
+	 Train metrics/train/NLL: 0.9232
+	 Train metrics/train/BPD: 1.3319
+	 Train metrics/train/Perplexity: 2.5174
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 8.8323
+	 Train throughput/batches_per_sec: 1.3472
+	 Train throughput/samples_per_sec: 1.3472
+	 Train throughput/device/batches_per_sec: 1.3472
+	 Train throughput/device/samples_per_sec: 1.3472
+	 Train throughput/tokens_per_sec: 1379.5488
+	 Train throughput/device/tokens_per_sec: 1379.5488
+	 Train time/train: 0.2062
+	 Train time/val: 0.0000
+	 Train time/total: 0.2062
+[Eval batch=1/149] Eval on eval data
+[Eval batch=16/149] Eval on eval data
+[Eval batch=31/149] Eval on eval data
+[Eval batch=45/149] Eval on eval data
+[Eval batch=60/149] Eval on eval data
+[Eval batch=75/149] Eval on eval data
+[Eval batch=90/149] Eval on eval data
+[Eval batch=105/149] Eval on eval data
+[Eval batch=119/149] Eval on eval data
+[Eval batch=134/149] Eval on eval data
+[2026-07-01 08:12:24,957][src.custom_composer.callbacks][INFO] - Best loss attained: 0.8589710593223572. Saving checkpoint to /data/shared_data/hankun/outputs/gsm8k_selfdistill_block4_warm100ba_lr1e-5_bsz1_lambda1.0_max-dur6ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260701_075919/checkpoints/best-rank0.pt.
+[Eval batch=149/149] Eval on eval data:
+	 Eval metrics/eval/Loss: 0.8590
+	 Eval metrics/eval/NLL: 0.8893
+	 Eval metrics/eval/BPD: 1.2830
+	 Eval metrics/eval/Perplexity: 2.4334
+[epoch=1][batch=1010/7324]:
+	 Train time/batch: 1009
+	 Train time/sample: 1009
+	 Train time/batch_in_epoch: 1009
+	 Train time/sample_in_epoch: 1009
+	 Train time/token: 1033216
+	 Train time/token_in_epoch: 1033216
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9187
+	 Train metrics/train/Loss: 0.9187
+	 Train metrics/train/NLL: 0.9187
+	 Train metrics/train/BPD: 1.3254
+	 Train metrics/train/Perplexity: 2.5061
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.8687
+	 Train throughput/batches_per_sec: 1.2307
+	 Train throughput/samples_per_sec: 1.2307
+	 Train throughput/device/batches_per_sec: 1.2307
+	 Train throughput/device/samples_per_sec: 1.2307
+	 Train throughput/tokens_per_sec: 1260.2230
+	 Train throughput/device/tokens_per_sec: 1260.2230
+	 Train time/train: 0.2180
+	 Train time/val: 0.0047
+	 Train time/total: 0.2227
+[epoch=1][batch=1020/7324]:
+	 Train time/batch: 1019
+	 Train time/sample: 1019
+	 Train time/batch_in_epoch: 1019
+	 Train time/sample_in_epoch: 1019
+	 Train time/token: 1043456
+	 Train time/token_in_epoch: 1043456
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8528
+	 Train metrics/train/Loss: 0.8528
+	 Train metrics/train/NLL: 0.8528
+	 Train metrics/train/BPD: 1.2303
+	 Train metrics/train/Perplexity: 2.3461
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.8580
+	 Train throughput/batches_per_sec: 1.2307
+	 Train throughput/samples_per_sec: 1.2307
+	 Train throughput/device/batches_per_sec: 1.2307
+	 Train throughput/device/samples_per_sec: 1.2307
+	 Train throughput/tokens_per_sec: 1260.2610
+	 Train throughput/device/tokens_per_sec: 1260.2610
+	 Train time/train: 0.2200
+	 Train time/val: 0.0047
+	 Train time/total: 0.2247
+[epoch=1][batch=1030/7324]:
+	 Train time/batch: 1029
+	 Train time/sample: 1029
+	 Train time/batch_in_epoch: 1029
+	 Train time/sample_in_epoch: 1029
+	 Train time/token: 1053696
+	 Train time/token_in_epoch: 1053696
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8185
+	 Train metrics/train/Loss: 0.8185
+	 Train metrics/train/NLL: 0.8184
+	 Train metrics/train/BPD: 1.1807
+	 Train metrics/train/Perplexity: 2.2668
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.8476
+	 Train throughput/batches_per_sec: 1.2308
+	 Train throughput/samples_per_sec: 1.2308
+	 Train throughput/device/batches_per_sec: 1.2308
+	 Train throughput/device/samples_per_sec: 1.2308
+	 Train throughput/tokens_per_sec: 1260.3056
+	 Train throughput/device/tokens_per_sec: 1260.3056
+	 Train time/train: 0.2221
+	 Train time/val: 0.0047
+	 Train time/total: 0.2268
+[epoch=1][batch=1040/7324]:
+	 Train time/batch: 1039
+	 Train time/sample: 1039
+	 Train time/batch_in_epoch: 1039
+	 Train time/sample_in_epoch: 1039
+	 Train time/token: 1063936
+	 Train time/token_in_epoch: 1063936
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.1904
+	 Train metrics/train/Loss: 1.1904
+	 Train metrics/train/NLL: 1.1903
+	 Train metrics/train/BPD: 1.7173
+	 Train metrics/train/Perplexity: 3.2881
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.8374
+	 Train throughput/batches_per_sec: 1.2308
+	 Train throughput/samples_per_sec: 1.2308
+	 Train throughput/device/batches_per_sec: 1.2308
+	 Train throughput/device/samples_per_sec: 1.2308
+	 Train throughput/tokens_per_sec: 1260.3855
+	 Train throughput/device/tokens_per_sec: 1260.3855
+	 Train time/train: 0.2241
+	 Train time/val: 0.0047
+	 Train time/total: 0.2288
+[epoch=1][batch=1050/7324]:
+	 Train time/batch: 1049
+	 Train time/sample: 1049
+	 Train time/batch_in_epoch: 1049
+	 Train time/sample_in_epoch: 1049
+	 Train time/token: 1074176
+	 Train time/token_in_epoch: 1074176
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0402
+	 Train metrics/train/Loss: 1.0402
+	 Train metrics/train/NLL: 1.0400
+	 Train metrics/train/BPD: 1.5003
+	 Train metrics/train/Perplexity: 2.8291
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.8272
+	 Train throughput/batches_per_sec: 1.2309
+	 Train throughput/samples_per_sec: 1.2309
+	 Train throughput/device/batches_per_sec: 1.2309
+	 Train throughput/device/samples_per_sec: 1.2309
+	 Train throughput/tokens_per_sec: 1260.4520
+	 Train throughput/device/tokens_per_sec: 1260.4520
+	 Train time/train: 0.2262
+	 Train time/val: 0.0047
+	 Train time/total: 0.2309
+[epoch=1][batch=1060/7324]:
+	 Train time/batch: 1059
+	 Train time/sample: 1059
+	 Train time/batch_in_epoch: 1059
+	 Train time/sample_in_epoch: 1059
+	 Train time/token: 1084416
+	 Train time/token_in_epoch: 1084416
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8241
+	 Train metrics/train/Loss: 0.8241
+	 Train metrics/train/NLL: 0.8241
+	 Train metrics/train/BPD: 1.1890
+	 Train metrics/train/Perplexity: 2.2799
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.8172
+	 Train throughput/batches_per_sec: 1.2310
+	 Train throughput/samples_per_sec: 1.2310
+	 Train throughput/device/batches_per_sec: 1.2310
+	 Train throughput/device/samples_per_sec: 1.2310
+	 Train throughput/tokens_per_sec: 1260.5466
+	 Train throughput/device/tokens_per_sec: 1260.5466
+	 Train time/train: 0.2283
+	 Train time/val: 0.0047
+	 Train time/total: 0.2329
+[epoch=1][batch=1070/7324]:
+	 Train time/batch: 1069
+	 Train time/sample: 1069
+	 Train time/batch_in_epoch: 1069
+	 Train time/sample_in_epoch: 1069
+	 Train time/token: 1094656
+	 Train time/token_in_epoch: 1094656
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9575
+	 Train metrics/train/Loss: 0.9575
+	 Train metrics/train/NLL: 0.9576
+	 Train metrics/train/BPD: 1.3815
+	 Train metrics/train/Perplexity: 2.6053
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.8072
+	 Train throughput/batches_per_sec: 1.2311
+	 Train throughput/samples_per_sec: 1.2311
+	 Train throughput/device/batches_per_sec: 1.2311
+	 Train throughput/device/samples_per_sec: 1.2311
+	 Train throughput/tokens_per_sec: 1260.6357
+	 Train throughput/device/tokens_per_sec: 1260.6357
+	 Train time/train: 0.2303
+	 Train time/val: 0.0047
+	 Train time/total: 0.2350
+[epoch=1][batch=1080/7324]:
+	 Train time/batch: 1079
+	 Train time/sample: 1079
+	 Train time/batch_in_epoch: 1079
+	 Train time/sample_in_epoch: 1079
+	 Train time/token: 1104896
+	 Train time/token_in_epoch: 1104896
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6759
+	 Train metrics/train/Loss: 0.6759
+	 Train metrics/train/NLL: 0.6757
+	 Train metrics/train/BPD: 0.9749
+	 Train metrics/train/Perplexity: 1.9654
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.7974
+	 Train throughput/batches_per_sec: 1.2312
+	 Train throughput/samples_per_sec: 1.2312
+	 Train throughput/device/batches_per_sec: 1.2312
+	 Train throughput/device/samples_per_sec: 1.2312
+	 Train throughput/tokens_per_sec: 1260.7045
+	 Train throughput/device/tokens_per_sec: 1260.7045
+	 Train time/train: 0.2324
+	 Train time/val: 0.0047
+	 Train time/total: 0.2370
+[epoch=1][batch=1090/7324]:
+	 Train time/batch: 1089
+	 Train time/sample: 1089
+	 Train time/batch_in_epoch: 1089
+	 Train time/sample_in_epoch: 1089
+	 Train time/token: 1115136
+	 Train time/token_in_epoch: 1115136
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9160
+	 Train metrics/train/Loss: 0.9160
+	 Train metrics/train/NLL: 0.9161
+	 Train metrics/train/BPD: 1.3216
+	 Train metrics/train/Perplexity: 2.4995
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.7878
+	 Train throughput/batches_per_sec: 1.2313
+	 Train throughput/samples_per_sec: 1.2313
+	 Train throughput/device/batches_per_sec: 1.2313
+	 Train throughput/device/samples_per_sec: 1.2313
+	 Train throughput/tokens_per_sec: 1260.8154
+	 Train throughput/device/tokens_per_sec: 1260.8154
+	 Train time/train: 0.2344
+	 Train time/val: 0.0047
+	 Train time/total: 0.2391
+[epoch=1][batch=1100/7324]:
+	 Train time/batch: 1099
+	 Train time/sample: 1099
+	 Train time/batch_in_epoch: 1099
+	 Train time/sample_in_epoch: 1099
+	 Train time/token: 1125376
+	 Train time/token_in_epoch: 1125376
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.1008
+	 Train metrics/train/Loss: 1.1008
+	 Train metrics/train/NLL: 1.1010
+	 Train metrics/train/BPD: 1.5884
+	 Train metrics/train/Perplexity: 3.0071
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.7783
+	 Train throughput/batches_per_sec: 1.2314
+	 Train throughput/samples_per_sec: 1.2314
+	 Train throughput/device/batches_per_sec: 1.2314
+	 Train throughput/device/samples_per_sec: 1.2314
+	 Train throughput/tokens_per_sec: 1260.9741
+	 Train throughput/device/tokens_per_sec: 1260.9741
+	 Train time/train: 0.2365
+	 Train time/val: 0.0047
+	 Train time/total: 0.2411
+[epoch=1][batch=1110/7324]:
+	 Train time/batch: 1109
+	 Train time/sample: 1109
+	 Train time/batch_in_epoch: 1109
+	 Train time/sample_in_epoch: 1109
+	 Train time/token: 1135616
+	 Train time/token_in_epoch: 1135616
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.3479
+	 Train metrics/train/Loss: 1.3479
+	 Train metrics/train/NLL: 1.3480
+	 Train metrics/train/BPD: 1.9447
+	 Train metrics/train/Perplexity: 3.8497
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.7690
+	 Train throughput/batches_per_sec: 1.2324
+	 Train throughput/samples_per_sec: 1.2324
+	 Train throughput/device/batches_per_sec: 1.2324
+	 Train throughput/device/samples_per_sec: 1.2324
+	 Train throughput/tokens_per_sec: 1261.9690
+	 Train throughput/device/tokens_per_sec: 1261.9690
+	 Train time/train: 0.2385
+	 Train time/val: 0.0047
+	 Train time/total: 0.2432
+[epoch=1][batch=1120/7324]:
+	 Train time/batch: 1119
+	 Train time/sample: 1119
+	 Train time/batch_in_epoch: 1119
+	 Train time/sample_in_epoch: 1119
+	 Train time/token: 1145856
+	 Train time/token_in_epoch: 1145856
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9556
+	 Train metrics/train/Loss: 0.9556
+	 Train metrics/train/NLL: 0.9556
+	 Train metrics/train/BPD: 1.3786
+	 Train metrics/train/Perplexity: 2.6001
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.7600
+	 Train throughput/batches_per_sec: 1.2324
+	 Train throughput/samples_per_sec: 1.2324
+	 Train throughput/device/batches_per_sec: 1.2324
+	 Train throughput/device/samples_per_sec: 1.2324
+	 Train throughput/tokens_per_sec: 1262.0021
+	 Train throughput/device/tokens_per_sec: 1262.0021
+	 Train time/train: 0.2406
+	 Train time/val: 0.0047
+	 Train time/total: 0.2452
+[epoch=1][batch=1130/7324]:
+	 Train time/batch: 1129
+	 Train time/sample: 1129
+	 Train time/batch_in_epoch: 1129
+	 Train time/sample_in_epoch: 1129
+	 Train time/token: 1156096
+	 Train time/token_in_epoch: 1156096
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.7783
+	 Train metrics/train/Loss: 0.7783
+	 Train metrics/train/NLL: 0.7784
+	 Train metrics/train/BPD: 1.1230
+	 Train metrics/train/Perplexity: 2.1779
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.7512
+	 Train throughput/batches_per_sec: 1.2324
+	 Train throughput/samples_per_sec: 1.2324
+	 Train throughput/device/batches_per_sec: 1.2324
+	 Train throughput/device/samples_per_sec: 1.2324
+	 Train throughput/tokens_per_sec: 1261.9565
+	 Train throughput/device/tokens_per_sec: 1261.9565
+	 Train time/train: 0.2426
+	 Train time/val: 0.0047
+	 Train time/total: 0.2473
+[epoch=1][batch=1140/7324]:
+	 Train time/batch: 1139
+	 Train time/sample: 1139
+	 Train time/batch_in_epoch: 1139
+	 Train time/sample_in_epoch: 1139
+	 Train time/token: 1166336
+	 Train time/token_in_epoch: 1166336
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5851
+	 Train metrics/train/Loss: 0.5851
+	 Train metrics/train/NLL: 0.5852
+	 Train metrics/train/BPD: 0.8442
+	 Train metrics/train/Perplexity: 1.7953
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.7426
+	 Train throughput/batches_per_sec: 1.2323
+	 Train throughput/samples_per_sec: 1.2323
+	 Train throughput/device/batches_per_sec: 1.2323
+	 Train throughput/device/samples_per_sec: 1.2323
+	 Train throughput/tokens_per_sec: 1261.9235
+	 Train throughput/device/tokens_per_sec: 1261.9235
+	 Train time/train: 0.2447
+	 Train time/val: 0.0047
+	 Train time/total: 0.2493
+[epoch=1][batch=1150/7324]:
+	 Train time/batch: 1149
+	 Train time/sample: 1149
+	 Train time/batch_in_epoch: 1149
+	 Train time/sample_in_epoch: 1149
+	 Train time/token: 1176576
+	 Train time/token_in_epoch: 1176576
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.2021
+	 Train metrics/train/Loss: 1.2021
+	 Train metrics/train/NLL: 1.2019
+	 Train metrics/train/BPD: 1.7339
+	 Train metrics/train/Perplexity: 3.3263
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.7340
+	 Train throughput/batches_per_sec: 1.2323
+	 Train throughput/samples_per_sec: 1.2323
+	 Train throughput/device/batches_per_sec: 1.2323
+	 Train throughput/device/samples_per_sec: 1.2323
+	 Train throughput/tokens_per_sec: 1261.8939
+	 Train throughput/device/tokens_per_sec: 1261.8939
+	 Train time/train: 0.2467
+	 Train time/val: 0.0047
+	 Train time/total: 0.2514
+[epoch=1][batch=1160/7324]:
+	 Train time/batch: 1159
+	 Train time/sample: 1159
+	 Train time/batch_in_epoch: 1159
+	 Train time/sample_in_epoch: 1159
+	 Train time/token: 1186816
+	 Train time/token_in_epoch: 1186816
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6766
+	 Train metrics/train/Loss: 0.6766
+	 Train metrics/train/NLL: 0.6766
+	 Train metrics/train/BPD: 0.9761
+	 Train metrics/train/Perplexity: 1.9672
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.7255
+	 Train throughput/batches_per_sec: 1.2324
+	 Train throughput/samples_per_sec: 1.2324
+	 Train throughput/device/batches_per_sec: 1.2324
+	 Train throughput/device/samples_per_sec: 1.2324
+	 Train throughput/tokens_per_sec: 1261.9345
+	 Train throughput/device/tokens_per_sec: 1261.9345
+	 Train time/train: 0.2488
+	 Train time/val: 0.0047
+	 Train time/total: 0.2535
+[epoch=1][batch=1170/7324]:
+	 Train time/batch: 1169
+	 Train time/sample: 1169
+	 Train time/batch_in_epoch: 1169
+	 Train time/sample_in_epoch: 1169
+	 Train time/token: 1197056
+	 Train time/token_in_epoch: 1197056
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.7862
+	 Train metrics/train/Loss: 0.7862
+	 Train metrics/train/NLL: 0.7862
+	 Train metrics/train/BPD: 1.1343
+	 Train metrics/train/Perplexity: 2.1951
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.7169
+	 Train throughput/batches_per_sec: 1.2325
+	 Train throughput/samples_per_sec: 1.2325
+	 Train throughput/device/batches_per_sec: 1.2325
+	 Train throughput/device/samples_per_sec: 1.2325
+	 Train throughput/tokens_per_sec: 1262.0762
+	 Train throughput/device/tokens_per_sec: 1262.0762
+	 Train time/train: 0.2508
+	 Train time/val: 0.0047
+	 Train time/total: 0.2555
+[epoch=1][batch=1180/7324]:
+	 Train time/batch: 1179
+	 Train time/sample: 1179
+	 Train time/batch_in_epoch: 1179
+	 Train time/sample_in_epoch: 1179
+	 Train time/token: 1207296
+	 Train time/token_in_epoch: 1207296
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.3239
+	 Train metrics/train/Loss: 1.3239
+	 Train metrics/train/NLL: 1.3237
+	 Train metrics/train/BPD: 1.9097
+	 Train metrics/train/Perplexity: 3.7573
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.7084
+	 Train throughput/batches_per_sec: 1.2327
+	 Train throughput/samples_per_sec: 1.2327
+	 Train throughput/device/batches_per_sec: 1.2327
+	 Train throughput/device/samples_per_sec: 1.2327
+	 Train throughput/tokens_per_sec: 1262.2341
+	 Train throughput/device/tokens_per_sec: 1262.2341
+	 Train time/train: 0.2529
+	 Train time/val: 0.0047
+	 Train time/total: 0.2576
+[epoch=1][batch=1190/7324]:
+	 Train time/batch: 1189
+	 Train time/sample: 1189
+	 Train time/batch_in_epoch: 1189
+	 Train time/sample_in_epoch: 1189
+	 Train time/token: 1217536
+	 Train time/token_in_epoch: 1217536
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.7670
+	 Train metrics/train/Loss: 0.7670
+	 Train metrics/train/NLL: 0.7670
+	 Train metrics/train/BPD: 1.1066
+	 Train metrics/train/Perplexity: 2.1533
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.6999
+	 Train throughput/batches_per_sec: 1.2328
+	 Train throughput/samples_per_sec: 1.2328
+	 Train throughput/device/batches_per_sec: 1.2328
+	 Train throughput/device/samples_per_sec: 1.2328
+	 Train throughput/tokens_per_sec: 1262.3428
+	 Train throughput/device/tokens_per_sec: 1262.3428
+	 Train time/train: 0.2550
+	 Train time/val: 0.0047
+	 Train time/total: 0.2596
+[epoch=1][batch=1200/7324]:
+	 Train time/batch: 1199
+	 Train time/sample: 1199
+	 Train time/batch_in_epoch: 1199
+	 Train time/sample_in_epoch: 1199
+	 Train time/token: 1227776
+	 Train time/token_in_epoch: 1227776
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8565
+	 Train metrics/train/Loss: 0.8565
+	 Train metrics/train/NLL: 0.8563
+	 Train metrics/train/BPD: 1.2354
+	 Train metrics/train/Perplexity: 2.3544
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.6918
+	 Train throughput/batches_per_sec: 1.2328
+	 Train throughput/samples_per_sec: 1.2328
+	 Train throughput/device/batches_per_sec: 1.2328
+	 Train throughput/device/samples_per_sec: 1.2328
+	 Train throughput/tokens_per_sec: 1262.3432
+	 Train throughput/device/tokens_per_sec: 1262.3432
+	 Train time/train: 0.2570
+	 Train time/val: 0.0047
+	 Train time/total: 0.2617
+[epoch=1][batch=1210/7324]:
+	 Train time/batch: 1209
+	 Train time/sample: 1209
+	 Train time/batch_in_epoch: 1209
+	 Train time/sample_in_epoch: 1209
+	 Train time/token: 1238016
+	 Train time/token_in_epoch: 1238016
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.7092
+	 Train metrics/train/Loss: 0.7092
+	 Train metrics/train/NLL: 0.7091
+	 Train metrics/train/BPD: 1.0231
+	 Train metrics/train/Perplexity: 2.0322
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.6836
+	 Train throughput/batches_per_sec: 1.2328
+	 Train throughput/samples_per_sec: 1.2328
+	 Train throughput/device/batches_per_sec: 1.2328
+	 Train throughput/device/samples_per_sec: 1.2328
+	 Train throughput/tokens_per_sec: 1262.3802
+	 Train throughput/device/tokens_per_sec: 1262.3802
+	 Train time/train: 0.2591
+	 Train time/val: 0.0047
+	 Train time/total: 0.2637
+[epoch=1][batch=1220/7324]:
+	 Train time/batch: 1219
+	 Train time/sample: 1219
+	 Train time/batch_in_epoch: 1219
+	 Train time/sample_in_epoch: 1219
+	 Train time/token: 1248256
+	 Train time/token_in_epoch: 1248256
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9697
+	 Train metrics/train/Loss: 0.9697
+	 Train metrics/train/NLL: 0.9695
+	 Train metrics/train/BPD: 1.3987
+	 Train metrics/train/Perplexity: 2.6367
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.6755
+	 Train throughput/batches_per_sec: 1.2329
+	 Train throughput/samples_per_sec: 1.2329
+	 Train throughput/device/batches_per_sec: 1.2329
+	 Train throughput/device/samples_per_sec: 1.2329
+	 Train throughput/tokens_per_sec: 1262.4531
+	 Train throughput/device/tokens_per_sec: 1262.4531
+	 Train time/train: 0.2611
+	 Train time/val: 0.0047
+	 Train time/total: 0.2658
+[epoch=1][batch=1230/7324]:
+	 Train time/batch: 1229
+	 Train time/sample: 1229
+	 Train time/batch_in_epoch: 1229
+	 Train time/sample_in_epoch: 1229
+	 Train time/token: 1258496
+	 Train time/token_in_epoch: 1258496
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9240
+	 Train metrics/train/Loss: 0.9240
+	 Train metrics/train/NLL: 0.9239
+	 Train metrics/train/BPD: 1.3329
+	 Train metrics/train/Perplexity: 2.5191
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.6677
+	 Train throughput/batches_per_sec: 1.2330
+	 Train throughput/samples_per_sec: 1.2330
+	 Train throughput/device/batches_per_sec: 1.2330
+	 Train throughput/device/samples_per_sec: 1.2330
+	 Train throughput/tokens_per_sec: 1262.6017
+	 Train throughput/device/tokens_per_sec: 1262.6017
+	 Train time/train: 0.2632
+	 Train time/val: 0.0047
+	 Train time/total: 0.2678
+[epoch=1][batch=1240/7324]:
+	 Train time/batch: 1239
+	 Train time/sample: 1239
+	 Train time/batch_in_epoch: 1239
+	 Train time/sample_in_epoch: 1239
+	 Train time/token: 1268736
+	 Train time/token_in_epoch: 1268736
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0380
+	 Train metrics/train/Loss: 1.0380
+	 Train metrics/train/NLL: 1.0380
+	 Train metrics/train/BPD: 1.4975
+	 Train metrics/train/Perplexity: 2.8235
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.6599
+	 Train throughput/batches_per_sec: 1.2331
+	 Train throughput/samples_per_sec: 1.2331
+	 Train throughput/device/batches_per_sec: 1.2331
+	 Train throughput/device/samples_per_sec: 1.2331
+	 Train throughput/tokens_per_sec: 1262.7176
+	 Train throughput/device/tokens_per_sec: 1262.7176
+	 Train time/train: 0.2652
+	 Train time/val: 0.0047
+	 Train time/total: 0.2699
+[epoch=1][batch=1250/7324]:
+	 Train time/batch: 1249
+	 Train time/sample: 1249
+	 Train time/batch_in_epoch: 1249
+	 Train time/sample_in_epoch: 1249
+	 Train time/token: 1278976
+	 Train time/token_in_epoch: 1278976
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8552
+	 Train metrics/train/Loss: 0.8552
+	 Train metrics/train/NLL: 0.8550
+	 Train metrics/train/BPD: 1.2336
+	 Train metrics/train/Perplexity: 2.3515
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.6521
+	 Train throughput/batches_per_sec: 1.2332
+	 Train throughput/samples_per_sec: 1.2332
+	 Train throughput/device/batches_per_sec: 1.2332
+	 Train throughput/device/samples_per_sec: 1.2332
+	 Train throughput/tokens_per_sec: 1262.8386
+	 Train throughput/device/tokens_per_sec: 1262.8386
+	 Train time/train: 0.2673
+	 Train time/val: 0.0047
+	 Train time/total: 0.2719
+[epoch=1][batch=1260/7324]:
+	 Train time/batch: 1259
+	 Train time/sample: 1259
+	 Train time/batch_in_epoch: 1259
+	 Train time/sample_in_epoch: 1259
+	 Train time/token: 1289216
+	 Train time/token_in_epoch: 1289216
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.1735
+	 Train metrics/train/Loss: 1.1735
+	 Train metrics/train/NLL: 1.1736
+	 Train metrics/train/BPD: 1.6931
+	 Train metrics/train/Perplexity: 3.2336
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.6445
+	 Train throughput/batches_per_sec: 1.2333
+	 Train throughput/samples_per_sec: 1.2333
+	 Train throughput/device/batches_per_sec: 1.2333
+	 Train throughput/device/samples_per_sec: 1.2333
+	 Train throughput/tokens_per_sec: 1262.9399
+	 Train throughput/device/tokens_per_sec: 1262.9399
+	 Train time/train: 0.2693
+	 Train time/val: 0.0047
+	 Train time/total: 0.2740
+[epoch=1][batch=1270/7324]:
+	 Train time/batch: 1269
+	 Train time/sample: 1269
+	 Train time/batch_in_epoch: 1269
+	 Train time/sample_in_epoch: 1269
+	 Train time/token: 1299456
+	 Train time/token_in_epoch: 1299456
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.1957
+	 Train metrics/train/Loss: 1.1957
+	 Train metrics/train/NLL: 1.1952
+	 Train metrics/train/BPD: 1.7244
+	 Train metrics/train/Perplexity: 3.3043
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.6368
+	 Train throughput/batches_per_sec: 1.2335
+	 Train throughput/samples_per_sec: 1.2335
+	 Train throughput/device/batches_per_sec: 1.2335
+	 Train throughput/device/samples_per_sec: 1.2335
+	 Train throughput/tokens_per_sec: 1263.0891
+	 Train throughput/device/tokens_per_sec: 1263.0891
+	 Train time/train: 0.2714
+	 Train time/val: 0.0047
+	 Train time/total: 0.2760
+[epoch=1][batch=1280/7324]:
+	 Train time/batch: 1279
+	 Train time/sample: 1279
+	 Train time/batch_in_epoch: 1279
+	 Train time/sample_in_epoch: 1279
+	 Train time/token: 1309696
+	 Train time/token_in_epoch: 1309696
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5993
+	 Train metrics/train/Loss: 0.5993
+	 Train metrics/train/NLL: 0.5992
+	 Train metrics/train/BPD: 0.8645
+	 Train metrics/train/Perplexity: 1.8207
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.6293
+	 Train throughput/batches_per_sec: 1.2336
+	 Train throughput/samples_per_sec: 1.2336
+	 Train throughput/device/batches_per_sec: 1.2336
+	 Train throughput/device/samples_per_sec: 1.2336
+	 Train throughput/tokens_per_sec: 1263.2469
+	 Train throughput/device/tokens_per_sec: 1263.2469
+	 Train time/train: 0.2734
+	 Train time/val: 0.0047
+	 Train time/total: 0.2781
+[epoch=1][batch=1290/7324]:
+	 Train time/batch: 1289
+	 Train time/sample: 1289
+	 Train time/batch_in_epoch: 1289
+	 Train time/sample_in_epoch: 1289
+	 Train time/token: 1319936
+	 Train time/token_in_epoch: 1319936
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.4199
+	 Train metrics/train/Loss: 0.4199
+	 Train metrics/train/NLL: 0.4198
+	 Train metrics/train/BPD: 0.6057
+	 Train metrics/train/Perplexity: 1.5217
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.6219
+	 Train throughput/batches_per_sec: 1.2337
+	 Train throughput/samples_per_sec: 1.2337
+	 Train throughput/device/batches_per_sec: 1.2337
+	 Train throughput/device/samples_per_sec: 1.2337
+	 Train throughput/tokens_per_sec: 1263.3445
+	 Train throughput/device/tokens_per_sec: 1263.3445
+	 Train time/train: 0.2755
+	 Train time/val: 0.0047
+	 Train time/total: 0.2801
+[epoch=1][batch=1300/7324]:
+	 Train time/batch: 1299
+	 Train time/sample: 1299
+	 Train time/batch_in_epoch: 1299
+	 Train time/sample_in_epoch: 1299
+	 Train time/token: 1330176
+	 Train time/token_in_epoch: 1330176
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6281
+	 Train metrics/train/Loss: 0.6281
+	 Train metrics/train/NLL: 0.6281
+	 Train metrics/train/BPD: 0.9062
+	 Train metrics/train/Perplexity: 1.8741
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.6147
+	 Train throughput/batches_per_sec: 1.2338
+	 Train throughput/samples_per_sec: 1.2338
+	 Train throughput/device/batches_per_sec: 1.2338
+	 Train throughput/device/samples_per_sec: 1.2338
+	 Train throughput/tokens_per_sec: 1263.4483
+	 Train throughput/device/tokens_per_sec: 1263.4483
+	 Train time/train: 0.2775
+	 Train time/val: 0.0047
+	 Train time/total: 0.2822
+[epoch=1][batch=1310/7324]:
+	 Train time/batch: 1309
+	 Train time/sample: 1309
+	 Train time/batch_in_epoch: 1309
+	 Train time/sample_in_epoch: 1309
+	 Train time/token: 1340416
+	 Train time/token_in_epoch: 1340416
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.4945
+	 Train metrics/train/Loss: 0.4945
+	 Train metrics/train/NLL: 0.4945
+	 Train metrics/train/BPD: 0.7134
+	 Train metrics/train/Perplexity: 1.6397
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.6076
+	 Train throughput/batches_per_sec: 1.2339
+	 Train throughput/samples_per_sec: 1.2339
+	 Train throughput/device/batches_per_sec: 1.2339
+	 Train throughput/device/samples_per_sec: 1.2339
+	 Train throughput/tokens_per_sec: 1263.5155
+	 Train throughput/device/tokens_per_sec: 1263.5155
+	 Train time/train: 0.2796
+	 Train time/val: 0.0047
+	 Train time/total: 0.2843
+[epoch=1][batch=1320/7324]:
+	 Train time/batch: 1319
+	 Train time/sample: 1319
+	 Train time/batch_in_epoch: 1319
+	 Train time/sample_in_epoch: 1319
+	 Train time/token: 1350656
+	 Train time/token_in_epoch: 1350656
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9935
+	 Train metrics/train/Loss: 0.9935
+	 Train metrics/train/NLL: 0.9932
+	 Train metrics/train/BPD: 1.4329
+	 Train metrics/train/Perplexity: 2.6999
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.6006
+	 Train throughput/batches_per_sec: 1.2340
+	 Train throughput/samples_per_sec: 1.2340
+	 Train throughput/device/batches_per_sec: 1.2340
+	 Train throughput/device/samples_per_sec: 1.2340
+	 Train throughput/tokens_per_sec: 1263.6284
+	 Train throughput/device/tokens_per_sec: 1263.6284
+	 Train time/train: 0.2817
+	 Train time/val: 0.0047
+	 Train time/total: 0.2863
+[epoch=1][batch=1330/7324]:
+	 Train time/batch: 1329
+	 Train time/sample: 1329
+	 Train time/batch_in_epoch: 1329
+	 Train time/sample_in_epoch: 1329
+	 Train time/token: 1360896
+	 Train time/token_in_epoch: 1360896
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.3873
+	 Train metrics/train/Loss: 0.3873
+	 Train metrics/train/NLL: 0.3873
+	 Train metrics/train/BPD: 0.5587
+	 Train metrics/train/Perplexity: 1.4729
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.5936
+	 Train throughput/batches_per_sec: 1.2341
+	 Train throughput/samples_per_sec: 1.2341
+	 Train throughput/device/batches_per_sec: 1.2341
+	 Train throughput/device/samples_per_sec: 1.2341
+	 Train throughput/tokens_per_sec: 1263.6693
+	 Train throughput/device/tokens_per_sec: 1263.6693
+	 Train time/train: 0.2837
+	 Train time/val: 0.0047
+	 Train time/total: 0.2884
+[epoch=1][batch=1340/7324]:
+	 Train time/batch: 1339
+	 Train time/sample: 1339
+	 Train time/batch_in_epoch: 1339
+	 Train time/sample_in_epoch: 1339
+	 Train time/token: 1371136
+	 Train time/token_in_epoch: 1371136
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6786
+	 Train metrics/train/Loss: 0.6786
+	 Train metrics/train/NLL: 0.6787
+	 Train metrics/train/BPD: 0.9792
+	 Train metrics/train/Perplexity: 1.9714
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.5866
+	 Train throughput/batches_per_sec: 1.2341
+	 Train throughput/samples_per_sec: 1.2341
+	 Train throughput/device/batches_per_sec: 1.2341
+	 Train throughput/device/samples_per_sec: 1.2341
+	 Train throughput/tokens_per_sec: 1263.7283
+	 Train throughput/device/tokens_per_sec: 1263.7283
+	 Train time/train: 0.2858
+	 Train time/val: 0.0047
+	 Train time/total: 0.2904
+[epoch=1][batch=1350/7324]:
+	 Train time/batch: 1349
+	 Train time/sample: 1349
+	 Train time/batch_in_epoch: 1349
+	 Train time/sample_in_epoch: 1349
+	 Train time/token: 1381376
+	 Train time/token_in_epoch: 1381376
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5919
+	 Train metrics/train/Loss: 0.5919
+	 Train metrics/train/NLL: 0.5919
+	 Train metrics/train/BPD: 0.8539
+	 Train metrics/train/Perplexity: 1.8074
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.5797
+	 Train throughput/batches_per_sec: 1.2342
+	 Train throughput/samples_per_sec: 1.2342
+	 Train throughput/device/batches_per_sec: 1.2342
+	 Train throughput/device/samples_per_sec: 1.2342
+	 Train throughput/tokens_per_sec: 1263.8413
+	 Train throughput/device/tokens_per_sec: 1263.8413
+	 Train time/train: 0.2878
+	 Train time/val: 0.0047
+	 Train time/total: 0.2925
+[epoch=1][batch=1360/7324]:
+	 Train time/batch: 1359
+	 Train time/sample: 1359
+	 Train time/batch_in_epoch: 1359
+	 Train time/sample_in_epoch: 1359
+	 Train time/token: 1391616
+	 Train time/token_in_epoch: 1391616
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8237
+	 Train metrics/train/Loss: 0.8237
+	 Train metrics/train/NLL: 0.8237
+	 Train metrics/train/BPD: 1.1883
+	 Train metrics/train/Perplexity: 2.2788
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.5729
+	 Train throughput/batches_per_sec: 1.2343
+	 Train throughput/samples_per_sec: 1.2343
+	 Train throughput/device/batches_per_sec: 1.2343
+	 Train throughput/device/samples_per_sec: 1.2343
+	 Train throughput/tokens_per_sec: 1263.9196
+	 Train throughput/device/tokens_per_sec: 1263.9196
+	 Train time/train: 0.2899
+	 Train time/val: 0.0047
+	 Train time/total: 0.2945
+[epoch=1][batch=1370/7324]:
+	 Train time/batch: 1369
+	 Train time/sample: 1369
+	 Train time/batch_in_epoch: 1369
+	 Train time/sample_in_epoch: 1369
+	 Train time/token: 1401856
+	 Train time/token_in_epoch: 1401856
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5756
+	 Train metrics/train/Loss: 0.5756
+	 Train metrics/train/NLL: 0.5755
+	 Train metrics/train/BPD: 0.8303
+	 Train metrics/train/Perplexity: 1.7780
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.5662
+	 Train throughput/batches_per_sec: 1.2343
+	 Train throughput/samples_per_sec: 1.2343
+	 Train throughput/device/batches_per_sec: 1.2343
+	 Train throughput/device/samples_per_sec: 1.2343
+	 Train throughput/tokens_per_sec: 1263.9728
+	 Train throughput/device/tokens_per_sec: 1263.9728
+	 Train time/train: 0.2919
+	 Train time/val: 0.0047
+	 Train time/total: 0.2966
+[epoch=1][batch=1380/7324]:
+	 Train time/batch: 1379
+	 Train time/sample: 1379
+	 Train time/batch_in_epoch: 1379
+	 Train time/sample_in_epoch: 1379
+	 Train time/token: 1412096
+	 Train time/token_in_epoch: 1412096
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0194
+	 Train metrics/train/Loss: 1.0194
+	 Train metrics/train/NLL: 1.0192
+	 Train metrics/train/BPD: 1.4705
+	 Train metrics/train/Perplexity: 2.7711
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.5596
+	 Train throughput/batches_per_sec: 1.2344
+	 Train throughput/samples_per_sec: 1.2344
+	 Train throughput/device/batches_per_sec: 1.2344
+	 Train throughput/device/samples_per_sec: 1.2344
+	 Train throughput/tokens_per_sec: 1264.0284
+	 Train throughput/device/tokens_per_sec: 1264.0284
+	 Train time/train: 0.2940
+	 Train time/val: 0.0047
+	 Train time/total: 0.2986
+[epoch=1][batch=1390/7324]:
+	 Train time/batch: 1389
+	 Train time/sample: 1389
+	 Train time/batch_in_epoch: 1389
+	 Train time/sample_in_epoch: 1389
+	 Train time/token: 1422336
+	 Train time/token_in_epoch: 1422336
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0561
+	 Train metrics/train/Loss: 1.0561
+	 Train metrics/train/NLL: 1.0560
+	 Train metrics/train/BPD: 1.5235
+	 Train metrics/train/Perplexity: 2.8749
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.5529
+	 Train throughput/batches_per_sec: 1.2345
+	 Train throughput/samples_per_sec: 1.2345
+	 Train throughput/device/batches_per_sec: 1.2345
+	 Train throughput/device/samples_per_sec: 1.2345
+	 Train throughput/tokens_per_sec: 1264.1049
+	 Train throughput/device/tokens_per_sec: 1264.1049
+	 Train time/train: 0.2960
+	 Train time/val: 0.0047
+	 Train time/total: 0.3007
+[epoch=1][batch=1400/7324]:
+	 Train time/batch: 1399
+	 Train time/sample: 1399
+	 Train time/batch_in_epoch: 1399
+	 Train time/sample_in_epoch: 1399
+	 Train time/token: 1432576
+	 Train time/token_in_epoch: 1432576
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5037
+	 Train metrics/train/Loss: 0.5037
+	 Train metrics/train/NLL: 0.5038
+	 Train metrics/train/BPD: 0.7268
+	 Train metrics/train/Perplexity: 1.6549
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.5463
+	 Train throughput/batches_per_sec: 1.2345
+	 Train throughput/samples_per_sec: 1.2345
+	 Train throughput/device/batches_per_sec: 1.2345
+	 Train throughput/device/samples_per_sec: 1.2345
+	 Train throughput/tokens_per_sec: 1264.1638
+	 Train throughput/device/tokens_per_sec: 1264.1638
+	 Train time/train: 0.2981
+	 Train time/val: 0.0047
+	 Train time/total: 0.3028
+[epoch=1][batch=1410/7324]:
+	 Train time/batch: 1409
+	 Train time/sample: 1409
+	 Train time/batch_in_epoch: 1409
+	 Train time/sample_in_epoch: 1409
+	 Train time/token: 1442816
+	 Train time/token_in_epoch: 1442816
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.4423
+	 Train metrics/train/Loss: 0.4423
+	 Train metrics/train/NLL: 0.4422
+	 Train metrics/train/BPD: 0.6380
+	 Train metrics/train/Perplexity: 1.5561
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.5398
+	 Train throughput/batches_per_sec: 1.2346
+	 Train throughput/samples_per_sec: 1.2346
+	 Train throughput/device/batches_per_sec: 1.2346
+	 Train throughput/device/samples_per_sec: 1.2346
+	 Train throughput/tokens_per_sec: 1264.2125
+	 Train throughput/device/tokens_per_sec: 1264.2125
+	 Train time/train: 0.3001
+	 Train time/val: 0.0047
+	 Train time/total: 0.3048
+[epoch=1][batch=1420/7324]:
+	 Train time/batch: 1419
+	 Train time/sample: 1419
+	 Train time/batch_in_epoch: 1419
+	 Train time/sample_in_epoch: 1419
+	 Train time/token: 1453056
+	 Train time/token_in_epoch: 1453056
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.4386
+	 Train metrics/train/Loss: 0.4386
+	 Train metrics/train/NLL: 0.4385
+	 Train metrics/train/BPD: 0.6326
+	 Train metrics/train/Perplexity: 1.5503
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.5335
+	 Train throughput/batches_per_sec: 1.2346
+	 Train throughput/samples_per_sec: 1.2346
+	 Train throughput/device/batches_per_sec: 1.2346
+	 Train throughput/device/samples_per_sec: 1.2346
+	 Train throughput/tokens_per_sec: 1264.2187
+	 Train throughput/device/tokens_per_sec: 1264.2187
+	 Train time/train: 0.3022
+	 Train time/val: 0.0047
+	 Train time/total: 0.3069
+[epoch=1][batch=1430/7324]:
+	 Train time/batch: 1429
+	 Train time/sample: 1429
+	 Train time/batch_in_epoch: 1429
+	 Train time/sample_in_epoch: 1429
+	 Train time/token: 1463296
+	 Train time/token_in_epoch: 1463296
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.3596
+	 Train metrics/train/Loss: 1.3596
+	 Train metrics/train/NLL: 1.3596
+	 Train metrics/train/BPD: 1.9615
+	 Train metrics/train/Perplexity: 3.8947
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.5272
+	 Train throughput/batches_per_sec: 1.2346
+	 Train throughput/samples_per_sec: 1.2346
+	 Train throughput/device/batches_per_sec: 1.2346
+	 Train throughput/device/samples_per_sec: 1.2346
+	 Train throughput/tokens_per_sec: 1264.1897
+	 Train throughput/device/tokens_per_sec: 1264.1897
+	 Train time/train: 0.3043
+	 Train time/val: 0.0047
+	 Train time/total: 0.3089
+[epoch=1][batch=1440/7324]:
+	 Train time/batch: 1439
+	 Train time/sample: 1439
+	 Train time/batch_in_epoch: 1439
+	 Train time/sample_in_epoch: 1439
+	 Train time/token: 1473536
+	 Train time/token_in_epoch: 1473536
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9627
+	 Train metrics/train/Loss: 0.9627
+	 Train metrics/train/NLL: 0.9628
+	 Train metrics/train/BPD: 1.3890
+	 Train metrics/train/Perplexity: 2.6189
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.5210
+	 Train throughput/batches_per_sec: 1.2345
+	 Train throughput/samples_per_sec: 1.2345
+	 Train throughput/device/batches_per_sec: 1.2345
+	 Train throughput/device/samples_per_sec: 1.2345
+	 Train throughput/tokens_per_sec: 1264.1498
+	 Train throughput/device/tokens_per_sec: 1264.1498
+	 Train time/train: 0.3063
+	 Train time/val: 0.0047
+	 Train time/total: 0.3110
+[epoch=1][batch=1450/7324]:
+	 Train time/batch: 1449
+	 Train time/sample: 1449
+	 Train time/batch_in_epoch: 1449
+	 Train time/sample_in_epoch: 1449
+	 Train time/token: 1483776
+	 Train time/token_in_epoch: 1483776
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8288
+	 Train metrics/train/Loss: 0.8288
+	 Train metrics/train/NLL: 0.8288
+	 Train metrics/train/BPD: 1.1957
+	 Train metrics/train/Perplexity: 2.2905
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.5149
+	 Train throughput/batches_per_sec: 1.2345
+	 Train throughput/samples_per_sec: 1.2345
+	 Train throughput/device/batches_per_sec: 1.2345
+	 Train throughput/device/samples_per_sec: 1.2345
+	 Train throughput/tokens_per_sec: 1264.1121
+	 Train throughput/device/tokens_per_sec: 1264.1121
+	 Train time/train: 0.3084
+	 Train time/val: 0.0047
+	 Train time/total: 0.3130
+[epoch=1][batch=1460/7324]:
+	 Train time/batch: 1459
+	 Train time/sample: 1459
+	 Train time/batch_in_epoch: 1459
+	 Train time/sample_in_epoch: 1459
+	 Train time/token: 1494016
+	 Train time/token_in_epoch: 1494016
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6583
+	 Train metrics/train/Loss: 0.6583
+	 Train metrics/train/NLL: 0.6583
+	 Train metrics/train/BPD: 0.9498
+	 Train metrics/train/Perplexity: 1.9316
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.5087
+	 Train throughput/batches_per_sec: 1.2345
+	 Train throughput/samples_per_sec: 1.2345
+	 Train throughput/device/batches_per_sec: 1.2345
+	 Train throughput/device/samples_per_sec: 1.2345
+	 Train throughput/tokens_per_sec: 1264.1295
+	 Train throughput/device/tokens_per_sec: 1264.1295
+	 Train time/train: 0.3104
+	 Train time/val: 0.0047
+	 Train time/total: 0.3151
+[epoch=1][batch=1470/7324]:
+	 Train time/batch: 1469
+	 Train time/sample: 1469
+	 Train time/batch_in_epoch: 1469
+	 Train time/sample_in_epoch: 1469
+	 Train time/token: 1504256
+	 Train time/token_in_epoch: 1504256
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0123
+	 Train metrics/train/Loss: 1.0123
+	 Train metrics/train/NLL: 1.0121
+	 Train metrics/train/BPD: 1.4601
+	 Train metrics/train/Perplexity: 2.7512
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.5027
+	 Train throughput/batches_per_sec: 1.2345
+	 Train throughput/samples_per_sec: 1.2345
+	 Train throughput/device/batches_per_sec: 1.2345
+	 Train throughput/device/samples_per_sec: 1.2345
+	 Train throughput/tokens_per_sec: 1264.1232
+	 Train throughput/device/tokens_per_sec: 1264.1232
+	 Train time/train: 0.3125
+	 Train time/val: 0.0047
+	 Train time/total: 0.3172
+[epoch=1][batch=1480/7324]:
+	 Train time/batch: 1479
+	 Train time/sample: 1479
+	 Train time/batch_in_epoch: 1479
+	 Train time/sample_in_epoch: 1479
+	 Train time/token: 1514496
+	 Train time/token_in_epoch: 1514496
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5461
+	 Train metrics/train/Loss: 0.5461
+	 Train metrics/train/NLL: 0.5461
+	 Train metrics/train/BPD: 0.7879
+	 Train metrics/train/Perplexity: 1.7265
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4969
+	 Train throughput/batches_per_sec: 1.2345
+	 Train throughput/samples_per_sec: 1.2345
+	 Train throughput/device/batches_per_sec: 1.2345
+	 Train throughput/device/samples_per_sec: 1.2345
+	 Train throughput/tokens_per_sec: 1264.1426
+	 Train throughput/device/tokens_per_sec: 1264.1426
+	 Train time/train: 0.3146
+	 Train time/val: 0.0047
+	 Train time/total: 0.3192
+[epoch=1][batch=1490/7324]:
+	 Train time/batch: 1489
+	 Train time/sample: 1489
+	 Train time/batch_in_epoch: 1489
+	 Train time/sample_in_epoch: 1489
+	 Train time/token: 1524736
+	 Train time/token_in_epoch: 1524736
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6586
+	 Train metrics/train/Loss: 0.6586
+	 Train metrics/train/NLL: 0.6586
+	 Train metrics/train/BPD: 0.9501
+	 Train metrics/train/Perplexity: 1.9321
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4910
+	 Train throughput/batches_per_sec: 1.2345
+	 Train throughput/samples_per_sec: 1.2345
+	 Train throughput/device/batches_per_sec: 1.2345
+	 Train throughput/device/samples_per_sec: 1.2345
+	 Train throughput/tokens_per_sec: 1264.1621
+	 Train throughput/device/tokens_per_sec: 1264.1621
+	 Train time/train: 0.3166
+	 Train time/val: 0.0047
+	 Train time/total: 0.3213
+[epoch=1][batch=1500/7324]:
+	 Train time/batch: 1499
+	 Train time/sample: 1499
+	 Train time/batch_in_epoch: 1499
+	 Train time/sample_in_epoch: 1499
+	 Train time/token: 1534976
+	 Train time/token_in_epoch: 1534976
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5391
+	 Train metrics/train/Loss: 0.5391
+	 Train metrics/train/NLL: 0.5391
+	 Train metrics/train/BPD: 0.7778
+	 Train metrics/train/Perplexity: 1.7145
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4851
+	 Train throughput/batches_per_sec: 1.2345
+	 Train throughput/samples_per_sec: 1.2345
+	 Train throughput/device/batches_per_sec: 1.2345
+	 Train throughput/device/samples_per_sec: 1.2345
+	 Train throughput/tokens_per_sec: 1264.1471
+	 Train throughput/device/tokens_per_sec: 1264.1471
+	 Train time/train: 0.3187
+	 Train time/val: 0.0047
+	 Train time/total: 0.3233
+[epoch=1][batch=1510/7324]:
+	 Train time/batch: 1509
+	 Train time/sample: 1509
+	 Train time/batch_in_epoch: 1509
+	 Train time/sample_in_epoch: 1509
+	 Train time/token: 1545216
+	 Train time/token_in_epoch: 1545216
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.6877
+	 Train metrics/train/Loss: 1.6877
+	 Train metrics/train/NLL: 1.6876
+	 Train metrics/train/BPD: 2.4348
+	 Train metrics/train/Perplexity: 5.4067
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4793
+	 Train throughput/batches_per_sec: 1.3518
+	 Train throughput/samples_per_sec: 1.3518
+	 Train throughput/device/batches_per_sec: 1.3518
+	 Train throughput/device/samples_per_sec: 1.3518
+	 Train throughput/tokens_per_sec: 1384.2788
+	 Train throughput/device/tokens_per_sec: 1384.2788
+	 Train time/train: 0.3207
+	 Train time/val: 0.0047
+	 Train time/total: 0.3254
+[epoch=1][batch=1520/7324]:
+	 Train time/batch: 1519
+	 Train time/sample: 1519
+	 Train time/batch_in_epoch: 1519
+	 Train time/sample_in_epoch: 1519
+	 Train time/token: 1555456
+	 Train time/token_in_epoch: 1555456
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5148
+	 Train metrics/train/Loss: 0.5148
+	 Train metrics/train/NLL: 0.5148
+	 Train metrics/train/BPD: 0.7426
+	 Train metrics/train/Perplexity: 1.6732
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4736
+	 Train throughput/batches_per_sec: 1.3517
+	 Train throughput/samples_per_sec: 1.3517
+	 Train throughput/device/batches_per_sec: 1.3517
+	 Train throughput/device/samples_per_sec: 1.3517
+	 Train throughput/tokens_per_sec: 1384.1758
+	 Train throughput/device/tokens_per_sec: 1384.1758
+	 Train time/train: 0.3228
+	 Train time/val: 0.0047
+	 Train time/total: 0.3275
+[epoch=1][batch=1530/7324]:
+	 Train time/batch: 1529
+	 Train time/sample: 1529
+	 Train time/batch_in_epoch: 1529
+	 Train time/sample_in_epoch: 1529
+	 Train time/token: 1565696
+	 Train time/token_in_epoch: 1565696
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9088
+	 Train metrics/train/Loss: 0.9088
+	 Train metrics/train/NLL: 0.9089
+	 Train metrics/train/BPD: 1.3112
+	 Train metrics/train/Perplexity: 2.4816
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4678
+	 Train throughput/batches_per_sec: 1.3517
+	 Train throughput/samples_per_sec: 1.3517
+	 Train throughput/device/batches_per_sec: 1.3517
+	 Train throughput/device/samples_per_sec: 1.3517
+	 Train throughput/tokens_per_sec: 1384.1380
+	 Train throughput/device/tokens_per_sec: 1384.1380
+	 Train time/train: 0.3248
+	 Train time/val: 0.0047
+	 Train time/total: 0.3295
+[epoch=1][batch=1540/7324]:
+	 Train time/batch: 1539
+	 Train time/sample: 1539
+	 Train time/batch_in_epoch: 1539
+	 Train time/sample_in_epoch: 1539
+	 Train time/token: 1575936
+	 Train time/token_in_epoch: 1575936
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8892
+	 Train metrics/train/Loss: 0.8892
+	 Train metrics/train/NLL: 0.8892
+	 Train metrics/train/BPD: 1.2828
+	 Train metrics/train/Perplexity: 2.4332
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4621
+	 Train throughput/batches_per_sec: 1.3517
+	 Train throughput/samples_per_sec: 1.3517
+	 Train throughput/device/batches_per_sec: 1.3517
+	 Train throughput/device/samples_per_sec: 1.3517
+	 Train throughput/tokens_per_sec: 1384.1283
+	 Train throughput/device/tokens_per_sec: 1384.1283
+	 Train time/train: 0.3269
+	 Train time/val: 0.0047
+	 Train time/total: 0.3316
+[epoch=1][batch=1550/7324]:
+	 Train time/batch: 1549
+	 Train time/sample: 1549
+	 Train time/batch_in_epoch: 1549
+	 Train time/sample_in_epoch: 1549
+	 Train time/token: 1586176
+	 Train time/token_in_epoch: 1586176
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8389
+	 Train metrics/train/Loss: 0.8389
+	 Train metrics/train/NLL: 0.8388
+	 Train metrics/train/BPD: 1.2102
+	 Train metrics/train/Perplexity: 2.3136
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4582
+	 Train throughput/batches_per_sec: 1.3508
+	 Train throughput/samples_per_sec: 1.3508
+	 Train throughput/device/batches_per_sec: 1.3508
+	 Train throughput/device/samples_per_sec: 1.3508
+	 Train throughput/tokens_per_sec: 1383.2073
+	 Train throughput/device/tokens_per_sec: 1383.2073
+	 Train time/train: 0.3290
+	 Train time/val: 0.0047
+	 Train time/total: 0.3337
+[epoch=1][batch=1560/7324]:
+	 Train time/batch: 1559
+	 Train time/sample: 1559
+	 Train time/batch_in_epoch: 1559
+	 Train time/sample_in_epoch: 1559
+	 Train time/token: 1596416
+	 Train time/token_in_epoch: 1596416
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5744
+	 Train metrics/train/Loss: 0.5744
+	 Train metrics/train/NLL: 0.5744
+	 Train metrics/train/BPD: 0.8287
+	 Train metrics/train/Perplexity: 1.7761
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4525
+	 Train throughput/batches_per_sec: 1.3507
+	 Train throughput/samples_per_sec: 1.3507
+	 Train throughput/device/batches_per_sec: 1.3507
+	 Train throughput/device/samples_per_sec: 1.3507
+	 Train throughput/tokens_per_sec: 1383.1490
+	 Train throughput/device/tokens_per_sec: 1383.1490
+	 Train time/train: 0.3311
+	 Train time/val: 0.0047
+	 Train time/total: 0.3357
+[epoch=1][batch=1570/7324]:
+	 Train time/batch: 1569
+	 Train time/sample: 1569
+	 Train time/batch_in_epoch: 1569
+	 Train time/sample_in_epoch: 1569
+	 Train time/token: 1606656
+	 Train time/token_in_epoch: 1606656
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8647
+	 Train metrics/train/Loss: 0.8647
+	 Train metrics/train/NLL: 0.8646
+	 Train metrics/train/BPD: 1.2473
+	 Train metrics/train/Perplexity: 2.3740
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4469
+	 Train throughput/batches_per_sec: 1.3506
+	 Train throughput/samples_per_sec: 1.3506
+	 Train throughput/device/batches_per_sec: 1.3506
+	 Train throughput/device/samples_per_sec: 1.3506
+	 Train throughput/tokens_per_sec: 1383.0338
+	 Train throughput/device/tokens_per_sec: 1383.0338
+	 Train time/train: 0.3331
+	 Train time/val: 0.0047
+	 Train time/total: 0.3378
+[epoch=1][batch=1580/7324]:
+	 Train time/batch: 1579
+	 Train time/sample: 1579
+	 Train time/batch_in_epoch: 1579
+	 Train time/sample_in_epoch: 1579
+	 Train time/token: 1616896
+	 Train time/token_in_epoch: 1616896
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9113
+	 Train metrics/train/Loss: 0.9113
+	 Train metrics/train/NLL: 0.9112
+	 Train metrics/train/BPD: 1.3145
+	 Train metrics/train/Perplexity: 2.4872
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4413
+	 Train throughput/batches_per_sec: 1.3506
+	 Train throughput/samples_per_sec: 1.3506
+	 Train throughput/device/batches_per_sec: 1.3506
+	 Train throughput/device/samples_per_sec: 1.3506
+	 Train throughput/tokens_per_sec: 1382.9738
+	 Train throughput/device/tokens_per_sec: 1382.9738
+	 Train time/train: 0.3352
+	 Train time/val: 0.0047
+	 Train time/total: 0.3399
+[epoch=1][batch=1590/7324]:
+	 Train time/batch: 1589
+	 Train time/sample: 1589
+	 Train time/batch_in_epoch: 1589
+	 Train time/sample_in_epoch: 1589
+	 Train time/token: 1627136
+	 Train time/token_in_epoch: 1627136
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.4514
+	 Train metrics/train/Loss: 0.4514
+	 Train metrics/train/NLL: 0.4515
+	 Train metrics/train/BPD: 0.6514
+	 Train metrics/train/Perplexity: 1.5707
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4359
+	 Train throughput/batches_per_sec: 1.3505
+	 Train throughput/samples_per_sec: 1.3505
+	 Train throughput/device/batches_per_sec: 1.3505
+	 Train throughput/device/samples_per_sec: 1.3505
+	 Train throughput/tokens_per_sec: 1382.8785
+	 Train throughput/device/tokens_per_sec: 1382.8785
+	 Train time/train: 0.3372
+	 Train time/val: 0.0047
+	 Train time/total: 0.3419
+[epoch=1][batch=1600/7324]:
+	 Train time/batch: 1599
+	 Train time/sample: 1599
+	 Train time/batch_in_epoch: 1599
+	 Train time/sample_in_epoch: 1599
+	 Train time/token: 1637376
+	 Train time/token_in_epoch: 1637376
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5475
+	 Train metrics/train/Loss: 0.5475
+	 Train metrics/train/NLL: 0.5473
+	 Train metrics/train/BPD: 0.7896
+	 Train metrics/train/Perplexity: 1.7286
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4304
+	 Train throughput/batches_per_sec: 1.3504
+	 Train throughput/samples_per_sec: 1.3504
+	 Train throughput/device/batches_per_sec: 1.3504
+	 Train throughput/device/samples_per_sec: 1.3504
+	 Train throughput/tokens_per_sec: 1382.8443
+	 Train throughput/device/tokens_per_sec: 1382.8443
+	 Train time/train: 0.3393
+	 Train time/val: 0.0047
+	 Train time/total: 0.3440
+[epoch=1][batch=1610/7324]:
+	 Train time/batch: 1609
+	 Train time/sample: 1609
+	 Train time/batch_in_epoch: 1609
+	 Train time/sample_in_epoch: 1609
+	 Train time/token: 1647616
+	 Train time/token_in_epoch: 1647616
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5470
+	 Train metrics/train/Loss: 0.5470
+	 Train metrics/train/NLL: 0.5470
+	 Train metrics/train/BPD: 0.7892
+	 Train metrics/train/Perplexity: 1.7281
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4249
+	 Train throughput/batches_per_sec: 1.3504
+	 Train throughput/samples_per_sec: 1.3504
+	 Train throughput/device/batches_per_sec: 1.3504
+	 Train throughput/device/samples_per_sec: 1.3504
+	 Train throughput/tokens_per_sec: 1382.8125
+	 Train throughput/device/tokens_per_sec: 1382.8125
+	 Train time/train: 0.3414
+	 Train time/val: 0.0047
+	 Train time/total: 0.3460
+[epoch=1][batch=1620/7324]:
+	 Train time/batch: 1619
+	 Train time/sample: 1619
+	 Train time/batch_in_epoch: 1619
+	 Train time/sample_in_epoch: 1619
+	 Train time/token: 1657856
+	 Train time/token_in_epoch: 1657856
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.9917
+	 Train metrics/train/Loss: 0.9917
+	 Train metrics/train/NLL: 0.9918
+	 Train metrics/train/BPD: 1.4309
+	 Train metrics/train/Perplexity: 2.6961
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4197
+	 Train throughput/batches_per_sec: 1.3503
+	 Train throughput/samples_per_sec: 1.3503
+	 Train throughput/device/batches_per_sec: 1.3503
+	 Train throughput/device/samples_per_sec: 1.3503
+	 Train throughput/tokens_per_sec: 1382.7203
+	 Train throughput/device/tokens_per_sec: 1382.7203
+	 Train time/train: 0.3434
+	 Train time/val: 0.0047
+	 Train time/total: 0.3481
+[epoch=1][batch=1630/7324]:
+	 Train time/batch: 1629
+	 Train time/sample: 1629
+	 Train time/batch_in_epoch: 1629
+	 Train time/sample_in_epoch: 1629
+	 Train time/token: 1668096
+	 Train time/token_in_epoch: 1668096
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5245
+	 Train metrics/train/Loss: 0.5245
+	 Train metrics/train/NLL: 0.5246
+	 Train metrics/train/BPD: 0.7569
+	 Train metrics/train/Perplexity: 1.6898
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4146
+	 Train throughput/batches_per_sec: 1.3503
+	 Train throughput/samples_per_sec: 1.3503
+	 Train throughput/device/batches_per_sec: 1.3503
+	 Train throughput/device/samples_per_sec: 1.3503
+	 Train throughput/tokens_per_sec: 1382.6561
+	 Train throughput/device/tokens_per_sec: 1382.6561
+	 Train time/train: 0.3455
+	 Train time/val: 0.0047
+	 Train time/total: 0.3502
+[epoch=1][batch=1640/7324]:
+	 Train time/batch: 1639
+	 Train time/sample: 1639
+	 Train time/batch_in_epoch: 1639
+	 Train time/sample_in_epoch: 1639
+	 Train time/token: 1678336
+	 Train time/token_in_epoch: 1678336
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8030
+	 Train metrics/train/Loss: 0.8030
+	 Train metrics/train/NLL: 0.8030
+	 Train metrics/train/BPD: 1.1586
+	 Train metrics/train/Perplexity: 2.2323
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4095
+	 Train throughput/batches_per_sec: 1.3502
+	 Train throughput/samples_per_sec: 1.3502
+	 Train throughput/device/batches_per_sec: 1.3502
+	 Train throughput/device/samples_per_sec: 1.3502
+	 Train throughput/tokens_per_sec: 1382.5905
+	 Train throughput/device/tokens_per_sec: 1382.5905
+	 Train time/train: 0.3475
+	 Train time/val: 0.0047
+	 Train time/total: 0.3522
+[epoch=1][batch=1650/7324]:
+	 Train time/batch: 1649
+	 Train time/sample: 1649
+	 Train time/batch_in_epoch: 1649
+	 Train time/sample_in_epoch: 1649
+	 Train time/token: 1688576
+	 Train time/token_in_epoch: 1688576
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.7392
+	 Train metrics/train/Loss: 0.7392
+	 Train metrics/train/NLL: 0.7393
+	 Train metrics/train/BPD: 1.0666
+	 Train metrics/train/Perplexity: 2.0945
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.4043
+	 Train throughput/batches_per_sec: 1.3501
+	 Train throughput/samples_per_sec: 1.3501
+	 Train throughput/device/batches_per_sec: 1.3501
+	 Train throughput/device/samples_per_sec: 1.3501
+	 Train throughput/tokens_per_sec: 1382.5523
+	 Train throughput/device/tokens_per_sec: 1382.5523
+	 Train time/train: 0.3496
+	 Train time/val: 0.0047
+	 Train time/total: 0.3543
+[epoch=1][batch=1660/7324]:
+	 Train time/batch: 1659
+	 Train time/sample: 1659
+	 Train time/batch_in_epoch: 1659
+	 Train time/sample_in_epoch: 1659
+	 Train time/token: 1698816
+	 Train time/token_in_epoch: 1698816
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5510
+	 Train metrics/train/Loss: 0.5510
+	 Train metrics/train/NLL: 0.5511
+	 Train metrics/train/BPD: 0.7951
+	 Train metrics/train/Perplexity: 1.7352
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3993
+	 Train throughput/batches_per_sec: 1.3501
+	 Train throughput/samples_per_sec: 1.3501
+	 Train throughput/device/batches_per_sec: 1.3501
+	 Train throughput/device/samples_per_sec: 1.3501
+	 Train throughput/tokens_per_sec: 1382.4704
+	 Train throughput/device/tokens_per_sec: 1382.4704
+	 Train time/train: 0.3517
+	 Train time/val: 0.0047
+	 Train time/total: 0.3563
+[epoch=1][batch=1670/7324]:
+	 Train time/batch: 1669
+	 Train time/sample: 1669
+	 Train time/batch_in_epoch: 1669
+	 Train time/sample_in_epoch: 1669
+	 Train time/token: 1709056
+	 Train time/token_in_epoch: 1709056
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.4195
+	 Train metrics/train/Loss: 1.4195
+	 Train metrics/train/NLL: 1.4195
+	 Train metrics/train/BPD: 2.0479
+	 Train metrics/train/Perplexity: 4.1349
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3944
+	 Train throughput/batches_per_sec: 1.3499
+	 Train throughput/samples_per_sec: 1.3499
+	 Train throughput/device/batches_per_sec: 1.3499
+	 Train throughput/device/samples_per_sec: 1.3499
+	 Train throughput/tokens_per_sec: 1382.2953
+	 Train throughput/device/tokens_per_sec: 1382.2953
+	 Train time/train: 0.3537
+	 Train time/val: 0.0047
+	 Train time/total: 0.3584
+[epoch=1][batch=1680/7324]:
+	 Train time/batch: 1679
+	 Train time/sample: 1679
+	 Train time/batch_in_epoch: 1679
+	 Train time/sample_in_epoch: 1679
+	 Train time/token: 1719296
+	 Train time/token_in_epoch: 1719296
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6098
+	 Train metrics/train/Loss: 0.6098
+	 Train metrics/train/NLL: 0.6098
+	 Train metrics/train/BPD: 0.8798
+	 Train metrics/train/Perplexity: 1.8401
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3894
+	 Train throughput/batches_per_sec: 1.3497
+	 Train throughput/samples_per_sec: 1.3497
+	 Train throughput/device/batches_per_sec: 1.3497
+	 Train throughput/device/samples_per_sec: 1.3497
+	 Train throughput/tokens_per_sec: 1382.1256
+	 Train throughput/device/tokens_per_sec: 1382.1256
+	 Train time/train: 0.3558
+	 Train time/val: 0.0047
+	 Train time/total: 0.3605
+[epoch=1][batch=1690/7324]:
+	 Train time/batch: 1689
+	 Train time/sample: 1689
+	 Train time/batch_in_epoch: 1689
+	 Train time/sample_in_epoch: 1689
+	 Train time/token: 1729536
+	 Train time/token_in_epoch: 1729536
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.7453
+	 Train metrics/train/Loss: 0.7453
+	 Train metrics/train/NLL: 0.7453
+	 Train metrics/train/BPD: 1.0753
+	 Train metrics/train/Perplexity: 2.1072
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3845
+	 Train throughput/batches_per_sec: 1.3495
+	 Train throughput/samples_per_sec: 1.3495
+	 Train throughput/device/batches_per_sec: 1.3495
+	 Train throughput/device/samples_per_sec: 1.3495
+	 Train throughput/tokens_per_sec: 1381.9204
+	 Train throughput/device/tokens_per_sec: 1381.9204
+	 Train time/train: 0.3579
+	 Train time/val: 0.0047
+	 Train time/total: 0.3625
+[epoch=1][batch=1700/7324]:
+	 Train time/batch: 1699
+	 Train time/sample: 1699
+	 Train time/batch_in_epoch: 1699
+	 Train time/sample_in_epoch: 1699
+	 Train time/token: 1739776
+	 Train time/token_in_epoch: 1739776
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0759
+	 Train metrics/train/Loss: 1.0759
+	 Train metrics/train/NLL: 1.0755
+	 Train metrics/train/BPD: 1.5516
+	 Train metrics/train/Perplexity: 2.9314
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3795
+	 Train throughput/batches_per_sec: 1.3494
+	 Train throughput/samples_per_sec: 1.3494
+	 Train throughput/device/batches_per_sec: 1.3494
+	 Train throughput/device/samples_per_sec: 1.3494
+	 Train throughput/tokens_per_sec: 1381.8346
+	 Train throughput/device/tokens_per_sec: 1381.8346
+	 Train time/train: 0.3599
+	 Train time/val: 0.0047
+	 Train time/total: 0.3646
+[epoch=1][batch=1710/7324]:
+	 Train time/batch: 1709
+	 Train time/sample: 1709
+	 Train time/batch_in_epoch: 1709
+	 Train time/sample_in_epoch: 1709
+	 Train time/token: 1750016
+	 Train time/token_in_epoch: 1750016
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.2149
+	 Train metrics/train/Loss: 1.2149
+	 Train metrics/train/NLL: 1.2153
+	 Train metrics/train/BPD: 1.7533
+	 Train metrics/train/Perplexity: 3.3713
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3745
+	 Train throughput/batches_per_sec: 1.3494
+	 Train throughput/samples_per_sec: 1.3494
+	 Train throughput/device/batches_per_sec: 1.3494
+	 Train throughput/device/samples_per_sec: 1.3494
+	 Train throughput/tokens_per_sec: 1381.7529
+	 Train throughput/device/tokens_per_sec: 1381.7529
+	 Train time/train: 0.3620
+	 Train time/val: 0.0047
+	 Train time/total: 0.3667
+[epoch=1][batch=1720/7324]:
+	 Train time/batch: 1719
+	 Train time/sample: 1719
+	 Train time/batch_in_epoch: 1719
+	 Train time/sample_in_epoch: 1719
+	 Train time/token: 1760256
+	 Train time/token_in_epoch: 1760256
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5255
+	 Train metrics/train/Loss: 0.5255
+	 Train metrics/train/NLL: 0.5255
+	 Train metrics/train/BPD: 0.7581
+	 Train metrics/train/Perplexity: 1.6913
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3694
+	 Train throughput/batches_per_sec: 1.3493
+	 Train throughput/samples_per_sec: 1.3493
+	 Train throughput/device/batches_per_sec: 1.3493
+	 Train throughput/device/samples_per_sec: 1.3493
+	 Train throughput/tokens_per_sec: 1381.7328
+	 Train throughput/device/tokens_per_sec: 1381.7328
+	 Train time/train: 0.3640
+	 Train time/val: 0.0047
+	 Train time/total: 0.3687
+[epoch=1][batch=1730/7324]:
+	 Train time/batch: 1729
+	 Train time/sample: 1729
+	 Train time/batch_in_epoch: 1729
+	 Train time/sample_in_epoch: 1729
+	 Train time/token: 1770496
+	 Train time/token_in_epoch: 1770496
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8678
+	 Train metrics/train/Loss: 0.8678
+	 Train metrics/train/NLL: 0.8678
+	 Train metrics/train/BPD: 1.2519
+	 Train metrics/train/Perplexity: 2.3816
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3644
+	 Train throughput/batches_per_sec: 1.3494
+	 Train throughput/samples_per_sec: 1.3494
+	 Train throughput/device/batches_per_sec: 1.3494
+	 Train throughput/device/samples_per_sec: 1.3494
+	 Train throughput/tokens_per_sec: 1381.7441
+	 Train throughput/device/tokens_per_sec: 1381.7441
+	 Train time/train: 0.3661
+	 Train time/val: 0.0047
+	 Train time/total: 0.3708
+[epoch=1][batch=1740/7324]:
+	 Train time/batch: 1739
+	 Train time/sample: 1739
+	 Train time/batch_in_epoch: 1739
+	 Train time/sample_in_epoch: 1739
+	 Train time/token: 1780736
+	 Train time/token_in_epoch: 1780736
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.7543
+	 Train metrics/train/Loss: 0.7543
+	 Train metrics/train/NLL: 0.7540
+	 Train metrics/train/BPD: 1.0878
+	 Train metrics/train/Perplexity: 2.1255
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3593
+	 Train throughput/batches_per_sec: 1.3494
+	 Train throughput/samples_per_sec: 1.3494
+	 Train throughput/device/batches_per_sec: 1.3494
+	 Train throughput/device/samples_per_sec: 1.3494
+	 Train throughput/tokens_per_sec: 1381.7766
+	 Train throughput/device/tokens_per_sec: 1381.7766
+	 Train time/train: 0.3681
+	 Train time/val: 0.0047
+	 Train time/total: 0.3728
+[epoch=1][batch=1750/7324]:
+	 Train time/batch: 1749
+	 Train time/sample: 1749
+	 Train time/batch_in_epoch: 1749
+	 Train time/sample_in_epoch: 1749
+	 Train time/token: 1790976
+	 Train time/token_in_epoch: 1790976
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.3994
+	 Train metrics/train/Loss: 0.3994
+	 Train metrics/train/NLL: 0.3995
+	 Train metrics/train/BPD: 0.5763
+	 Train metrics/train/Perplexity: 1.4910
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3543
+	 Train throughput/batches_per_sec: 1.3494
+	 Train throughput/samples_per_sec: 1.3494
+	 Train throughput/device/batches_per_sec: 1.3494
+	 Train throughput/device/samples_per_sec: 1.3494
+	 Train throughput/tokens_per_sec: 1381.7824
+	 Train throughput/device/tokens_per_sec: 1381.7824
+	 Train time/train: 0.3702
+	 Train time/val: 0.0047
+	 Train time/total: 0.3749
+[epoch=1][batch=1760/7324]:
+	 Train time/batch: 1759
+	 Train time/sample: 1759
+	 Train time/batch_in_epoch: 1759
+	 Train time/sample_in_epoch: 1759
+	 Train time/token: 1801216
+	 Train time/token_in_epoch: 1801216
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.4567
+	 Train metrics/train/Loss: 0.4567
+	 Train metrics/train/NLL: 0.4567
+	 Train metrics/train/BPD: 0.6589
+	 Train metrics/train/Perplexity: 1.5789
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3495
+	 Train throughput/batches_per_sec: 1.3493
+	 Train throughput/samples_per_sec: 1.3493
+	 Train throughput/device/batches_per_sec: 1.3493
+	 Train throughput/device/samples_per_sec: 1.3493
+	 Train throughput/tokens_per_sec: 1381.7332
+	 Train throughput/device/tokens_per_sec: 1381.7332
+	 Train time/train: 0.3723
+	 Train time/val: 0.0047
+	 Train time/total: 0.3769
+[epoch=1][batch=1770/7324]:
+	 Train time/batch: 1769
+	 Train time/sample: 1769
+	 Train time/batch_in_epoch: 1769
+	 Train time/sample_in_epoch: 1769
+	 Train time/token: 1811456
+	 Train time/token_in_epoch: 1811456
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.4019
+	 Train metrics/train/Loss: 0.4019
+	 Train metrics/train/NLL: 0.4019
+	 Train metrics/train/BPD: 0.5798
+	 Train metrics/train/Perplexity: 1.4947
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3448
+	 Train throughput/batches_per_sec: 1.3492
+	 Train throughput/samples_per_sec: 1.3492
+	 Train throughput/device/batches_per_sec: 1.3492
+	 Train throughput/device/samples_per_sec: 1.3492
+	 Train throughput/tokens_per_sec: 1381.5811
+	 Train throughput/device/tokens_per_sec: 1381.5811
+	 Train time/train: 0.3743
+	 Train time/val: 0.0047
+	 Train time/total: 0.3790
+[epoch=1][batch=1780/7324]:
+	 Train time/batch: 1779
+	 Train time/sample: 1779
+	 Train time/batch_in_epoch: 1779
+	 Train time/sample_in_epoch: 1779
+	 Train time/token: 1821696
+	 Train time/token_in_epoch: 1821696
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.3208
+	 Train metrics/train/Loss: 1.3208
+	 Train metrics/train/NLL: 1.3207
+	 Train metrics/train/BPD: 1.9054
+	 Train metrics/train/Perplexity: 3.7461
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3401
+	 Train throughput/batches_per_sec: 1.3490
+	 Train throughput/samples_per_sec: 1.3490
+	 Train throughput/device/batches_per_sec: 1.3490
+	 Train throughput/device/samples_per_sec: 1.3490
+	 Train throughput/tokens_per_sec: 1381.4134
+	 Train throughput/device/tokens_per_sec: 1381.4134
+	 Train time/train: 0.3764
+	 Train time/val: 0.0047
+	 Train time/total: 0.3810
+[epoch=1][batch=1790/7324]:
+	 Train time/batch: 1789
+	 Train time/sample: 1789
+	 Train time/batch_in_epoch: 1789
+	 Train time/sample_in_epoch: 1789
+	 Train time/token: 1831936
+	 Train time/token_in_epoch: 1831936
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.7316
+	 Train metrics/train/Loss: 0.7316
+	 Train metrics/train/NLL: 0.7316
+	 Train metrics/train/BPD: 1.0555
+	 Train metrics/train/Perplexity: 2.0785
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3354
+	 Train throughput/batches_per_sec: 1.3490
+	 Train throughput/samples_per_sec: 1.3490
+	 Train throughput/device/batches_per_sec: 1.3490
+	 Train throughput/device/samples_per_sec: 1.3490
+	 Train throughput/tokens_per_sec: 1381.3587
+	 Train throughput/device/tokens_per_sec: 1381.3587
+	 Train time/train: 0.3784
+	 Train time/val: 0.0047
+	 Train time/total: 0.3831
+[epoch=1][batch=1800/7324]:
+	 Train time/batch: 1799
+	 Train time/sample: 1799
+	 Train time/batch_in_epoch: 1799
+	 Train time/sample_in_epoch: 1799
+	 Train time/token: 1842176
+	 Train time/token_in_epoch: 1842176
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5100
+	 Train metrics/train/Loss: 0.5100
+	 Train metrics/train/NLL: 0.5100
+	 Train metrics/train/BPD: 0.7358
+	 Train metrics/train/Perplexity: 1.6653
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3305
+	 Train throughput/batches_per_sec: 1.3490
+	 Train throughput/samples_per_sec: 1.3490
+	 Train throughput/device/batches_per_sec: 1.3490
+	 Train throughput/device/samples_per_sec: 1.3490
+	 Train throughput/tokens_per_sec: 1381.4125
+	 Train throughput/device/tokens_per_sec: 1381.4125
+	 Train time/train: 0.3805
+	 Train time/val: 0.0047
+	 Train time/total: 0.3852
+[epoch=1][batch=1810/7324]:
+	 Train time/batch: 1809
+	 Train time/sample: 1809
+	 Train time/batch_in_epoch: 1809
+	 Train time/sample_in_epoch: 1809
+	 Train time/token: 1852416
+	 Train time/token_in_epoch: 1852416
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.7179
+	 Train metrics/train/Loss: 0.7179
+	 Train metrics/train/NLL: 0.7178
+	 Train metrics/train/BPD: 1.0356
+	 Train metrics/train/Perplexity: 2.0500
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3257
+	 Train throughput/batches_per_sec: 1.3491
+	 Train throughput/samples_per_sec: 1.3491
+	 Train throughput/device/batches_per_sec: 1.3491
+	 Train throughput/device/samples_per_sec: 1.3491
+	 Train throughput/tokens_per_sec: 1381.5005
+	 Train throughput/device/tokens_per_sec: 1381.5005
+	 Train time/train: 0.3825
+	 Train time/val: 0.0047
+	 Train time/total: 0.3872
+[epoch=1][batch=1820/7324]:
+	 Train time/batch: 1819
+	 Train time/sample: 1819
+	 Train time/batch_in_epoch: 1819
+	 Train time/sample_in_epoch: 1819
+	 Train time/token: 1862656
+	 Train time/token_in_epoch: 1862656
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.1201
+	 Train metrics/train/Loss: 1.1201
+	 Train metrics/train/NLL: 1.1201
+	 Train metrics/train/BPD: 1.6159
+	 Train metrics/train/Perplexity: 3.0651
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3208
+	 Train throughput/batches_per_sec: 1.3492
+	 Train throughput/samples_per_sec: 1.3492
+	 Train throughput/device/batches_per_sec: 1.3492
+	 Train throughput/device/samples_per_sec: 1.3492
+	 Train throughput/tokens_per_sec: 1381.5814
+	 Train throughput/device/tokens_per_sec: 1381.5814
+	 Train time/train: 0.3846
+	 Train time/val: 0.0047
+	 Train time/total: 0.3893
+[epoch=1][batch=1830/7324]:
+	 Train time/batch: 1829
+	 Train time/sample: 1829
+	 Train time/batch_in_epoch: 1829
+	 Train time/sample_in_epoch: 1829
+	 Train time/token: 1872896
+	 Train time/token_in_epoch: 1872896
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.4322
+	 Train metrics/train/Loss: 0.4322
+	 Train metrics/train/NLL: 0.4319
+	 Train metrics/train/BPD: 0.6231
+	 Train metrics/train/Perplexity: 1.5402
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3160
+	 Train throughput/batches_per_sec: 1.3493
+	 Train throughput/samples_per_sec: 1.3493
+	 Train throughput/device/batches_per_sec: 1.3493
+	 Train throughput/device/samples_per_sec: 1.3493
+	 Train throughput/tokens_per_sec: 1381.6897
+	 Train throughput/device/tokens_per_sec: 1381.6897
+	 Train time/train: 0.3866
+	 Train time/val: 0.0047
+	 Train time/total: 0.3913
+[epoch=1][batch=1840/7324]:
+	 Train time/batch: 1839
+	 Train time/sample: 1839
+	 Train time/batch_in_epoch: 1839
+	 Train time/sample_in_epoch: 1839
+	 Train time/token: 1883136
+	 Train time/token_in_epoch: 1883136
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6118
+	 Train metrics/train/Loss: 0.6118
+	 Train metrics/train/NLL: 0.6117
+	 Train metrics/train/BPD: 0.8825
+	 Train metrics/train/Perplexity: 1.8436
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3112
+	 Train throughput/batches_per_sec: 1.3494
+	 Train throughput/samples_per_sec: 1.3494
+	 Train throughput/device/batches_per_sec: 1.3494
+	 Train throughput/device/samples_per_sec: 1.3494
+	 Train throughput/tokens_per_sec: 1381.7657
+	 Train throughput/device/tokens_per_sec: 1381.7657
+	 Train time/train: 0.3887
+	 Train time/val: 0.0047
+	 Train time/total: 0.3934
+[epoch=1][batch=1850/7324]:
+	 Train time/batch: 1849
+	 Train time/sample: 1849
+	 Train time/batch_in_epoch: 1849
+	 Train time/sample_in_epoch: 1849
+	 Train time/token: 1893376
+	 Train time/token_in_epoch: 1893376
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.0632
+	 Train metrics/train/Loss: 1.0632
+	 Train metrics/train/NLL: 1.0633
+	 Train metrics/train/BPD: 1.5340
+	 Train metrics/train/Perplexity: 2.8959
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3064
+	 Train throughput/batches_per_sec: 1.3494
+	 Train throughput/samples_per_sec: 1.3494
+	 Train throughput/device/batches_per_sec: 1.3494
+	 Train throughput/device/samples_per_sec: 1.3494
+	 Train throughput/tokens_per_sec: 1381.8095
+	 Train throughput/device/tokens_per_sec: 1381.8095
+	 Train time/train: 0.3907
+	 Train time/val: 0.0047
+	 Train time/total: 0.3954
+[epoch=1][batch=1860/7324]:
+	 Train time/batch: 1859
+	 Train time/sample: 1859
+	 Train time/batch_in_epoch: 1859
+	 Train time/sample_in_epoch: 1859
+	 Train time/token: 1903616
+	 Train time/token_in_epoch: 1903616
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5880
+	 Train metrics/train/Loss: 0.5880
+	 Train metrics/train/NLL: 0.5881
+	 Train metrics/train/BPD: 0.8484
+	 Train metrics/train/Perplexity: 1.8006
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.3018
+	 Train throughput/batches_per_sec: 1.3495
+	 Train throughput/samples_per_sec: 1.3495
+	 Train throughput/device/batches_per_sec: 1.3495
+	 Train throughput/device/samples_per_sec: 1.3495
+	 Train throughput/tokens_per_sec: 1381.8512
+	 Train throughput/device/tokens_per_sec: 1381.8512
+	 Train time/train: 0.3928
+	 Train time/val: 0.0047
+	 Train time/total: 0.3975
+[epoch=1][batch=1870/7324]:
+	 Train time/batch: 1869
+	 Train time/sample: 1869
+	 Train time/batch_in_epoch: 1869
+	 Train time/sample_in_epoch: 1869
+	 Train time/token: 1913856
+	 Train time/token_in_epoch: 1913856
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8828
+	 Train metrics/train/Loss: 0.8828
+	 Train metrics/train/NLL: 0.8828
+	 Train metrics/train/BPD: 1.2736
+	 Train metrics/train/Perplexity: 2.4176
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.2973
+	 Train throughput/batches_per_sec: 1.3494
+	 Train throughput/samples_per_sec: 1.3494
+	 Train throughput/device/batches_per_sec: 1.3494
+	 Train throughput/device/samples_per_sec: 1.3494
+	 Train throughput/tokens_per_sec: 1381.7919
+	 Train throughput/device/tokens_per_sec: 1381.7919
+	 Train time/train: 0.3949
+	 Train time/val: 0.0047
+	 Train time/total: 0.3995
+[epoch=1][batch=1880/7324]:
+	 Train time/batch: 1879
+	 Train time/sample: 1879
+	 Train time/batch_in_epoch: 1879
+	 Train time/sample_in_epoch: 1879
+	 Train time/token: 1924096
+	 Train time/token_in_epoch: 1924096
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8485
+	 Train metrics/train/Loss: 0.8485
+	 Train metrics/train/NLL: 0.8487
+	 Train metrics/train/BPD: 1.2244
+	 Train metrics/train/Perplexity: 2.3366
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.2927
+	 Train throughput/batches_per_sec: 1.3494
+	 Train throughput/samples_per_sec: 1.3494
+	 Train throughput/device/batches_per_sec: 1.3494
+	 Train throughput/device/samples_per_sec: 1.3494
+	 Train throughput/tokens_per_sec: 1381.7891
+	 Train throughput/device/tokens_per_sec: 1381.7891
+	 Train time/train: 0.3969
+	 Train time/val: 0.0047
+	 Train time/total: 0.4016
+[epoch=1][batch=1890/7324]:
+	 Train time/batch: 1889
+	 Train time/sample: 1889
+	 Train time/batch_in_epoch: 1889
+	 Train time/sample_in_epoch: 1889
+	 Train time/token: 1934336
+	 Train time/token_in_epoch: 1934336
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.6620
+	 Train metrics/train/Loss: 0.6620
+	 Train metrics/train/NLL: 0.6618
+	 Train metrics/train/BPD: 0.9548
+	 Train metrics/train/Perplexity: 1.9383
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.2883
+	 Train throughput/batches_per_sec: 1.3493
+	 Train throughput/samples_per_sec: 1.3493
+	 Train throughput/device/batches_per_sec: 1.3493
+	 Train throughput/device/samples_per_sec: 1.3493
+	 Train throughput/tokens_per_sec: 1381.7285
+	 Train throughput/device/tokens_per_sec: 1381.7285
+	 Train time/train: 0.3990
+	 Train time/val: 0.0047
+	 Train time/total: 0.4036
+[epoch=1][batch=1900/7324]:
+	 Train time/batch: 1899
+	 Train time/sample: 1899
+	 Train time/batch_in_epoch: 1899
+	 Train time/sample_in_epoch: 1899
+	 Train time/token: 1944576
+	 Train time/token_in_epoch: 1944576
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 1.6283
+	 Train metrics/train/Loss: 1.6283
+	 Train metrics/train/NLL: 1.6284
+	 Train metrics/train/BPD: 2.3492
+	 Train metrics/train/Perplexity: 5.0955
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.2838
+	 Train throughput/batches_per_sec: 1.3493
+	 Train throughput/samples_per_sec: 1.3493
+	 Train throughput/device/batches_per_sec: 1.3493
+	 Train throughput/device/samples_per_sec: 1.3493
+	 Train throughput/tokens_per_sec: 1381.6989
+	 Train throughput/device/tokens_per_sec: 1381.6989
+	 Train time/train: 0.4010
+	 Train time/val: 0.0047
+	 Train time/total: 0.4057
+[epoch=1][batch=1910/7324]:
+	 Train time/batch: 1909
+	 Train time/sample: 1909
+	 Train time/batch_in_epoch: 1909
+	 Train time/sample_in_epoch: 1909
+	 Train time/token: 1954816
+	 Train time/token_in_epoch: 1954816
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.3798
+	 Train metrics/train/Loss: 0.3798
+	 Train metrics/train/NLL: 0.3797
+	 Train metrics/train/BPD: 0.5478
+	 Train metrics/train/Perplexity: 1.4619
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.2792
+	 Train throughput/batches_per_sec: 1.3494
+	 Train throughput/samples_per_sec: 1.3494
+	 Train throughput/device/batches_per_sec: 1.3494
+	 Train throughput/device/samples_per_sec: 1.3494
+	 Train throughput/tokens_per_sec: 1381.7353
+	 Train throughput/device/tokens_per_sec: 1381.7353
+	 Train time/train: 0.4031
+	 Train time/val: 0.0047
+	 Train time/total: 0.4077
+[epoch=1][batch=1920/7324]:
+	 Train time/batch: 1919
+	 Train time/sample: 1919
+	 Train time/batch_in_epoch: 1919
+	 Train time/sample_in_epoch: 1919
+	 Train time/token: 1965056
+	 Train time/token_in_epoch: 1965056
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5691
+	 Train metrics/train/Loss: 0.5691
+	 Train metrics/train/NLL: 0.5690
+	 Train metrics/train/BPD: 0.8210
+	 Train metrics/train/Perplexity: 1.7666
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.2747
+	 Train throughput/batches_per_sec: 1.3494
+	 Train throughput/samples_per_sec: 1.3494
+	 Train throughput/device/batches_per_sec: 1.3494
+	 Train throughput/device/samples_per_sec: 1.3494
+	 Train throughput/tokens_per_sec: 1381.8227
+	 Train throughput/device/tokens_per_sec: 1381.8227
+	 Train time/train: 0.4051
+	 Train time/val: 0.0047
+	 Train time/total: 0.4098
+[epoch=1][batch=1930/7324]:
+	 Train time/batch: 1929
+	 Train time/sample: 1929
+	 Train time/batch_in_epoch: 1929
+	 Train time/sample_in_epoch: 1929
+	 Train time/token: 1975296
+	 Train time/token_in_epoch: 1975296
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.8396
+	 Train metrics/train/Loss: 0.8396
+	 Train metrics/train/NLL: 0.8391
+	 Train metrics/train/BPD: 1.2106
+	 Train metrics/train/Perplexity: 2.3144
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.2701
+	 Train throughput/batches_per_sec: 1.3495
+	 Train throughput/samples_per_sec: 1.3495
+	 Train throughput/device/batches_per_sec: 1.3495
+	 Train throughput/device/samples_per_sec: 1.3495
+	 Train throughput/tokens_per_sec: 1381.9335
+	 Train throughput/device/tokens_per_sec: 1381.9335
+	 Train time/train: 0.4072
+	 Train time/val: 0.0047
+	 Train time/total: 0.4118
+[epoch=1][batch=1940/7324]:
+	 Train time/batch: 1939
+	 Train time/sample: 1939
+	 Train time/batch_in_epoch: 1939
+	 Train time/sample_in_epoch: 1939
+	 Train time/token: 1985536
+	 Train time/token_in_epoch: 1985536
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5316
+	 Train metrics/train/Loss: 0.5316
+	 Train metrics/train/NLL: 0.5316
+	 Train metrics/train/BPD: 0.7669
+	 Train metrics/train/Perplexity: 1.7017
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.2659
+	 Train throughput/batches_per_sec: 1.3495
+	 Train throughput/samples_per_sec: 1.3495
+	 Train throughput/device/batches_per_sec: 1.3495
+	 Train throughput/device/samples_per_sec: 1.3495
+	 Train throughput/tokens_per_sec: 1381.8432
+	 Train throughput/device/tokens_per_sec: 1381.8432
+	 Train time/train: 0.4092
+	 Train time/val: 0.0047
+	 Train time/total: 0.4139
+[epoch=1][batch=1950/7324]:
+	 Train time/batch: 1949
+	 Train time/sample: 1949
+	 Train time/batch_in_epoch: 1949
+	 Train time/sample_in_epoch: 1949
+	 Train time/token: 1995776
+	 Train time/token_in_epoch: 1995776
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.4935
+	 Train metrics/train/Loss: 0.4935
+	 Train metrics/train/NLL: 0.4936
+	 Train metrics/train/BPD: 0.7121
+	 Train metrics/train/Perplexity: 1.6381
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.2615
+	 Train throughput/batches_per_sec: 1.3495
+	 Train throughput/samples_per_sec: 1.3495
+	 Train throughput/device/batches_per_sec: 1.3495
+	 Train throughput/device/samples_per_sec: 1.3495
+	 Train throughput/tokens_per_sec: 1381.9214
+	 Train throughput/device/tokens_per_sec: 1381.9214
+	 Train time/train: 0.4113
+	 Train time/val: 0.0047
+	 Train time/total: 0.4160
+[epoch=1][batch=1960/7324]:
+	 Train time/batch: 1959
+	 Train time/sample: 1959
+	 Train time/batch_in_epoch: 1959
+	 Train time/sample_in_epoch: 1959
+	 Train time/token: 2006016
+	 Train time/token_in_epoch: 2006016
+	 Train trainer/device_train_microbatch_size: 1
+	 Train loss/train/total: 0.5097
+	 Train metrics/train/Loss: 0.5097
+	 Train metrics/train/NLL: 0.5096
+	 Train metrics/train/BPD: 0.7353
+	 Train metrics/train/Perplexity: 1.6647
+	 Train lr-DecoupledAdamW/group0: 0.0000
+	 Train time/remaining_estimate: 9.2571
+	 Train throughput/batches_per_sec: 1.3496
+	 Train throughput/samples_per_sec: 1.3496
+	 Train throughput/device/batches_per_sec: 1.3496
+	 Train throughput/device/samples_per_sec: 1.3496
+	 Train throughput/tokens_per_sec: 1381.9416
+	 Train throughput/device/tokens_per_sec: 1381.9416
+	 Train time/train: 0.4133
+	 Train time/val: 0.0047
+	 Train time/total: 0.4180
