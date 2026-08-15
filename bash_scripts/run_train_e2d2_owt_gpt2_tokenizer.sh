@@ -27,7 +27,7 @@ RUN_NAME=owt_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_
 MICRO_BATCH_SIZE=16
 NUM_WORKERS=0
 
-composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoiser.py \
+uv run composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoiser.py \
   run_name=${RUN_NAME} \
   pretrained_model_name_or_path=${PRETRAINED_MODEL_NAME_OR_PATH} \
   tokenizer.pretrained_model_name_or_path="gpt2" \

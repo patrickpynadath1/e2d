@@ -48,8 +48,9 @@ training:
   compile_backbone: false
 
 checkpointing:
-  # Use custom `save_dir` if, e.g., saving to S3 bucket, otherwise leave this parameter as is
-  save_dir: ${cwd:}/checkpoints  # With hydra.job.chdir=true, this will be ${hydra.run.dir}/checkpoints
+  # setup_env.sh points this at ~/.cache/e2d/checkpoints by default. Each run gets
+  # an isolated directory; direct Python use falls back to the Hydra output tree.
+  save_dir: ${oc.env:E2D_CHECKPOINT_ROOT,${cwd:}/checkpoints}/${run_name}
 
 hydra:
   run:

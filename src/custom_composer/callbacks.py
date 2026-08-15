@@ -230,7 +230,7 @@ class HuggingFaceCompatibleCheckpointing(CheckpointSaver):
     def close(self, state: State, logger: Logger) -> None:
         """Clean up tmp repo snapshot"""
         if dist.get_global_rank() == 0:
-            if fsspec_exists(self.project_root):
+            if self.project_root and fsspec_exists(self.project_root):
                 shutil.rmtree(self.project_root)
         dist.barrier()
         super().close(state, logger)

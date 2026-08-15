@@ -60,7 +60,7 @@ mkdir -p ${OUTPUT_PATH}
 
 ASSISTANT_EARLY_EXIT=${ASSISTANT_EARLY_EXIT:-0}
 
-accelerate launch scripts/eval/harness_eval.py \
+uv run accelerate launch scripts/eval/harness_eval.py \
   hydra.output_subdir=null \
   hydra.run.dir="${PWD}" \
   hydra/job_logging=disabled \

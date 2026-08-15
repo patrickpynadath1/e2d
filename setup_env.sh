@@ -4,26 +4,23 @@
 # Usage:
 #     source setup_env.sh
 
-# Activate conda env
-# shellcheck source=${HOME}/.bashrc disable=SC1091
-CONDA_SHELL="$(conda info --base)/etc/profile.d/conda.sh"
-source "${CONDA_SHELL}"
-if [ -z "${CONDA_PREFIX}" ]; then
-    conda activate e2d-env
- elif [[ "${CONDA_PREFIX}" != *"/e2d-env" ]]; then
-  conda deactivate
-  conda activate e2d-env
+# Dependencies are managed by uv. Run `uv sync --frozen` once before launching jobs.
+# This file only supplies optional runtime environment settings.
+if [ -f "${HOME}/setup_discdiff.sh" ]; then
+  # shellcheck source=/dev/null
+  source "${HOME}/setup_discdiff.sh"
 fi
 
-# W&B / HF Setup
-source "${HOME}/setup_discdiff.sh"
-export HF_HOME="${PWD}/.hf_cache"
+export HF_HOME="${HF_HOME:-${PWD}/.hf_cache}"
 echo "HuggingFace cache set to '${HF_HOME}'."
 
-# Add root directory to PYTHONPATH to enable module imports
-export PYTHONPATH="${PWD}:${HF_HOME}/modules"
+# Keep large checkpoints on the cache mount rather than the workspace filesystem.
+export E2D_CACHE_HOME="${E2D_CACHE_HOME:-${HOME}/.cache/e2d}"
+export E2D_CHECKPOINT_ROOT="${E2D_CHECKPOINT_ROOT:-${E2D_CACHE_HOME}/checkpoints}"
+mkdir -p "${E2D_CHECKPOINT_ROOT}"
+echo "E2D checkpoints will be stored under '${E2D_CHECKPOINT_ROOT}'."
 
 # Enforce verbose Hydra error logging
-export HYDRA_FULL_ERROR=1
+export HYDRA_FULL_ERROR="${HYDRA_FULL_ERROR:-1}"
 
-export NCCL_P2P_LEVEL=NVL
+export NCCL_P2P_LEVEL="${NCCL_P2P_LEVEL:-NVL}"

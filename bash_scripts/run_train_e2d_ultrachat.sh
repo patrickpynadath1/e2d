@@ -56,7 +56,7 @@ if [[ "${FORCE_REGENERATE}" == "true" || ! -d "${DISTILL_TRAIN_PATH}" || ! -d "$
     export FORCE_REGENERATE
     export EMPTY_CACHE_EVERY_BATCHES
 
-  python - <<'PY'
+  uv run python - <<'PY'
 import json
 import os
 import random
@@ -587,7 +587,7 @@ fi
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoiser.py \
+uv run composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoiser.py \
   run_name=${RUN_NAME} \
     pretrained_model_name_or_path=${MODEL_NAME_OR_PATH} \
     dataset@train_dataset=ultrachat_distill_train \

@@ -151,7 +151,7 @@ OUTPUT_PATH="${OUTPUT_DIR}/L-${L}-block_size-${BLOCK_SIZE}-do_sample-${DO_SAMPLE
 OUTPUT_PATH="${OUTPUT_DIR}/ema${USE_EMA}_ckpt${CKPT}_${NUM_FEW_SHOT}shot_L${L}_block${BLOCK_SIZE}-do_sample${DO_SAMPLE}-sampling_strategy${SAMPLING_STRATEGY}-T${T}_first_hit${FIRST_HITTING}-conf_noise${CONFIDENCE_BASED_NOISING}-conf_margin_noise${CONFIDENCE_MARGIN_BASED_NOISING}-conf_thold${CONFIDENCE_THRESHOLD}-align_to_blocks${ALIGN_INPUTS_TO_BLOCKS}"
 mkdir -p ${OUTPUT_PATH}
 
-accelerate launch scripts/eval/harness_eval.py \
+uv run accelerate launch scripts/eval/harness_eval.py \
   hydra.output_subdir=null \
   hydra.run.dir="${PWD}" \
   hydra/job_logging=disabled \

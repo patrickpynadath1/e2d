@@ -55,7 +55,7 @@ fi
 OUTPUT_PATH="${OUTPUT_DIR}/ema${USE_EMA}_ckpt${CKPT}_L${L}_block${BLOCK_SIZE}-do_sample${DO_SAMPLE}-sampling_strategy${SAMPLING_STRATEGY}-T${T}_first_hit${FIRST_HITTING}-conf_noise${CONFIDENCE_BASED_NOISING}-conf_margin_noise${CONFIDENCE_MARGIN_BASED_NOISING}-conf_thold${CONFIDENCE_THRESHOLD}-align_to_blocks${ALIGN_INPUTS_TO_BLOCKS}-prompt_${PROMPT_STYLE}"
 mkdir -p ${OUTPUT_PATH}
 
-python scripts/eval/math500_eval.py \
+uv run python scripts/eval/math500_eval.py \
   hydra.output_subdir=null \
   hydra.run.dir="${PWD}" \
   hydra/job_logging=disabled \

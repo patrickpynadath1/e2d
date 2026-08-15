@@ -29,6 +29,7 @@ from src.denoiser.base import (
     DenoiserInput,
     LossAndNllOutput,
 )
+from src.denoiser.speculative import SpeculativeStats
 
 
 def create_attn_mask(attn_mask):
@@ -1904,7 +1905,12 @@ class E2D(E2D2):
         return LossAndNllOutput(
             loss=loss,
             nlls=token_nlls,
-            other_loss_terms={},
+            other_loss_terms={
+                "encoder_loss": encoder_loss,
+                "decoder_loss": decoder_loss,
+            }
+            if model_output.shape[1] == 2 * seq_len
+            else {},
         )
 
     def _forward(
@@ -2485,5 +2491,18 @@ class E2D(E2D2):
         else:
             import time
             total_all_time_s = time.perf_counter() - overall_start_t
+
+        committed_tokens = max(0, current_idx - inputs_offset)
+        self._last_speculative_stats = SpeculativeStats(
+            proposed_tokens=total_generated_tokens,
+            accepted_tokens=total_accepted_tokens,
+            correction_tokens=accept_counts,
+            committed_tokens=committed_tokens,
+            draft_calls=accept_counts,
+            verifier_calls=accept_counts,
+            accepted_lengths=[int(value) for value in total_accepted_lengths],
+            draft_seconds=total_drafting_time_s,
+            total_seconds=total_all_time_s,
+        ).to_dict()
 
         return accumulated_samples, (total_generated_tokens, total_accepted_tokens), (total_accepted_lengths, accept_counts), (total_drafting_time_s, total_all_time_s)

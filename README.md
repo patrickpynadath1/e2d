@@ -12,37 +12,28 @@ work.
 
 ### Setup environment
 
-Install conda:
-```bash
-# For conda: https://docs.conda.io/projects/conda/en/stable/user-guide/install/linux.html
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh && \
-bash miniconda.sh -b -p /opt/conda
-```
-
-Setup a conda environment and install dependencies using:
+Dependencies are managed exclusively with [uv](https://docs.astral.sh/uv/):
 
 ```bash
-conda env create -f requirements.yaml
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv python install 3.12
+uv sync --frozen
 ```
 
-Activate the environment:
+Run commands through uv so they use the locked environment:
 
 ```bash
-conda activate e2d2-env
+uv run pytest
+uv run ruff check src scripts tests
 ```
 
-We also include a [`setup_env.sh`](./setup_env.sh) script that can be used to set up the
-environment on a new machine.
-Run the script using:
-```bash
-source setup_env.sh
-```
+GPU runs use the locked CUDA 11.8 PyTorch wheels and require a compatible NVIDIA
+driver. [`setup_env.sh`](./setup_env.sh) only supplies optional runtime settings; it
+does not install or activate an environment. Run `uv sync --frozen` before submitting
+jobs.
 
-You can also include this snippet in shell / slurm scripts to set up the environment on
-a compute node.
-
-In this script, we set up WandB and HuggingFace tokens by sourcing a script which is
-expected to be in the `/home/<YOUR_USER_NAME>/` directory.
+When present, `setup_env.sh` loads WandB and Hugging Face credentials from
+`~/setup_discdiff.sh`. Credentials are optional for offline tests.
 Copy the contents below into a shell script `/home/<YOUR_USER_NAME>/setup_discdiff.sh`
 and replace the placeholder tokens with your own:
 ```shell
@@ -71,7 +62,7 @@ We use [pre-commit](https://pre-commit.com/) to run linters and formatters on th
 To install the pre-commit hooks, run:
 
 ```bash
-pre-commit install
+uv run pre-commit install
 ```
 On every `git commit`,
 the pre-commit hooks will run automatically and report any issues / automatic fixes that
@@ -126,6 +117,33 @@ In that file, and similar ones for other evaluations, specify the path to the sa
 checkpoints, and uncomment the relevant section for a given denoiser class.
 We also provide scripts that will produce the generation throughput numbers we report.
 These files contain a `_tput` at the end of the script name.
+
+### Small E2D reference run
+
+The first correctness and performance milestone is the existing dual-decoder E2D
+method: the full model verifies proposals drafted by its tied top two layers. Run its
+portable 128-example GSM8K preset with:
+
+```bash
+uv sync --frozen
+AR_CHECKPOINT_PATH=/path/to/ar/weights-only.pt \
+  bash bash_scripts/run_train_e2d_gsm8k_small.sh
+```
+
+`OUTPUT_ROOT`, `MODEL_NAME`, `RUN_NAME`, `NUM_DEVICES`, and `MAX_DURATION` are optional.
+The script defaults to online W&B logging, local outputs, block size 4, 20 training
+batches, and a 32-example validation subset. It deliberately fails before launching if
+the AR checkpoint is unspecified.
+
+E2D generation keeps its historical return tuple and also records normalized metrics
+in `model._last_speculative_stats`, including proposals, accepted/committed tokens,
+draft and verifier calls, acceptance length, drafting time, total time, and throughput.
+
+Checkpoints default to `~/.cache/e2d/checkpoints/<run_name>`, which is the large cache
+mount on the reference machine. Set `E2D_CHECKPOINT_ROOT` to override it. Hydra outputs
+and W&B logs remain under the configured run directory; checkpoint callbacks alone use
+the cache location. The small smoke launcher disables checkpoints by default; set
+`ENABLE_CHECKPOINTING=true CHECKPOINTS_TO_KEEP=1` for a retained training checkpoint.
 
 Below are the evaluation scripts provided for various tasks:
 - Text summarization: [`run_seq2seq_eval_cnndm.sh`](bash_scripts/run_seq2seq_eval_cnndm.sh),[`run_seq2seq_eval_cnndm_tput.sh`](bash_scripts/run_seq2seq_eval_cnndm_tput.sh)

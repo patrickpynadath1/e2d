@@ -36,14 +36,23 @@ class GSM8KDataset(Dataset):
         source_key: str = "question",
         target_key: str = "answer",
         num_shot: int = 0,
+        max_samples: int | None = None,
+        sampling_seed: int = 1,
         # Unused tokenizer arg (compat. with other dataset loading functions/classes)
         **_: Dict[str, Any],
     ):
         self.tokenizer = tokenizer
         self.split = split
-        self.dataset = load_dataset(
-            dataset_path, config_name, split=split, trust_remote_code=True
-        )
+        self.dataset = load_dataset(dataset_path, config_name, split=split)
+        if max_samples is not None:
+            if max_samples <= 0:
+                raise ValueError("max_samples must be positive when provided")
+            sample_count = min(max_samples, len(self.dataset))
+            generator = np.random.default_rng(sampling_seed)
+            indices = np.sort(
+                generator.choice(len(self.dataset), sample_count, replace=False)
+            ).tolist()
+            self.dataset = self.dataset.select(indices)
         self.max_length = max_length
         self.padding = padding
         self.add_special_tokens = add_special_tokens
@@ -52,6 +61,8 @@ class GSM8KDataset(Dataset):
         self.source_key = source_key
         self.target_key = target_key
         self.num_shot = num_shot
+        self.max_samples = max_samples
+        self.sampling_seed = sampling_seed
         self._arange = range(len(self.dataset))
 
     def __len__(self):

@@ -29,7 +29,7 @@ NUM_VISIBLE_DEVICES=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoiser.py \
+uv run composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoiser.py \
   run_name=${RUN_NAME} \
   pretrained_model_name_or_path=${PRETRAINED_MODEL_NAME_OR_PATH} \
   dataset@train_dataset=tulu_v2_sft_train \

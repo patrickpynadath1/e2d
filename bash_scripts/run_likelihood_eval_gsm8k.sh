@@ -16,7 +16,7 @@ USE_EMA=true
 
 NUM_VISIBLE_DEVICES=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
-composer -n ${NUM_VISIBLE_DEVICES} scripts/eval/likelihood_eval.py \
+uv run composer -n ${NUM_VISIBLE_DEVICES} scripts/eval/likelihood_eval.py \
   hydra.output_subdir=null \
   hydra.run.dir="${PWD}" \
   hydra/job_logging=disabled \

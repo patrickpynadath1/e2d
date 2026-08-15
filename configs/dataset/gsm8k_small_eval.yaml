@@ -1,0 +1,6 @@
+defaults:
+  - gsm8k_eval@_here_
+  - _self_
+
+max_samples: 32
+sampling_seed: ${seed}

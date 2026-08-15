@@ -71,7 +71,7 @@ else
   NUM_VISIBLE_DEVICES=$(echo "${CUDA_VISIBLE_DEVICES}" | awk -F',' '{print NF}')
 fi
 
-composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoiser.py \
+uv run composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoiser.py \
   run_name=${RUN_NAME} \
   pretrained_model_name_or_path=${PRETRAINED_MODEL_NAME_OR_PATH} \
   dataset@train_dataset=ultrachat_distill_train \

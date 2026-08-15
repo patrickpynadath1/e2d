@@ -70,7 +70,7 @@ if [ "${USE_FSDP}" == "true" ]; then
   FSDP_ARGS="+composer/parallelism=fsdp composer.parallelism.fsdp.sharding_strategy=${FSDP_SHARDING_STRATEGY}"
 fi
 
-composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoiser.py \
+uv run composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoiser.py \
   run_name=${RUN_NAME} \
   pretrained_model_name_or_path=${PRETRAINED_MODEL_NAME_OR_PATH} \
   dataset@train_dataset=kodcode_train \

@@ -31,6 +31,28 @@ class Loss(Metric):
         return self.sum_loss / self.total_batches
 
 
+class EncoderLoss(Loss):
+    """Encoder component of a dual-decoder training objective."""
+
+    def __init__(self, dist_sync_on_step: bool = False):
+        super().__init__(
+            name="encoder_loss",
+            update_key="encoder_loss",
+            dist_sync_on_step=dist_sync_on_step,
+        )
+
+
+class DecoderLoss(Loss):
+    """Decoder component of a dual-decoder training objective."""
+
+    def __init__(self, dist_sync_on_step: bool = False):
+        super().__init__(
+            name="decoder_loss",
+            update_key="decoder_loss",
+            dist_sync_on_step=dist_sync_on_step,
+        )
+
+
 class NLL(Metric):
     # Make torchmetrics call update only once
     full_state_update = False

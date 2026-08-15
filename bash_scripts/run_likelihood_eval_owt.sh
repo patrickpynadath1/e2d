@@ -14,7 +14,7 @@ for EVAL_DATASET in "owt_eval_gpt2" "ptb_eval" "wikitext2_eval" "lm1b_eval" "lam
   CKPT_FILE="best-rank0.pt"
   USE_EMA=true
 
-  composer -n ${NUM_VISIBLE_DEVICES} scripts/eval/likelihood_eval.py \
+  uv run composer -n ${NUM_VISIBLE_DEVICES} scripts/eval/likelihood_eval.py \
     hydra.output_subdir=null \
     hydra.run.dir="${PWD}" \
     hydra/job_logging=disabled \
