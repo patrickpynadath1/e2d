@@ -7,12 +7,14 @@ import time
 from typing import Any, Literal
 
 import torch
-import wandb
 from composer.callbacks import CheckpointSaver
 from composer.core import Callback, State, Time, Timestamp
 from composer.loggers import Logger
 from composer.utils import PartialFilePath, dist, get_save_filename
 
+import wandb
+from src.denoiser.diffusion import DiffusionGenerationConfig
+from src.denoiser.speculative import SpeculativeStats
 from src.utils import (
     fsspec_exists,
     save_pretrained_or_push_to_hub,
@@ -20,7 +22,222 @@ from src.utils import (
 )
 
 log = logging.getLogger(__name__)
-__all__ = ["DataloaderSpeedMonitor"]
+__all__ = ["DataloaderSpeedMonitor", "SpeculativeGenerationEvaluator"]
+
+
+def _unwrap_huggingface_model(state_model: Any) -> tuple[Any, Any]:
+    """Return the denoiser and tokenizer from Composer's optional DDP wrapper."""
+    composer_model = (
+        state_model.module if hasattr(state_model, "module") else state_model
+    )
+    if not hasattr(composer_model, "model") or not hasattr(composer_model, "tokenizer"):
+        raise TypeError("speculative evaluation requires Composer HuggingFaceModel")
+    return composer_model.model, composer_model.tokenizer
+
+
+def _target_forward(model: Any, input_ids: torch.LongTensor) -> torch.Tensor:
+    """Run the full target model for one uncached greedy step."""
+    if hasattr(model, "target"):
+        return model.target(input_ids=input_ids, use_cache=False).logits
+    if hasattr(model, "backbone") and hasattr(model.backbone, "encoder"):
+        return model.backbone.encoder(input_ids=input_ids, use_cache=False).logits
+    raise TypeError("model does not expose a target verifier")
+
+
+@torch.no_grad()
+def _target_greedy(
+    model: Any, input_ids: torch.LongTensor, max_new_tokens: int
+) -> torch.LongTensor:
+    output = input_ids
+    eos_token_id = getattr(model, "eos_token_id", None)
+    for _ in range(max_new_tokens):
+        token = _target_forward(model, output)[:, -1:].argmax(-1)
+        output = torch.cat([output, token], dim=-1)
+        if eos_token_id is not None and bool((token == eos_token_id).all()):
+            break
+    return output
+
+
+def _read_speculative_stats(model: Any) -> dict[str, Any]:
+    stats = getattr(model, "last_speculative_stats", None)
+    if stats is None:
+        stats = getattr(model, "_last_speculative_stats", None)
+    if isinstance(stats, SpeculativeStats):
+        return stats.to_dict()
+    if isinstance(stats, dict):
+        return stats
+    raise RuntimeError("model did not expose speculative generation statistics")
+
+
+class SpeculativeGenerationEvaluator(Callback):
+    """Run a small fixed speculative-generation evaluation after validation.
+
+    Every distributed rank executes the same prompts so wrapped model forwards remain
+    collective-safe. Only rank zero logs the identical deterministic result.
+    """
+
+    def __init__(
+        self,
+        prompts: list[str],
+        max_new_tokens: int = 64,
+        block_size: int = 4,
+        num_steps: int = 1,
+        seed: int = 17,
+        verify_exact_match: bool = True,
+        num_prompts: int | None = None,
+    ) -> None:
+        if not prompts:
+            raise ValueError("speculative evaluator requires at least one prompt")
+        if max_new_tokens < 1 or block_size < 1 or num_steps < 1:
+            raise ValueError("generation lengths and num_steps must be positive")
+        if num_prompts is not None and num_prompts < 1:
+            raise ValueError("num_prompts must be positive when provided")
+        self.prompts = prompts[:num_prompts]
+        self.max_new_tokens = max_new_tokens
+        self.block_size = block_size
+        self.num_steps = num_steps
+        self.seed = seed
+        self.verify_exact_match = verify_exact_match
+
+    def eval_end(self, state: State, logger: Logger) -> None:
+        model, tokenizer = _unwrap_huggingface_model(state.model)
+        was_training = model.training
+        device = next(model.parameters()).device
+        totals: dict[str, float] = {
+            "proposed_tokens": 0.0,
+            "accepted_tokens": 0.0,
+            "correction_tokens": 0.0,
+            "committed_tokens": 0.0,
+            "draft_calls": 0.0,
+            "verifier_calls": 0.0,
+            "draft_seconds": 0.0,
+            "verifier_seconds": 0.0,
+            "cache_seconds": 0.0,
+            "total_seconds": 0.0,
+        }
+        accepted_lengths: list[int] = []
+        position_attempts = [0] * self.block_size
+        position_accepts = [0] * self.block_size
+        exact_matches = 0
+        greedy_seconds = 0.0
+        speculative_seconds = 0.0
+        generation_config = DiffusionGenerationConfig(
+            max_new_tokens=self.max_new_tokens,
+            block_size=self.block_size,
+            num_steps=self.num_steps,
+            use_cache=True,
+            align_inputs_to_blocks=False,
+        )
+
+        model.eval()
+        try:
+            devices = [device] if device.type == "cuda" else []
+            with torch.random.fork_rng(devices=devices):
+                torch.manual_seed(self.seed)
+                if device.type == "cuda":
+                    torch.cuda.manual_seed_all(self.seed)
+                for prompt in self.prompts:
+                    inputs = tokenizer(
+                        prompt, return_tensors="pt", add_special_tokens=True
+                    ).input_ids.to(device)
+                    if device.type == "cuda":
+                        torch.cuda.synchronize(device)
+                    speculative_started = time.perf_counter()
+                    generate = getattr(model, "generate_verified", model.generate)
+                    speculative_output = generate(
+                        inputs=inputs,
+                        generation_config=generation_config,
+                        max_new_tokens=self.max_new_tokens,
+                        disable_pbar=True,
+                        conf_seg=False,
+                        tree_attn=False,
+                    )
+                    if device.type == "cuda":
+                        torch.cuda.synchronize(device)
+                    speculative_seconds += time.perf_counter() - speculative_started
+                    if isinstance(speculative_output, tuple):
+                        speculative_output = speculative_output[0]
+                    stats = _read_speculative_stats(model)
+                    for key in totals:
+                        totals[key] += float(stats.get(key, 0.0))
+                    lengths = [
+                        int(value) for value in stats.get("accepted_lengths", [])
+                    ]
+                    accepted_lengths.extend(lengths)
+                    for length in lengths:
+                        for position in range(self.block_size):
+                            position_attempts[position] += 1
+                            if position < length:
+                                position_accepts[position] += 1
+
+                    generated_count = speculative_output.shape[1] - inputs.shape[1]
+                    if device.type == "cuda":
+                        torch.cuda.synchronize(device)
+                    greedy_started = time.perf_counter()
+                    greedy_output = _target_greedy(model, inputs, generated_count)
+                    if device.type == "cuda":
+                        torch.cuda.synchronize(device)
+                    greedy_seconds += time.perf_counter() - greedy_started
+                    matches = torch.equal(speculative_output, greedy_output)
+                    exact_matches += int(matches)
+                    if self.verify_exact_match and not matches:
+                        raise RuntimeError(
+                            "speculative output diverged from target-greedy output: "
+                            f"speculative={speculative_output.tolist()}, "
+                            f"greedy={greedy_output.tolist()}"
+                        )
+        finally:
+            model.train(was_training)
+
+        if dist.get_global_rank() != 0:
+            return
+        proposed = totals["proposed_tokens"]
+        committed = totals["committed_tokens"]
+        metrics = {
+            "speculative/acceptance_rate": (
+                totals["accepted_tokens"] / proposed if proposed else 0.0
+            ),
+            "speculative/average_accepted_length": (
+                sum(accepted_lengths) / len(accepted_lengths)
+                if accepted_lengths
+                else 0.0
+            ),
+            "speculative/proposed_tokens": totals["proposed_tokens"],
+            "speculative/accepted_tokens": totals["accepted_tokens"],
+            "speculative/correction_tokens": totals["correction_tokens"],
+            "speculative/committed_tokens": committed,
+            "speculative/draft_calls": totals["draft_calls"],
+            "speculative/verifier_calls": totals["verifier_calls"],
+            "speculative/draft_seconds": totals["draft_seconds"],
+            "speculative/verifier_seconds": totals["verifier_seconds"],
+            "speculative/cache_seconds": totals["cache_seconds"],
+            "speculative/total_seconds": totals["total_seconds"],
+            "speculative/measured_total_seconds": speculative_seconds,
+            "speculative/tokens_per_second": (
+                committed / speculative_seconds if speculative_seconds else 0.0
+            ),
+            "speculative/target_greedy_seconds": greedy_seconds,
+            "speculative/target_greedy_tokens_per_second": (
+                committed / greedy_seconds if greedy_seconds else 0.0
+            ),
+            "speculative/speedup_vs_target_greedy": (
+                greedy_seconds / speculative_seconds if speculative_seconds else 0.0
+            ),
+            "speculative/exact_match_rate": exact_matches / len(self.prompts),
+        }
+        for position, (accepted, attempted) in enumerate(
+            zip(position_accepts, position_attempts), start=1
+        ):
+            metrics[f"speculative/position_{position}_acceptance_rate"] = (
+                accepted / attempted if attempted else 0.0
+            )
+        for length in range(self.block_size + 1):
+            metrics[f"speculative/accepted_length_{length}_fraction"] = (
+                accepted_lengths.count(length) / len(accepted_lengths)
+                if accepted_lengths
+                else 0.0
+            )
+        logger.log_metrics(metrics)
 
 
 class DataloaderSpeedMonitor(Callback):

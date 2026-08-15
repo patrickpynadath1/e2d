@@ -1,6 +1,6 @@
+import time
 from functools import partial
 from typing import Any, Dict, Literal, Optional, Tuple, Union
-import math
 
 import torch
 from tqdm.auto import tqdm
@@ -10,7 +10,6 @@ from transformers import (
     PreTrainedTokenizer,
     StoppingCriteriaList,
 )
-import transformers
 from transformers.cache_utils import Cache, DynamicCache
 
 try:
@@ -1390,7 +1389,7 @@ class E2D2(BD3LM):
                 decoder_attention_mask = self.static_attention_mask
         else:
             raise ValueError("Unknown backbone backend")
-        
+
         # create a tensor [[0, 1, 2, ..., L-1]]
         position_ids = torch.arange(input_ids.shape[1]).to(input_ids.device)[None, :]
 
@@ -1506,7 +1505,7 @@ class E2D2(BD3LM):
             position_ids = torch.arange(context_len, full_seq_length).to(device)[
                 None, :
             ]
-        
+
         # decoder's run
         if input_ids is not None:
             # can attend to all the tokens
@@ -1557,7 +1556,7 @@ class E2D2(BD3LM):
 
 class E2DConfig(E2D2Config):
     """Configuration class for E2D models (autoregressive variant)."""
-    
+
     model_type = "e2d"
     auto_map = {
         "AutoConfig": "diffusion.E2DConfig",
@@ -1575,11 +1574,93 @@ class E2DConfig(E2D2Config):
 
 class E2D(E2D2):
     """Autoregressive variant of E2D2 using block causal attention."""
-    
+
     config_class = E2DConfig
 
     def __init__(self, config: E2DConfig, **kwargs):
         super().__init__(config, **kwargs)
+
+    @torch.no_grad()
+    def generate_verified(
+        self,
+        inputs: torch.LongTensor,
+        generation_config: DiffusionGenerationConfig,
+        max_new_tokens: Optional[int] = None,
+        **kwargs: Any,
+    ) -> tuple[torch.LongTensor, SpeculativeStats]:
+        """Correctness-first E2D drafting with explicit full-target verification.
+
+        The older optimized generation routine interleaves encoder and decoder KV
+        mutation. This path rebuilds the draft cache from committed tokens at each
+        block boundary and therefore cannot retain rejected draft state.
+        """
+        del kwargs
+        if inputs.shape[0] != 1:
+            raise NotImplementedError("verified E2D generation requires batch size one")
+        block_size = int(generation_config.block_size or self.config.eval_block_size)
+        max_new_tokens = int(max_new_tokens or generation_config.max_new_tokens)
+        generated = inputs
+        stats = SpeculativeStats()
+        started = time.perf_counter()
+
+        while generated.shape[1] - inputs.shape[1] < max_new_tokens:
+            remaining = max_new_tokens - (generated.shape[1] - inputs.shape[1])
+            proposal_len = min(block_size, remaining)
+            cache_started = time.perf_counter()
+            cache = self.update_cache(inputs=generated[:, :-1], cache={})
+            stats.cache_seconds += time.perf_counter() - cache_started
+            draft_input = generated[:, -1:]
+            proposal_tokens = []
+            draft_started = time.perf_counter()
+            for _ in range(proposal_len):
+                denoiser_inputs, remaining_cache = self._prepare_inputs_inference(
+                    input_ids=draft_input,
+                    cache=cache,
+                )
+                draft_output = self._backbone_forward(
+                    denoiser_inputs,
+                    fix_cache_length=True,
+                    truncate_cache=False,
+                    **remaining_cache,
+                )
+                draft_output = dict(draft_output)
+                logits = draft_output.pop("logits")
+                cache = remaining_cache | draft_output
+                draft_input = logits[:, -1:].argmax(-1)
+                proposal_tokens.append(draft_input)
+            stats.draft_seconds += time.perf_counter() - draft_started
+            stats.draft_calls += proposal_len
+            proposal = torch.cat(proposal_tokens, dim=-1)
+            stats.proposed_tokens += proposal_len
+
+            verify_started = time.perf_counter()
+            candidate = torch.cat([generated, proposal], dim=-1)
+            verifier_logits = self.backbone.encoder(
+                input_ids=candidate, use_cache=False
+            ).logits
+            start = generated.shape[1] - 1
+            target = verifier_logits[:, start : start + proposal_len].argmax(-1)
+            matches = (proposal == target).to(torch.long).cumprod(-1).sum(-1)
+            accepted = int(matches[0].item())
+            stats.verifier_seconds += time.perf_counter() - verify_started
+            stats.verifier_calls += 1
+            stats.accepted_tokens += accepted
+            stats.accepted_lengths.append(accepted)
+
+            if accepted:
+                generated = torch.cat([generated, proposal[:, :accepted]], dim=-1)
+            if accepted < proposal_len:
+                generated = torch.cat(
+                    [generated, target[:, accepted : accepted + 1]], dim=-1
+                )
+                stats.correction_tokens += 1
+            if self.eos_token_id is not None and generated[0, -1] == self.eos_token_id:
+                break
+
+        stats.committed_tokens = generated.shape[1] - inputs.shape[1]
+        stats.total_seconds = time.perf_counter() - started
+        self._last_speculative_stats = stats.to_dict()
+        return generated, stats
 
     @staticmethod
     def _encoder_block_mask(
@@ -1647,7 +1728,7 @@ class E2D(E2D2):
 
         # For AR: no noise sampling, just use the input as is
         xt = input_ids  # No diffusion noise for autoregressive
-        
+
         # Create attention masks
         if self.config.attn_backend == "sdpa":
             if self.config.block_size == "random":
@@ -1711,7 +1792,7 @@ class E2D(E2D2):
                         == encoder_context_mask.sum(dim=-1, keepdim=True)
                     ) & encoder_context_mask.bool()
                     encoder_context_mask[last_context_idx & has_context[:, None]] = 0
-                
+
                 encoder_attention_mask = (
                     (
                         self.encoder_static_attention_mask[None, ...]
@@ -1773,14 +1854,14 @@ class E2D(E2D2):
                 decoder_attention_mask = self.static_attention_mask
         else:
             raise ValueError("Unknown backbone backend")
-            
+
         position_ids = torch.arange(input_ids.shape[1]).to(input_ids.device)[None, :]
-        
+
         if self.training and self.config.train_on_context:
             tokens_mask = attention_mask
         else:
             tokens_mask = attention_mask * (1 - context_mask)
-            
+
         return DenoiserInput(
             xt=xt,
             x0=input_ids,
@@ -1826,9 +1907,9 @@ class E2D(E2D2):
 
         # Shift targets: predict next token
         targets = denoiser_inputs.x0[:, 1:]  # Remove first token (typically BOS)
-        
+
         seq_len = denoiser_inputs.x0.shape[1]
-        
+
         # Check if we have encoder logits as well
         if model_output.shape[1] == 2 * seq_len:
             # Encoder logits: first seq_len tokens
@@ -1880,28 +1961,28 @@ class E2D(E2D2):
                 mask = denoiser_inputs.tokens_mask[:, 1:]
             else:
                 mask = None
-        
+
         # Flatten for cross-entropy
         flat_logits = logits.contiguous().view(-1, logits.size(-1))
         flat_targets = targets.contiguous().view(-1)
-        
+
         # Apply token mask if needed
         if mask is not None:
             flat_mask = mask.contiguous().view(-1)
             flat_logits = flat_logits[flat_mask.bool()]
             flat_targets = flat_targets[flat_mask.bool()]
-        
+
         # Compute cross-entropy loss
         if model_output.shape[1] != 2 * seq_len:
             loss = torch.nn.functional.cross_entropy(flat_logits, flat_targets)
-        
+
         # Compute per-token NLLs for compatibility
         with torch.no_grad():
             log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
             token_nlls = -log_probs.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
             if mask is not None:
                 token_nlls = token_nlls * mask
-        
+
         return LossAndNllOutput(
             loss=loss,
             nlls=token_nlls,
@@ -1951,12 +2032,12 @@ class E2D(E2D2):
             max_length = generation_config.max_length if hasattr(generation_config, "max_length") else self.max_length
         if max_new_tokens is None:
             max_new_tokens = generation_config.max_new_tokens if hasattr(generation_config, "max_new_tokens") else max_length - inputs.shape[-1]
-        
+
         batch_size = batch_size if batch_size is not None else inputs.shape[0]
         assert batch_size == 1, "Batched sampling not supported yet"
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
-        
+
         block_size = generation_config.block_size
         max_blocks = max_new_tokens // block_size
 
@@ -1991,7 +2072,7 @@ class E2D(E2D2):
         accept_counts = 0
         draft_position_attempt_counts = [0 for _ in range(block_size)]
         draft_position_accept_counts = [0 for _ in range(block_size)]
-        
+
         if generation_config.use_cache and inputs.numel() > 0:
             cache = self.update_cache(
                 inputs=inputs[:, : block_size * (inputs.shape[-1] // block_size)]
@@ -2021,7 +2102,7 @@ class E2D(E2D2):
             conf_threshold = 0.7
         else:
             max_draft_len = block_size
-        
+
         # Tracking Acceptance Rate Configuration
         if track_acc_rate:
             acc_rate_history = []
@@ -2040,7 +2121,7 @@ class E2D(E2D2):
                 actual_max_draft_len = current_draft_len
             else:
                 actual_max_draft_len = max_draft_len
-                
+
             # --- DRAFTING PHASE ---
             if use_cuda_events:
                 draft_start = torch.cuda.Event(enable_timing=True)
@@ -2049,7 +2130,7 @@ class E2D(E2D2):
                 import time
                 draft_start_t = time.perf_counter()
 
-            draft_tree_candidates = [] 
+            draft_tree_candidates = []
             actual_draft_len = 0
             for step in range(actual_max_draft_len):
                 cur_pos = start_idx + step
@@ -2066,7 +2147,7 @@ class E2D(E2D2):
                     context=context,
                     cache=cache if generation_config.use_cache else None,
                 )
-                    
+
                 backbone_output = self._backbone_forward(
                     denoiser_inputs,
                     fix_cache_length=True,
@@ -2089,7 +2170,7 @@ class E2D(E2D2):
 
                 probs = torch.softmax(step_logits, dim=-1)
                 top1_prob = probs.max(dim=-1).values.item()
-                
+
                 next_tok = step_logits.argmax(dim=-1)
                 accumulated_samples[:, cur_pos:cur_pos+1] = next_tok.reshape(batch_size, 1)
                 actual_draft_len += 1
@@ -2108,20 +2189,20 @@ class E2D(E2D2):
                         k_dynamic = 5
                     else:
                         k_dynamic = 10
-                    
+
                     if k_dynamic > 1:
-                        _, topk_indices = torch.topk(step_logits, k_dynamic, dim=-1) 
+                        _, topk_indices = torch.topk(step_logits, k_dynamic, dim=-1)
                         topk_ids = topk_indices.flatten().tolist()
                         greedy_id = next_tok.item()
-                        
+
                         if tokenizer is not None:
                             topk_decoded = [tokenizer.decode([tid]) for tid in topk_ids if tid != greedy_id]
                             print(f"[DRAFT]   -> Tree candidates at step {step}: {topk_decoded}")
-                        
+
                         for tid in topk_ids:
                             if tid != greedy_id:
                                 draft_tree_candidates.append({
-                                    "step": step, 
+                                    "step": step,
                                     "token_id": tid,
                                     "pos_id": cur_pos
                                 })
@@ -2134,10 +2215,10 @@ class E2D(E2D2):
                     if torch.any(is_done):
                         stopped_and_ready_to_verify = True
                         break
-                
+
                 if conf_seg and top1_prob < conf_threshold:
                     break
-            
+
             # Debug: Print draft summary
             if tokenizer is not None:
                 drafted_tokens = accumulated_samples[0, start_idx:start_idx + actual_draft_len]
@@ -2149,12 +2230,12 @@ class E2D(E2D2):
 
             # --- PRE-VERIFICATION CACHE TRUNCATION ---
             draft_len_to_truncate = actual_draft_len if (conf_seg or track_acc_rate) else block_size
-            num_layers = len(cache['past_key_values'].key_cache)
+            num_layers = len(cache["past_key_values"].key_cache)
             is_share_kv = (self.backbone.encoder == self.backbone.decoder)
             for layer in range(num_layers):
                 if not is_share_kv or layer >= self.backbone.decoder_layer_idxs[0]:
-                    cache['past_key_values'].key_cache[layer] = cache['past_key_values'].key_cache[layer][..., :-draft_len_to_truncate, :]
-                    cache['past_key_values'].value_cache[layer] = cache['past_key_values'].value_cache[layer][..., :-draft_len_to_truncate, :]
+                    cache["past_key_values"].key_cache[layer] = cache["past_key_values"].key_cache[layer][..., :-draft_len_to_truncate, :]
+                    cache["past_key_values"].value_cache[layer] = cache["past_key_values"].value_cache[layer][..., :-draft_len_to_truncate, :]
 
             if use_cuda_events:
                 draft_end = torch.cuda.Event(enable_timing=True)
@@ -2167,17 +2248,17 @@ class E2D(E2D2):
             # --- VERIFICATION PHASE ---
             if generation_config.use_cache:
                 num_generated = actual_draft_len
-                
+
                 greedy_inputs = accumulated_samples[:, start_idx - 1 : start_idx + num_generated]
                 greedy_len = greedy_inputs.shape[1]
-                
+
                 if tree_attn and len(draft_tree_candidates) > 0:
                     extra_tokens_list = [c["token_id"] for c in draft_tree_candidates]
                     extra_inputs = torch.tensor([extra_tokens_list], device=device, dtype=torch.long)
                     encoder_inputs = torch.cat([greedy_inputs, extra_inputs], dim=1)
-                    
-                    past_len = cache['past_key_values'].key_cache[0].shape[-2]
-                    start_pos = past_len 
+
+                    past_len = cache["past_key_values"].key_cache[0].shape[-2]
+                    start_pos = past_len
                     greedy_pos_ids = torch.arange(start_pos, start_pos + greedy_len, device=device).unsqueeze(0)
                     extra_pos_ids = torch.tensor([[start_pos + 1 + c["step"] for c in draft_tree_candidates]], device=device)
                     position_ids = torch.cat([greedy_pos_ids, extra_pos_ids], dim=1)
@@ -2187,19 +2268,19 @@ class E2D(E2D2):
                     total_past = past_len
                     mask = torch.full((1, 1, total_len, total_past + total_len), torch.finfo(torch.float32).min, device=device)
                     mask[:, :, :, :total_past] = 0.0
-                    
-                    causal_mask = torch.triu(torch.full((greedy_len, greedy_len), float('-inf'), device=device), diagonal=1)
+
+                    causal_mask = torch.triu(torch.full((greedy_len, greedy_len), float("-inf"), device=device), diagonal=1)
                     mask[:, :, :greedy_len, total_past:total_past+greedy_len] = causal_mask.unsqueeze(0).unsqueeze(0)
                     mask[:, :, :greedy_len, total_past:total_past+greedy_len].masked_fill_(
                         torch.tril(torch.ones((greedy_len, greedy_len), device=device)).bool(), 0.0
                     )
-                    
+
                     for idx, cand in enumerate(draft_tree_candidates):
                         row_idx = greedy_len + idx
                         step = cand["step"]
                         mask[:, :, row_idx, total_past + row_idx] = 0.0
                         mask[:, :, row_idx, total_past : total_past + 1 + step] = 0.0
-                    
+
                     mask = mask.to(self.backbone.encoder.dtype)
                 else:
                     encoder_inputs = greedy_inputs
@@ -2207,7 +2288,7 @@ class E2D(E2D2):
                     mask = None
 
                 # --- FIX: Handling Argument Collision ---
-                
+
                 # 1. Clean kwargs of explicit overrides
                 safe_kwargs = kwargs.copy()
                 if position_ids is not None: safe_kwargs.pop("position_ids", None)
@@ -2229,39 +2310,39 @@ class E2D(E2D2):
                 # 4. Prepare inputs (Consumes KVs from temp_cache)
                 context_input, _ = self._prepare_inputs_inference(
                     input_ids=encoder_inputs,
-                    cache=temp_cache, 
+                    cache=temp_cache,
                     return_updated_cache=True,
-                    **prepare_overrides, 
+                    **prepare_overrides,
                     **safe_kwargs
                 )
 
                 backbone_args = {
                     "return_updated_cache": True,
                     "return_last_hidden_state": True,
-                    "enforce_causal_mask": (mask is None), 
+                    "enforce_causal_mask": (mask is None),
                 }
-                
+
                 # 5. Forward Pass (Uses temp_cache which no longer has KVs)
                 backbone_output = self._backbone_forward(
                     context_input,
                     **backbone_args,
-                    **temp_cache, 
+                    **temp_cache,
                     **safe_kwargs
                 )
-                
+
                 # ... (Rest of logic remains identical) ...
-                encoder_hidden = backbone_output['last_hidden_state']
+                encoder_hidden = backbone_output["last_hidden_state"]
                 encoder_logits = self.backbone.encoder.lm_head(encoder_hidden)
-                
+
                 greedy_logits = encoder_logits[:, :greedy_len]
-                draft_tokens = greedy_inputs[:, 1:] 
+                draft_tokens = greedy_inputs[:, 1:]
                 pred_logits = greedy_logits[:, :-1]
                 pred_tokens = pred_logits.argmax(dim=-1)
-                
+
                 matches = (draft_tokens == pred_tokens)
                 valid_mask = matches.cumprod(dim=1)
                 min_accepted = valid_mask.sum(dim=1).min().item()
-                
+
                 # Debug: Print verification results
                 if tokenizer is not None:
                     print(f"[VERIFY] Checking {draft_tokens.shape[1]} drafted tokens...")
@@ -2271,15 +2352,15 @@ class E2D(E2D2):
                         match_status = "✓" if matches[0, i].item() else "✗"
                         print(f"[VERIFY]   Position {i}: drafted='{draft_tok}' vs verified='{pred_tok}' [{match_status}]")
                     print(f"[VERIFY] Accepted {min_accepted}/{draft_tokens.shape[1]} tokens")
-                
+
                 switched_to_branch = False
                 branch_correction_token = None
                 branch_index_in_extra = -1
-                
+
                 if tree_attn and min_accepted < actual_draft_len and len(draft_tree_candidates) > 0:
                     target_token_at_mismatch = pred_tokens[0, min_accepted].item()
-                    step_of_mismatch = min_accepted 
-                    
+                    step_of_mismatch = min_accepted
+
                     for i, cand in enumerate(draft_tree_candidates):
                         if cand["step"] == step_of_mismatch and cand["token_id"] == target_token_at_mismatch:
                             switched_to_branch = True
@@ -2287,11 +2368,11 @@ class E2D(E2D2):
                             branch_logits = encoder_logits[0, greedy_len + i]
                             branch_correction_token = branch_logits.argmax().item()
                             break
-                
+
                 if switched_to_branch:
                     mismatch_pos = start_idx + min_accepted
                     accumulated_samples[:, mismatch_pos] = draft_tree_candidates[branch_index_in_extra]["token_id"]
-                    
+
                     # Debug: Print branch switch info
                     if tokenizer is not None:
                         branch_tok = tokenizer.decode([draft_tree_candidates[branch_index_in_extra]["token_id"]])
@@ -2320,36 +2401,36 @@ class E2D(E2D2):
                                 :, : mismatch_pos + 2
                             ]
                             break
-                    
+
                     total_accepted_tokens += (min_accepted + 1)
                     final_accepted_len = min_accepted + 1
                     total_accepted_lengths.append(final_accepted_len)
                     total_draft_lengths.append(actual_draft_len)
                     accept_counts += 1
-                    
-                    indices_to_keep = list(range(min_accepted + 1)) 
+
+                    indices_to_keep = list(range(min_accepted + 1))
                     indices_to_keep.append(greedy_len + branch_index_in_extra)
                     indices_tensor = torch.tensor(indices_to_keep, device=device)
-                    
-                    new_kv = backbone_output['past_key_values']
+
+                    new_kv = backbone_output["past_key_values"]
                     for layer in range(len(new_kv)):
                         k = new_kv.key_cache[layer]
                         v = new_kv.value_cache[layer]
-                        
+
                         total_hist_len = k.shape[-2]
                         new_len = encoder_inputs.shape[1]
                         past_len_val = total_hist_len - new_len
-                        
+
                         k_past = k[..., :past_len_val, :]
                         v_past = v[..., :past_len_val, :]
-                        
+
                         k_new = k[..., past_len_val:, :].index_select(-2, indices_tensor)
                         v_new = v[..., past_len_val:, :].index_select(-2, indices_tensor)
-                        
+
                         new_kv.key_cache[layer] = torch.cat([k_past, k_new], dim=-2)
                         new_kv.value_cache[layer] = torch.cat([v_past, v_new], dim=-2)
-                    
-                    cache['past_key_values'] = new_kv
+
+                    cache["past_key_values"] = new_kv
 
                 else:
                     total_accepted_tokens += min_accepted
@@ -2357,7 +2438,7 @@ class E2D(E2D2):
                     total_draft_lengths.append(actual_draft_len)
                     accept_counts += 1
                     correction_token = greedy_logits[:, min_accepted].argmax(dim=-1)
-                    
+
                     # Debug: Print correction token info
                     if tokenizer is not None:
                         correction_tok = tokenizer.decode([correction_token.item()])
@@ -2385,15 +2466,15 @@ class E2D(E2D2):
                             break
 
                     final_accepted_len = min_accepted
-                    
+
                     target_len = start_idx + min_accepted
-                    enc_kv = cache['past_key_values'] if 'past_key_values' in cache else backbone_output['past_key_values']
-                    
+                    enc_kv = cache["past_key_values"] if "past_key_values" in cache else backbone_output["past_key_values"]
+
                     for layer in range(len(enc_kv)):
                         enc_kv.key_cache[layer] = enc_kv.key_cache[layer][..., :target_len, :]
                         enc_kv.value_cache[layer] = enc_kv.value_cache[layer][..., :target_len, :]
-                    
-                    cache['past_key_values'] = enc_kv
+
+                    cache["past_key_values"] = enc_kv
 
                 accepted_prefix_len = min(final_accepted_len, actual_draft_len)
                 for pos in range(actual_draft_len):
@@ -2413,10 +2494,10 @@ class E2D(E2D2):
                         window_acc_count += hist_acc
                         window_draft_count += hist_draft
                         if window_draft_count >= target_window_tokens: break
-                    
+
                     current_window_acc_rate = window_acc_count / window_draft_count if window_draft_count > 0 else 0.0
                     ema_acc_rate = ema_alpha * current_window_acc_rate + (1 - ema_alpha) * ema_acc_rate
-                    
+
                     if ema_acc_rate > 0.8:
                         current_draft_len = min(current_draft_len + 1, max_draft_len_dynamic)
                     elif ema_acc_rate < 0.7:
@@ -2425,7 +2506,7 @@ class E2D(E2D2):
                 advance = final_accepted_len + 1
                 current_idx += advance
                 pbar.update(advance)
-                
+
                 # Debug: Print current generation state
                 if tokenizer is not None:
                     current_output = accumulated_samples[0, inputs_offset:current_idx]

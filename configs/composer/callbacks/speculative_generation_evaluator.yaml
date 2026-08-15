@@ -1,0 +1,17 @@
+speculative_generation_evaluator:
+  _target_: src.custom_composer.callbacks.SpeculativeGenerationEvaluator
+  prompts:
+    - "Question: Janet has 3 apples and buys 4 more. How many apples does she have?\nAnswer:"
+    - "Question: A box holds 12 pencils. Five are removed. How many pencils remain?\nAnswer:"
+    - "Question: There are 6 bags with 3 marbles in each bag. How many marbles are there?\nAnswer:"
+    - "Question: A train travels 40 miles in the morning and 35 miles in the afternoon. How far does it travel?\nAnswer:"
+    - "Question: Sam read 8 pages on Monday and twice as many on Tuesday. How many pages did Sam read in total?\nAnswer:"
+    - "Question: Twenty cookies are shared equally among 4 children. How many cookies does each child receive?\nAnswer:"
+    - "Question: A shirt costs 30 dollars and is discounted by 10 dollars. What is its new price?\nAnswer:"
+    - "Question: Mia has 15 stickers and gives 6 away. How many stickers does she have left?\nAnswer:"
+  max_new_tokens: 64
+  num_prompts: 8
+  block_size: ${block_size}
+  num_steps: 1
+  seed: 17
+  verify_exact_match: true
