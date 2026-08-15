@@ -1,0 +1,9 @@
+defaults:
+  - e2d2@_here_
+  - _self_
+
+_target_: src.denoiser.discrete_diffusion.MaskedDiffusionE2D
+config:
+  _target_: src.denoiser.discrete_diffusion.MaskedDiffusionE2DConfig
+  decoder_loss_lambda: 1.0
+  inference_steps: 1

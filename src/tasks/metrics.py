@@ -53,6 +53,17 @@ class DecoderLoss(Loss):
         )
 
 
+class FlowLoss(Loss):
+    """Velocity matching loss for latent-flow models."""
+
+    def __init__(self, dist_sync_on_step: bool = False):
+        super().__init__(
+            name="flow_loss",
+            update_key="flow_loss",
+            dist_sync_on_step=dist_sync_on_step,
+        )
+
+
 class NLL(Metric):
     # Make torchmetrics call update only once
     full_state_update = False

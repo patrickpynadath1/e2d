@@ -1,0 +1,2 @@
+flow_loss:
+  _target_: src.tasks.metrics.FlowLoss

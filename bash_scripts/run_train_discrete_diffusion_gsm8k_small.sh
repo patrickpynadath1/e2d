@@ -5,36 +5,31 @@ cd "$(dirname "$0")/.."
 # shellcheck source=../setup_env.sh
 source setup_env.sh
 
-: "${AR_CHECKPOINT_PATH:?Set AR_CHECKPOINT_PATH to an AR weights-only checkpoint}"
+: "${AR_CHECKPOINT_PATH:?Set AR_CHECKPOINT_PATH to the GSM8K AR weights checkpoint}"
+
+MODE="${MODE:-masked}"
+case "${MODE}" in
+  masked) MODEL_CONFIG=masked_diffusion_e2d ;;
+  uniform) MODEL_CONFIG=uniform_diffusion_e2d ;;
+  *) echo "MODE must be 'masked' or 'uniform'" >&2; exit 2 ;;
+esac
 
 MODEL_NAME="${MODEL_NAME:-Qwen/Qwen3-1.7B-Base}"
-OUTPUT_ROOT="${OUTPUT_ROOT:-${PWD}/outputs/reference}"
-RUN_NAME="${RUN_NAME:-e2d-gsm8k-small-block4}"
 NUM_DEVICES="${NUM_DEVICES:-1}"
-MAX_DURATION="${MAX_DURATION:-20ba}"
-EVAL_INTERVAL="${EVAL_INTERVAL:-10ba}"
-SAVE_INTERVAL="${SAVE_INTERVAL:-10ba}"
-CHECKPOINTS_TO_KEEP="${CHECKPOINTS_TO_KEEP:-0}"
-ENABLE_CHECKPOINTING="${ENABLE_CHECKPOINTING:-false}"
 TRAIN_SAMPLES="${TRAIN_SAMPLES:-128}"
 EVAL_SAMPLES="${EVAL_SAMPLES:-32}"
+EVAL_BATCHES="${EVAL_BATCHES:-4}"
+MAX_DURATION="${MAX_DURATION:-100ba}"
+EVAL_INTERVAL="${EVAL_INTERVAL:-25ba}"
+BLOCK_SIZE="${BLOCK_SIZE:-4}"
+INFERENCE_STEPS="${INFERENCE_STEPS:-1}"
 LR="${LR:-1e-5}"
-WARMUP="${WARMUP:-1000ba}"
-CONSOLE_LOG_INTERVAL="${CONSOLE_LOG_INTERVAL:-1ba}"
+WARMUP="${WARMUP:-20ba}"
+RUN_NAME="${RUN_NAME:-e2d-gsm8k-${MODE}-diffusion-block${BLOCK_SIZE}-${MAX_DURATION}}"
+OUTPUT_ROOT="${OUTPUT_ROOT:-${E2D_CACHE_HOME}/runs}"
+WANDB_PROJECT="${WANDB_PROJECT:-gsm8k-drafter-study}"
 WANDB_MODE="${WANDB_MODE:-online}"
-export WANDB_MODE
-
-if [ "${ENABLE_CHECKPOINTING}" = "true" ]; then
-  CHECKPOINT_OVERRIDES=(
-    "composer.callbacks.hf_compatible_checkpointing.disable_hf=true"
-    "~composer.callbacks.save_best_checkpointing"
-  )
-else
-  CHECKPOINT_OVERRIDES=(
-    "~composer.callbacks.hf_compatible_checkpointing"
-    "~composer.callbacks.save_best_checkpointing"
-  )
-fi
+export WANDB_PROJECT WANDB_MODE
 
 uv run composer -n "${NUM_DEVICES}" scripts/composer_scripts/train_discrete_denoiser.py \
   run_name="${RUN_NAME}" \
@@ -47,10 +42,11 @@ uv run composer -n "${NUM_DEVICES}" scripts/composer_scripts/train_discrete_deno
   +metrics.decoder_loss._target_=src.tasks.metrics.DecoderLoss \
   +eval_metrics.encoder_loss._target_=src.tasks.metrics.EncoderLoss \
   +eval_metrics.decoder_loss._target_=src.tasks.metrics.DecoderLoss \
-  model=e2d \
+  model="${MODEL_CONFIG}" \
   model/backbone@model.config.backbone_config=llm_as_encoder_decoder_share_kv_encoder_gen \
   model.config.length=256 \
   model.config.attn_backend=sdpa \
+  model.config.inference_steps="${INFERENCE_STEPS}" \
   model.config.backbone_config.num_encoder_layers=28 \
   model.config.backbone_config.num_decoder_layers=2 \
   model.config.backbone_config.keep_top_decoder_layers=true \
@@ -59,24 +55,23 @@ uv run composer -n "${NUM_DEVICES}" scripts/composer_scripts/train_discrete_deno
   model.config.backbone_config.reinit_decoder=false \
   model.config.backbone_config.train_on_ar=true \
   model.config.backbone_config.ar_checkpoint_path="${AR_CHECKPOINT_PATH}" \
-  model.config.decoder_loss_lambda=1.0 \
-  block_size=4 \
-  eval_block_size=4 \
+  block_size="${BLOCK_SIZE}" \
+  eval_block_size="${BLOCK_SIZE}" \
   training.global_batch_size="${NUM_DEVICES}" \
   training.grad_accum=1 \
   training.autoresume=false \
+  training.antithetic_sampling=false \
   composer.optimizer.lr="${LR}" \
   composer.lr_scheduler.t_warmup="${WARMUP}" \
   composer.trainer.max_duration="${MAX_DURATION}" \
   composer.trainer.eval_interval="${EVAL_INTERVAL}" \
-  composer.trainer.eval_subset_num_batches=4 \
-  composer.trainer.save_interval="${SAVE_INTERVAL}" \
-  composer.trainer.save_num_checkpoints_to_keep="${CHECKPOINTS_TO_KEEP}" \
+  composer.trainer.eval_subset_num_batches="${EVAL_BATCHES}" \
   composer.trainer.precision=amp_bf16 \
-  composer.trainer.console_log_interval="${CONSOLE_LOG_INTERVAL}" \
+  composer.trainer.console_log_interval=1ba \
   hydra.run.dir="${OUTPUT_ROOT}/${RUN_NAME}" \
   train_dataloader.num_workers=0 \
   eval_dataloader.num_workers=0 \
   eval_dataloader.batch_size=1 \
   ~composer.algorithms.ema \
-  "${CHECKPOINT_OVERRIDES[@]}"
+  ~composer.callbacks.hf_compatible_checkpointing \
+  ~composer.callbacks.save_best_checkpointing

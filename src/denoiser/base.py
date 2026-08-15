@@ -76,6 +76,7 @@ class DenoiserOutput(ModelOutput):
     other_loss_terms: Optional[dict[str, Any]] = None
     encoder_loss: Optional[torch.FloatTensor] = None
     decoder_loss: Optional[torch.FloatTensor] = None
+    flow_loss: Optional[torch.FloatTensor] = None
 
 
 class DenoiserConfig(PretrainedConfig):

@@ -39,7 +39,7 @@ uv run composer -n "${NUM_DEVICES}" scripts/composer_scripts/train_discrete_deno
   model.config.backbone_config.tie_encoder_decoder_weights=true \
   model.config.backbone_config.reinit_encoder=false \
   model.config.backbone_config.reinit_decoder=false \
-  model.config.backbone_config.train_on_ar=false \
+  model.config.backbone_config.train_on_ar=true \
   model.config.backbone_config.ar_checkpoint_path="${AR_CHECKPOINT_PATH}" \
   model.config.decoder_loss_lambda=1.0 \
   block_size=4 \

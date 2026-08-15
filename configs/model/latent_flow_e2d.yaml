@@ -1,0 +1,14 @@
+defaults:
+  - base@_here_
+  - _self_
+
+_target_: src.denoiser.latent_flow.LatentFlowE2D
+config:
+  _target_: src.denoiser.latent_flow.LatentFlowE2DConfig
+  block_size: ${block_size}
+  eval_block_size: ${eval_block_size}
+  draft_layer_offsets: [-3, -2]
+  target_layer_offset: -1
+  inference_steps: 1
+  fixed_training_noise: false
+  fixed_training_seed: 17
