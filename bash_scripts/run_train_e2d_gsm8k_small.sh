@@ -7,6 +7,7 @@ source setup_env.sh
 
 MODEL_NAME="${MODEL_NAME:-Qwen/Qwen3-1.7B-Base}"
 USE_AR_CHECKPOINT="${USE_AR_CHECKPOINT:-false}"
+DATASET_MODE="${DATASET_MODE:-small}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-${E2D_OUTPUT_ROOT}/reference}"
 RUN_NAME="${RUN_NAME:-e2d-gsm8k-small-block4}"
 NUM_DEVICES="${NUM_DEVICES:-1}"
@@ -20,8 +21,33 @@ EVAL_SAMPLES="${EVAL_SAMPLES:-32}"
 LR="${LR:-1e-5}"
 WARMUP="${WARMUP:-1000ba}"
 CONSOLE_LOG_INTERVAL="${CONSOLE_LOG_INTERVAL:-1ba}"
+MODEL_LENGTH="${MODEL_LENGTH:-256}"
+BLOCK_SIZE="${BLOCK_SIZE:-4}"
+EVAL_BLOCK_SIZE="${EVAL_BLOCK_SIZE:-${BLOCK_SIZE}}"
+ENABLE_EMA="${ENABLE_EMA:-false}"
+AUTORESUME="${AUTORESUME:-false}"
 WANDB_MODE="${WANDB_MODE:-online}"
 export WANDB_MODE
+
+if [ "${DATASET_MODE}" = "full" ]; then
+  DATASET_OVERRIDES=(
+    "dataset@train_dataset=gsm8k_train"
+    "dataset@eval_dataset=gsm8k_eval"
+  )
+else
+  DATASET_OVERRIDES=(
+    "dataset@train_dataset=gsm8k_small_train"
+    "dataset@eval_dataset=gsm8k_small_eval"
+    "train_dataset.max_samples=${TRAIN_SAMPLES}"
+    "eval_dataset.max_samples=${EVAL_SAMPLES}"
+  )
+fi
+
+if [ "${ENABLE_EMA}" = "true" ]; then
+  EMA_OVERRIDES=()
+else
+  EMA_OVERRIDES=("~composer.algorithms.ema")
+fi
 
 if [ "${USE_AR_CHECKPOINT}" = "true" ]; then
   : "${AR_CHECKPOINT_PATH:?Set AR_CHECKPOINT_PATH when USE_AR_CHECKPOINT=true}"
@@ -52,17 +78,14 @@ fi
 uv run composer -n "${NUM_DEVICES}" scripts/composer_scripts/train_discrete_denoiser.py \
   run_name="${RUN_NAME}" \
   pretrained_model_name_or_path="${MODEL_NAME}" \
-  dataset@train_dataset=gsm8k_small_train \
-  dataset@eval_dataset=gsm8k_small_eval \
-  train_dataset.max_samples="${TRAIN_SAMPLES}" \
-  eval_dataset.max_samples="${EVAL_SAMPLES}" \
+  "${DATASET_OVERRIDES[@]}" \
   +metrics.encoder_loss._target_=src.tasks.metrics.EncoderLoss \
   +metrics.decoder_loss._target_=src.tasks.metrics.DecoderLoss \
   +eval_metrics.encoder_loss._target_=src.tasks.metrics.EncoderLoss \
   +eval_metrics.decoder_loss._target_=src.tasks.metrics.DecoderLoss \
   model=e2d \
   model/backbone@model.config.backbone_config=llm_as_encoder_decoder_share_kv_encoder_gen \
-  model.config.length=256 \
+  model.config.length="${MODEL_LENGTH}" \
   model.config.attn_backend=sdpa \
   model.config.backbone_config.num_encoder_layers=28 \
   model.config.backbone_config.num_decoder_layers=2 \
@@ -72,11 +95,11 @@ uv run composer -n "${NUM_DEVICES}" scripts/composer_scripts/train_discrete_deno
   model.config.backbone_config.reinit_decoder=false \
   "${AR_INIT_OVERRIDES[@]}" \
   model.config.decoder_loss_lambda=1.0 \
-  block_size=4 \
-  eval_block_size=4 \
+  block_size="${BLOCK_SIZE}" \
+  eval_block_size="${EVAL_BLOCK_SIZE}" \
   training.global_batch_size="${NUM_DEVICES}" \
   training.grad_accum=1 \
-  training.autoresume=false \
+  training.autoresume="${AUTORESUME}" \
   composer.optimizer.lr="${LR}" \
   composer.lr_scheduler.t_warmup="${WARMUP}" \
   composer.trainer.max_duration="${MAX_DURATION}" \
@@ -90,5 +113,5 @@ uv run composer -n "${NUM_DEVICES}" scripts/composer_scripts/train_discrete_deno
   train_dataloader.num_workers=0 \
   eval_dataloader.num_workers=0 \
   eval_dataloader.batch_size=1 \
-  ~composer.algorithms.ema \
+  "${EMA_OVERRIDES[@]}" \
   "${CHECKPOINT_OVERRIDES[@]}"
