@@ -9,6 +9,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     E2D_STORAGE_ROOT=/workspace \
     HF_HOME=/workspace/cache/huggingface \
     HF_DATASETS_CACHE=/workspace/cache/huggingface/datasets \
+    HF_HUB_ENABLE_HF_TRANSFER=0 \
     E2D_CACHE_HOME=/workspace/cache/e2d \
     E2D_CHECKPOINT_ROOT=/workspace/checkpoints \
     E2D_OUTPUT_ROOT=/workspace/outputs \

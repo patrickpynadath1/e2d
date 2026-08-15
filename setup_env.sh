@@ -23,6 +23,9 @@ export E2D_STORAGE_ROOT
 
 export HF_HOME="${HF_HOME:-${E2D_STORAGE_ROOT}/cache/huggingface}"
 export HF_DATASETS_CACHE="${HF_DATASETS_CACHE:-${HF_HOME}/datasets}"
+# Some Runpod base images enable the optional legacy hf_transfer downloader.
+# The locked environment uses huggingface-hub's standard downloader instead.
+export HF_HUB_ENABLE_HF_TRANSFER=0
 echo "HuggingFace cache set to '${HF_HOME}'."
 
 # Keep large artifacts on persistent storage when /workspace is mounted.
