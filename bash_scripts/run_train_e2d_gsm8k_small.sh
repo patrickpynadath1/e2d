@@ -43,6 +43,7 @@ if [ "${ENABLE_CHECKPOINTING}" = "true" ]; then
   )
 else
   CHECKPOINT_OVERRIDES=(
+    "composer.trainer.save_folder=null"
     "~composer.callbacks.hf_compatible_checkpointing"
     "~composer.callbacks.save_best_checkpointing"
   )
