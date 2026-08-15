@@ -96,11 +96,19 @@ The bootstrap uses `/opt/e2d-venv`, loads
 `/workspace/credentials/e2d.env` when present, and requires a successful CUDA
 tensor operation. Keep the credentials file out of Git and set its mode to 600.
 
-Run the portable reference experiment with persistent outputs and checkpoints:
+Run the portable reference experiment directly from the Hugging Face Qwen base:
 
 ```bash
+bash bash_scripts/run_train_e2d_gsm8k_small.sh
+```
+
+To initialize from a separately fine-tuned AR checkpoint instead, set
+`USE_AR_CHECKPOINT=true` and provide its weights-only checkpoint:
+
+```bash
+USE_AR_CHECKPOINT=true \
 AR_CHECKPOINT_PATH=/workspace/checkpoints/ar/weights-only.pt \
-  bash bash_scripts/run_train_e2d_gsm8k_small.sh
+bash bash_scripts/run_train_e2d_gsm8k_small.sh
 ```
 
 ## 1. Code Organization

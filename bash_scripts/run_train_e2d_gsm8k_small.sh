@@ -5,9 +5,8 @@ cd "$(dirname "$0")/.."
 # shellcheck source=../setup_env.sh
 source setup_env.sh
 
-: "${AR_CHECKPOINT_PATH:?Set AR_CHECKPOINT_PATH to an AR weights-only checkpoint}"
-
 MODEL_NAME="${MODEL_NAME:-Qwen/Qwen3-1.7B-Base}"
+USE_AR_CHECKPOINT="${USE_AR_CHECKPOINT:-false}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-${E2D_OUTPUT_ROOT}/reference}"
 RUN_NAME="${RUN_NAME:-e2d-gsm8k-small-block4}"
 NUM_DEVICES="${NUM_DEVICES:-1}"
@@ -23,6 +22,19 @@ WARMUP="${WARMUP:-1000ba}"
 CONSOLE_LOG_INTERVAL="${CONSOLE_LOG_INTERVAL:-1ba}"
 WANDB_MODE="${WANDB_MODE:-online}"
 export WANDB_MODE
+
+if [ "${USE_AR_CHECKPOINT}" = "true" ]; then
+  : "${AR_CHECKPOINT_PATH:?Set AR_CHECKPOINT_PATH when USE_AR_CHECKPOINT=true}"
+  AR_INIT_OVERRIDES=(
+    "model.config.backbone_config.train_on_ar=true"
+    "model.config.backbone_config.ar_checkpoint_path=${AR_CHECKPOINT_PATH}"
+  )
+else
+  AR_INIT_OVERRIDES=(
+    "model.config.backbone_config.train_on_ar=false"
+    "model.config.backbone_config.ar_checkpoint_path=null"
+  )
+fi
 
 if [ "${ENABLE_CHECKPOINTING}" = "true" ]; then
   CHECKPOINT_OVERRIDES=(
@@ -57,8 +69,7 @@ uv run composer -n "${NUM_DEVICES}" scripts/composer_scripts/train_discrete_deno
   model.config.backbone_config.tie_encoder_decoder_weights=true \
   model.config.backbone_config.reinit_encoder=false \
   model.config.backbone_config.reinit_decoder=false \
-  model.config.backbone_config.train_on_ar=true \
-  model.config.backbone_config.ar_checkpoint_path="${AR_CHECKPOINT_PATH}" \
+  "${AR_INIT_OVERRIDES[@]}" \
   model.config.decoder_loss_lambda=1.0 \
   block_size=4 \
   eval_block_size=4 \
