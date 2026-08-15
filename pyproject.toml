@@ -33,13 +33,21 @@ dependencies = [
   "scipy==1.16.3",
   "sentencepiece==0.2.1",
   "tokenizers==0.21.4",
-  "torch==2.7.0",
   "torchmetrics==1.7.4",
-  "torchvision==0.22.0",
   "tqdm==4.67.1",
   "transformers==4.52.4",
   "wandb==0.22.2",
   "word2number==1.1",
+]
+
+[project.optional-dependencies]
+cu118 = [
+  "torch==2.7.0",
+  "torchvision==0.22.0",
+]
+cu128 = [
+  "torch==2.7.0",
+  "torchvision==0.22.0",
 ]
 
 [dependency-groups]
@@ -58,15 +66,32 @@ include = ["src*", "scripts*"]
 
 [tool.uv]
 default-groups = ["dev"]
+conflicts = [
+  [
+    { extra = "cu118" },
+    { extra = "cu128" },
+  ],
+]
 
 [[tool.uv.index]]
 name = "pytorch-cu118"
 url = "https://download.pytorch.org/whl/cu118"
 explicit = true
 
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
 [tool.uv.sources]
-torch = { index = "pytorch-cu118" }
-torchvision = { index = "pytorch-cu118" }
+torch = [
+  { index = "pytorch-cu118", extra = "cu118" },
+  { index = "pytorch-cu128", extra = "cu128" },
+]
+torchvision = [
+  { index = "pytorch-cu118", extra = "cu118" },
+  { index = "pytorch-cu128", extra = "cu128" },
+]
 
 [tool.ruff]
 line-length = 88

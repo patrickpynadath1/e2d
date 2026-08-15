@@ -4,20 +4,39 @@
 # Usage:
 #     source setup_env.sh
 
-# Dependencies are managed by uv. Run `uv sync --frozen` once before launching jobs.
+# Dependencies are managed by uv. Select one accelerator extra before launching jobs.
 # This file only supplies optional runtime environment settings.
+export UV_NO_SYNC="${UV_NO_SYNC:-1}"
 if [ -f "${HOME}/setup_discdiff.sh" ]; then
   # shellcheck source=/dev/null
   source "${HOME}/setup_discdiff.sh"
 fi
 
-export HF_HOME="${HF_HOME:-${PWD}/.hf_cache}"
+if [ -d /workspace ]; then
+  E2D_STORAGE_ROOT="${E2D_STORAGE_ROOT:-/workspace}"
+  E2D_DEFAULT_CACHE_HOME="${E2D_STORAGE_ROOT}/cache/e2d"
+else
+  E2D_STORAGE_ROOT="${E2D_STORAGE_ROOT:-${HOME}/.cache/e2d}"
+  E2D_DEFAULT_CACHE_HOME="${E2D_STORAGE_ROOT}"
+fi
+export E2D_STORAGE_ROOT
+
+export HF_HOME="${HF_HOME:-${E2D_STORAGE_ROOT}/cache/huggingface}"
+export HF_DATASETS_CACHE="${HF_DATASETS_CACHE:-${HF_HOME}/datasets}"
 echo "HuggingFace cache set to '${HF_HOME}'."
 
-# Keep large checkpoints on the cache mount rather than the workspace filesystem.
-export E2D_CACHE_HOME="${E2D_CACHE_HOME:-${HOME}/.cache/e2d}"
+# Keep large artifacts on persistent storage when /workspace is mounted.
+export E2D_CACHE_HOME="${E2D_CACHE_HOME:-${E2D_DEFAULT_CACHE_HOME}}"
 export E2D_CHECKPOINT_ROOT="${E2D_CHECKPOINT_ROOT:-${E2D_CACHE_HOME}/checkpoints}"
-mkdir -p "${E2D_CHECKPOINT_ROOT}"
+export E2D_OUTPUT_ROOT="${E2D_OUTPUT_ROOT:-${E2D_STORAGE_ROOT}/outputs}"
+export WANDB_DIR="${WANDB_DIR:-${E2D_STORAGE_ROOT}/wandb}"
+mkdir -p \
+  "${HF_HOME}" \
+  "${HF_DATASETS_CACHE}" \
+  "${E2D_CACHE_HOME}" \
+  "${E2D_CHECKPOINT_ROOT}" \
+  "${E2D_OUTPUT_ROOT}" \
+  "${WANDB_DIR}"
 echo "E2D checkpoints will be stored under '${E2D_CHECKPOINT_ROOT}'."
 
 # Enforce verbose Hydra error logging

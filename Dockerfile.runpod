@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1.7
+ARG RUNPOD_BASE=runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404@sha256:0a360022e8de4375af99430f84e8b38951acc397252163a37ceac7204d01be35
+FROM ${RUNPOD_BASE}
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    UV_PROJECT_ENVIRONMENT=/opt/e2d-venv \
+    UV_CACHE_DIR=/opt/uv-cache \
+    E2D_STORAGE_ROOT=/workspace \
+    HF_HOME=/workspace/cache/huggingface \
+    HF_DATASETS_CACHE=/workspace/cache/huggingface/datasets \
+    E2D_CACHE_HOME=/workspace/cache/e2d \
+    E2D_CHECKPOINT_ROOT=/workspace/checkpoints \
+    E2D_OUTPUT_ROOT=/workspace/outputs \
+    WANDB_DIR=/workspace/wandb \
+    HYDRA_FULL_ERROR=1 \
+    NCCL_P2P_LEVEL=NVL
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl git git-lfs \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -LsSf https://astral.sh/uv/install.sh | sh
+
+ENV PATH=/root/.local/bin:/opt/e2d-venv/bin:${PATH}
+WORKDIR /opt/e2d-image
+
+COPY pyproject.toml uv.lock README.md ./
+RUN --mount=type=cache,target=/opt/uv-cache \
+    uv python install 3.12 \
+    && uv sync --frozen --extra cu128 --no-install-project --no-dev
+
+COPY . .
+RUN --mount=type=cache,target=/opt/uv-cache \
+    uv sync --frozen --extra cu128 --no-dev \
+    && uv run --frozen --extra cu128 python -c \
+       "import torch; print(torch.__version__, torch.version.cuda)"
+
+# Deliberately inherit the Runpod base image's /start.sh command. It provides
+# SSH and Jupyter support and must not be replaced for an interactive Pod.
+WORKDIR /opt/e2d-image

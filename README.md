@@ -17,20 +17,20 @@ Dependencies are managed exclusively with [uv](https://docs.astral.sh/uv/):
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv python install 3.12
-uv sync --frozen
+uv sync --frozen --extra cu118
 ```
 
 Run commands through uv so they use the locked environment:
 
 ```bash
-uv run pytest
-uv run ruff check src scripts tests
+uv run --extra cu118 pytest
+uv run --extra cu118 ruff check src scripts tests
 ```
 
-GPU runs use the locked CUDA 11.8 PyTorch wheels and require a compatible NVIDIA
-driver. [`setup_env.sh`](./setup_env.sh) only supplies optional runtime settings; it
-does not install or activate an environment. Run `uv sync --frozen` before submitting
-jobs.
+Local GPU runs use the locked CUDA 11.8 variant. CUDA 12.8 environments such as
+Runpod use `uv sync --frozen --extra cu128`. The accelerator extras are mutually
+exclusive and share one lockfile. [`setup_env.sh`](./setup_env.sh) only supplies
+optional runtime settings; it does not install or activate an environment.
 
 When present, `setup_env.sh` loads WandB and Hugging Face credentials from
 `~/setup_discdiff.sh`. Credentials are optional for offline tests.
@@ -67,6 +67,41 @@ uv run pre-commit install
 On every `git commit`,
 the pre-commit hooks will run automatically and report any issues / automatic fixes that
 were applied.
+
+### Runpod development Pods
+
+Runpod uses the CUDA 12.8 dependency variant and keeps durable data on a volume
+mounted at `/workspace`. Build the development image for Runpod's x86-64 hosts:
+
+```bash
+docker build --platform=linux/amd64 -f Dockerfile.runpod \
+  -t YOUR_REGISTRY/e2d2-runpod:cuda128-v1 .
+docker push YOUR_REGISTRY/e2d2-runpod:cuda128-v1
+```
+
+Create a private Pod template with that image, a network volume mounted at
+`/workspace`, and ports `8888/http` and `22/tcp`. Leave the entrypoint and start
+command empty so the base image continues to start Jupyter and SSH.
+
+Clone this repository to `/workspace/e2d` on the first Pod. On each Pod, update
+and validate the environment with:
+
+```bash
+cd /workspace/e2d
+git pull --ff-only
+source bash_scripts/runpod_bootstrap.sh
+```
+
+The bootstrap uses `/opt/e2d-venv`, loads
+`/workspace/credentials/e2d.env` when present, and requires a successful CUDA
+tensor operation. Keep the credentials file out of Git and set its mode to 600.
+
+Run the portable reference experiment with persistent outputs and checkpoints:
+
+```bash
+AR_CHECKPOINT_PATH=/workspace/checkpoints/ar/weights-only.pt \
+  bash bash_scripts/run_train_e2d_gsm8k_small.sh
+```
 
 ## 1. Code Organization
 1. [`bash_scripts`](bash_scripts): These shells scripts can be used to reproduce the
