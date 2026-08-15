@@ -38,7 +38,7 @@ fi
 
 if [ "${ENABLE_CHECKPOINTING}" = "true" ]; then
   CHECKPOINT_OVERRIDES=(
-    "composer.callbacks.hf_compatible_checkpointing.disable_hf=true"
+    "~composer.callbacks.hf_compatible_checkpointing"
     "~composer.callbacks.save_best_checkpointing"
   )
 else
