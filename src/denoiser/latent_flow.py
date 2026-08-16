@@ -520,10 +520,11 @@ class RiemannianLatentFlowE2DConfig(LatentFlowE2DConfig):
 
     def __init__(
         self,
-        scalar_loss_weight: float = 0.1,
+        scalar_loss_weight: float = 1.0,
         log_radius_mean: float = 8.02,
         log_radius_std: float = 0.1,
         scalar_prediction_clip: float = 5.0,
+        radius_conditioning_width: int = 512,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -533,10 +534,13 @@ class RiemannianLatentFlowE2DConfig(LatentFlowE2DConfig):
             raise ValueError("log_radius_std must be positive")
         if scalar_prediction_clip <= 0:
             raise ValueError("scalar_prediction_clip must be positive")
+        if radius_conditioning_width <= 0:
+            raise ValueError("radius_conditioning_width must be positive")
         self.scalar_loss_weight = scalar_loss_weight
         self.log_radius_mean = log_radius_mean
         self.log_radius_std = log_radius_std
         self.scalar_prediction_clip = scalar_prediction_clip
+        self.radius_conditioning_width = radius_conditioning_width
 
 
 class RiemannianLatentFlowE2D(LatentFlowE2D):
@@ -558,6 +562,15 @@ class RiemannianLatentFlowE2D(LatentFlowE2D):
         )
         nn.init.zeros_(self.scalar_head[-1].weight)
         nn.init.zeros_(self.scalar_head[-1].bias)
+        self.radius_conditioner = nn.Sequential(
+            nn.Linear(1, config.radius_conditioning_width),
+            nn.SiLU(),
+            nn.Linear(config.radius_conditioning_width, hidden_size),
+        )
+        # Begin at the unit-direction baseline while allowing the model to learn
+        # how previous-token radii should alter attention keys and values.
+        nn.init.zeros_(self.radius_conditioner[-1].weight)
+        nn.init.zeros_(self.radius_conditioner[-1].bias)
         self.register_buffer(
             "log_radius_mean",
             torch.tensor(config.log_radius_mean, dtype=torch.float32),
@@ -593,14 +606,18 @@ class RiemannianLatentFlowE2D(LatentFlowE2D):
     def _run_spherical_heads(
         self,
         clean_direction: torch.Tensor,
+        clean_log_radius: torch.Tensor,
         noisy_direction: torch.Tensor,
         time_value: torch.Tensor,
         attention_mask: torch.BoolTensor,
         clean_position_ids: torch.LongTensor,
         noisy_position_ids: torch.LongTensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        clean_conditioned = self._condition_context(
+            clean_direction, clean_log_radius
+        )
         hidden = self._run_flow_hidden(
-            clean_direction,
+            clean_conditioned,
             noisy_direction,
             time_value,
             attention_mask,
@@ -613,6 +630,21 @@ class RiemannianLatentFlowE2D(LatentFlowE2D):
         )
         scalar_prediction = self.scalar_head(hidden).squeeze(-1).float()
         return tangent_velocity, scalar_prediction
+
+    def _condition_context(
+        self,
+        clean_direction: torch.Tensor,
+        clean_log_radius: torch.Tensor,
+    ) -> torch.Tensor:
+        """Encode known previous-token radii without rescaling sphere points."""
+        clipped_context_radius = clean_log_radius.float().clamp(
+            -self.config.scalar_prediction_clip,
+            self.config.scalar_prediction_clip,
+        )
+        radius_conditioning = self.radius_conditioner(
+            clipped_context_radius.unsqueeze(-1)
+        ).to(clean_direction.dtype)
+        return clean_direction + radius_conditioning
 
     def forward(
         self,
@@ -649,6 +681,7 @@ class RiemannianLatentFlowE2D(LatentFlowE2D):
         flow_mask = flow_mask[None] & padding[:, :, None] & padding[:, None, :]
         predicted_velocity, scalar_prediction = self._run_spherical_heads(
             clean_direction,
+            scalar_target,
             path,
             t,
             flow_mask,
@@ -704,7 +737,11 @@ class RiemannianLatentFlowE2D(LatentFlowE2D):
         )
 
     def _draft_latents(
-        self, context_direction: torch.Tensor, block_len: int, num_steps: int
+        self,
+        context_direction: torch.Tensor,
+        context_log_radius: torch.Tensor,
+        block_len: int,
+        num_steps: int,
     ) -> torch.Tensor:
         batch_size = context_direction.shape[0]
         canvas = F.normalize(
@@ -735,6 +772,7 @@ class RiemannianLatentFlowE2D(LatentFlowE2D):
             )
             velocity, _ = self._run_spherical_heads(
                 context_direction,
+                context_log_radius,
                 canvas,
                 time_value,
                 mask,
@@ -748,6 +786,7 @@ class RiemannianLatentFlowE2D(LatentFlowE2D):
         )
         _, scalar_prediction = self._run_spherical_heads(
             context_direction,
+            context_log_radius,
             canvas,
             endpoint_time,
             mask,
@@ -807,10 +846,12 @@ class RiemannianLatentFlowE2D(LatentFlowE2D):
             remaining = max_new_tokens - (generated.shape[1] - inputs.shape[1])
             proposal_len = min(block_size, remaining)
             clean_raw = self.extract_clean_latents(generated)
-            context_direction, _ = self.latent_direction_and_scalar(clean_raw)
+            context_direction, context_log_radius = self.latent_direction_and_scalar(
+                clean_raw
+            )
             draft_started = time.perf_counter()
             proposed_latents = self._draft_latents(
-                context_direction, proposal_len, num_steps
+                context_direction, context_log_radius, proposal_len, num_steps
             )
             proposal = self.decode_latents(clean_raw, proposed_latents)
             stats.draft_seconds += time.perf_counter() - draft_started

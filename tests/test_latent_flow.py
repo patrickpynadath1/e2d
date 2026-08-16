@@ -162,3 +162,19 @@ def test_log_norm_scalar_round_trip_reconstructs_latents():
 
     assert torch.allclose(direction.norm(dim=-1), torch.ones(2, 3), atol=1e-6)
     assert torch.allclose(reconstructed, latents, rtol=1e-5, atol=1e-5)
+
+
+def test_previous_radius_conditioning_encodes_distinct_context_features():
+    model = RiemannianLatentFlowE2D.__new__(RiemannianLatentFlowE2D)
+    torch.nn.Module.__init__(model)
+    model.config = SimpleNamespace(scalar_prediction_clip=5.0)
+    model.radius_conditioner = torch.nn.Linear(1, 3, bias=False)
+    with torch.no_grad():
+        model.radius_conditioner.weight.copy_(torch.tensor([[1.0], [0.0], [-1.0]]))
+    directions = torch.tensor([[[0.0, 1.0, 0.0], [0.0, 1.0, 0.0]]])
+    radii = torch.tensor([[1.0, 2.0]])
+
+    conditioned = model._condition_context(directions, radii)
+
+    assert torch.allclose(conditioned[0, 0], torch.tensor([1.0, 1.0, -1.0]))
+    assert torch.allclose(conditioned[0, 1], torch.tensor([2.0, 1.0, -2.0]))

@@ -12,8 +12,9 @@ config:
   inference_steps: 4
   fixed_training_noise: false
   fixed_training_seed: 17
-  scalar_loss_weight: 0.1
+  scalar_loss_weight: 1.0
   # Standardized log-L2 norm, calibrated from Qwen3-1.7B answer-token residuals.
   log_radius_mean: 8.02
   log_radius_std: 0.1
   scalar_prediction_clip: 5.0
+  radius_conditioning_width: 512
