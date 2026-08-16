@@ -35,6 +35,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", default="Qwen/Qwen3-1.7B-Base")
     parser.add_argument("--split", choices=["train", "test"], default="train")
     parser.add_argument("--num-samples", type=int, default=8)
+    parser.add_argument(
+        "--stats-samples",
+        type=int,
+        default=4,
+        help="Initial samples used to estimate the flow model's scalar mean/std.",
+    )
     parser.add_argument("--max-length", type=int, default=768)
     parser.add_argument(
         "--target-layer-offset",
@@ -140,6 +146,8 @@ def main() -> None:
     args = parse_args()
     if args.num_samples < 1:
         raise ValueError("--num-samples must be positive")
+    if not 1 <= args.stats_samples < args.num_samples:
+        raise ValueError("--stats-samples must be between 1 and num-samples - 1")
     if args.device.startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is not available")
 
@@ -189,12 +197,16 @@ def main() -> None:
         print(f"Processed sample {index + 1}/{len(dataset)} ({int(valid.sum())} tokens)")
 
     raw_all = torch.cat(all_latents)
-    scalar_mean = raw_all.mean()
-    scalar_std = raw_all.std().clamp_min(1e-6)
+    stats_latents = torch.cat(all_latents[: args.stats_samples])
+    heldout_latents = torch.cat(all_latents[args.stats_samples :])
+    scalar_mean = stats_latents.mean()
+    scalar_std = stats_latents.std().clamp_min(1e-6)
     generator = torch.Generator(device="cpu").manual_seed(args.seed)
 
     groups = {
         "all_tokens": raw_all,
+        "normalization_fit_tokens": stats_latents,
+        "heldout_all_tokens": heldout_latents,
         "context_tokens": torch.cat(context_latents),
         "answer_tokens": torch.cat(answer_latents),
     }
@@ -202,6 +214,8 @@ def main() -> None:
         "model": args.model,
         "split": args.split,
         "num_samples": len(dataset),
+        "normalization_stats_samples": args.stats_samples,
+        "heldout_samples": len(dataset) - args.stats_samples,
         "max_length": args.max_length,
         "layer_count": layer_count,
         "target_layer_index_zero_based": layer_index,
@@ -232,13 +246,20 @@ def main() -> None:
         raw_all_l2=groups["all_tokens"].norm(dim=-1).numpy(),
         normalized_all_l2=normalized_groups["all_tokens"].norm(dim=-1).numpy(),
         gaussian_all_l2=gaussian_groups["all_tokens"].norm(dim=-1).numpy(),
+        raw_heldout_l2=groups["heldout_all_tokens"].norm(dim=-1).numpy(),
+        normalized_heldout_l2=normalized_groups["heldout_all_tokens"]
+        .norm(dim=-1)
+        .numpy(),
+        gaussian_heldout_l2=gaussian_groups["heldout_all_tokens"]
+        .norm(dim=-1)
+        .numpy(),
         raw_context_l2=groups["context_tokens"].norm(dim=-1).numpy(),
         raw_answer_l2=groups["answer_tokens"].norm(dim=-1).numpy(),
     )
     _plot_norms(
-        groups["all_tokens"],
-        normalized_groups["all_tokens"],
-        gaussian_groups["all_tokens"],
+        groups["heldout_all_tokens"],
+        normalized_groups["heldout_all_tokens"],
+        gaussian_groups["heldout_all_tokens"],
         plot_path,
     )
 
