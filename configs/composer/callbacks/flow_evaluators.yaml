@@ -1,0 +1,4 @@
+defaults:
+  - speculative_generation_evaluator
+  - timestep_loss_monitor
+  - _self_

@@ -22,7 +22,129 @@ from src.utils import (
 )
 
 log = logging.getLogger(__name__)
-__all__ = ["DataloaderSpeedMonitor", "SpeculativeGenerationEvaluator"]
+__all__ = [
+    "DataloaderSpeedMonitor",
+    "SpeculativeGenerationEvaluator",
+    "TimestepLossMonitor",
+]
+
+
+class TimestepLossMonitor(Callback):
+    """Aggregate latent-flow token MSE into fixed timestep bins.
+
+    Curves are reduced across all distributed ranks and emitted at validation end.
+    Scalar bin values support ordinary logger dashboards; W&B additionally receives
+    a table-backed line chart whose x-axis is the timestep-bin center.
+    """
+
+    def __init__(self, num_bins: int = 50) -> None:
+        if num_bins < 2:
+            raise ValueError("num_bins must be at least two")
+        self.num_bins = num_bins
+        self._train_sums: torch.Tensor | None = None
+        self._train_counts: torch.Tensor | None = None
+        self._eval_sums: torch.Tensor | None = None
+        self._eval_counts: torch.Tensor | None = None
+
+    def _empty(self, device: torch.device) -> tuple[torch.Tensor, torch.Tensor]:
+        return (
+            torch.zeros(self.num_bins, dtype=torch.float64, device=device),
+            torch.zeros(self.num_bins, dtype=torch.float64, device=device),
+        )
+
+    def _accumulate(self, outputs: Any, split: Literal["train", "eval"]) -> None:
+        token_losses = getattr(outputs, "nlls", None)
+        timesteps = getattr(outputs, "flow_timesteps", None)
+        token_mask = getattr(outputs, "tokens_mask", None)
+        if token_losses is None or timesteps is None:
+            return
+
+        token_losses = token_losses.detach()
+        timesteps = timesteps.detach()
+        if timesteps.ndim == 1:
+            timesteps = timesteps[:, None].expand_as(token_losses)
+        else:
+            timesteps = torch.broadcast_to(timesteps, token_losses.shape)
+        weights = (
+            torch.ones_like(token_losses)
+            if token_mask is None
+            else torch.broadcast_to(token_mask.detach(), token_losses.shape)
+        )
+        valid = weights.bool() & torch.isfinite(token_losses) & torch.isfinite(timesteps)
+        if not bool(valid.any()):
+            return
+
+        indices = torch.floor(timesteps[valid].clamp(0.0, 1.0) * self.num_bins)
+        indices = indices.long().clamp_max(self.num_bins - 1)
+        weighted_losses = token_losses[valid].double() * weights[valid].double()
+        valid_weights = weights[valid].double()
+
+        sums_name = f"_{split}_sums"
+        counts_name = f"_{split}_counts"
+        sums = getattr(self, sums_name)
+        counts = getattr(self, counts_name)
+        if sums is None or sums.device != token_losses.device:
+            sums, counts = self._empty(token_losses.device)
+            setattr(self, sums_name, sums)
+            setattr(self, counts_name, counts)
+        sums.scatter_add_(0, indices, weighted_losses)
+        counts.scatter_add_(0, indices, valid_weights)
+
+    def after_forward(self, state: State, logger: Logger) -> None:
+        self._accumulate(state.outputs, "train")
+
+    def eval_after_forward(self, state: State, logger: Logger) -> None:
+        self._accumulate(state.outputs, "eval")
+
+    def _log_split(self, state: State, logger: Logger, split: str) -> None:
+        sums = getattr(self, f"_{split}_sums")
+        counts = getattr(self, f"_{split}_counts")
+        if sums is None or counts is None:
+            return
+        dist.all_reduce(sums, reduce_operation="SUM")
+        dist.all_reduce(counts, reduce_operation="SUM")
+        means = sums / counts.clamp_min(1.0)
+
+        if dist.get_global_rank() == 0:
+            metrics: dict[str, float] = {}
+            table_rows: list[list[float | int | None]] = []
+            step = int(state.timestamp.batch.value)
+            for index in range(self.num_bins):
+                low = index / self.num_bins
+                high = (index + 1) / self.num_bins
+                center = (low + high) / 2
+                count = int(counts[index].item())
+                mean = float(means[index].item()) if count else None
+                metrics[f"timestep_loss/{split}/bin_{index:02d}"] = (
+                    float("nan") if mean is None else mean
+                )
+                metrics[f"timestep_loss/{split}/count_{index:02d}"] = float(count)
+                table_rows.append([step, center, mean, count])
+            logger.log_metrics(metrics)
+            if wandb.run is not None:
+                table = wandb.Table(
+                    columns=["optimizer_step", "timestep", "mean_flow_loss", "count"],
+                    data=table_rows,
+                )
+                wandb.log(
+                    {
+                        f"timestep_loss/{split}/curve": wandb.plot.line(
+                            table,
+                            "timestep",
+                            "mean_flow_loss",
+                            title=f"{split.title()} flow loss by timestep at step {step}",
+                        ),
+                        f"timestep_loss/{split}/table": table,
+                    },
+                    commit=False,
+                )
+
+        setattr(self, f"_{split}_sums", None)
+        setattr(self, f"_{split}_counts", None)
+
+    def eval_end(self, state: State, logger: Logger) -> None:
+        self._log_split(state, logger, "train")
+        self._log_split(state, logger, "eval")
 
 
 def _unwrap_huggingface_model(state_model: Any) -> tuple[Any, Any]:

@@ -291,6 +291,7 @@ class LatentFlowE2D(Denoiser):
             nlls=token_mse,
             other_loss_terms={"flow_loss": flow_loss},
             flow_loss=flow_loss,
+            flow_timesteps=t,
         )
 
     def _prepare_inputs(self, *args: Any, **kwargs: Any):
