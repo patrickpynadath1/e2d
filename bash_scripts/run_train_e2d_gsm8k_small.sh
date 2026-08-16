@@ -26,6 +26,9 @@ CONSOLE_LOG_INTERVAL="${CONSOLE_LOG_INTERVAL:-1ba}"
 MODEL_LENGTH="${MODEL_LENGTH:-256}"
 BLOCK_SIZE="${BLOCK_SIZE:-4}"
 EVAL_BLOCK_SIZE="${EVAL_BLOCK_SIZE:-${BLOCK_SIZE}}"
+ENABLE_SPEC_EVAL="${ENABLE_SPEC_EVAL:-false}"
+SPEC_EVAL_MAX_NEW_TOKENS="${SPEC_EVAL_MAX_NEW_TOKENS:-64}"
+SPEC_EVAL_NUM_PROMPTS="${SPEC_EVAL_NUM_PROMPTS:-8}"
 ENABLE_EMA="${ENABLE_EMA:-false}"
 AUTORESUME="${AUTORESUME:-false}"
 WANDB_MODE="${WANDB_MODE:-online}"
@@ -77,6 +80,16 @@ else
   )
 fi
 
+if [ "${ENABLE_SPEC_EVAL}" = "true" ]; then
+  SPEC_EVAL_OVERRIDES=(
+    "+composer/callbacks@composer.callbacks=speculative_generation_evaluator"
+    "composer.callbacks.speculative_generation_evaluator.max_new_tokens=${SPEC_EVAL_MAX_NEW_TOKENS}"
+    "composer.callbacks.speculative_generation_evaluator.num_prompts=${SPEC_EVAL_NUM_PROMPTS}"
+  )
+else
+  SPEC_EVAL_OVERRIDES=()
+fi
+
 uv run composer -n "${NUM_DEVICES}" scripts/composer_scripts/train_discrete_denoiser.py \
   run_name="${RUN_NAME}" \
   pretrained_model_name_or_path="${MODEL_NAME}" \
@@ -106,6 +119,7 @@ uv run composer -n "${NUM_DEVICES}" scripts/composer_scripts/train_discrete_deno
   composer.lr_scheduler.t_warmup="${WARMUP}" \
   composer.trainer.max_duration="${MAX_DURATION}" \
   composer.trainer.eval_interval="${EVAL_INTERVAL}" \
+  "${SPEC_EVAL_OVERRIDES[@]}" \
   composer.trainer.eval_subset_num_batches=4 \
   composer.trainer.save_interval="${SAVE_INTERVAL}" \
   composer.trainer.save_num_checkpoints_to_keep="${CHECKPOINTS_TO_KEEP}" \
