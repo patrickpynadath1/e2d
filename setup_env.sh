@@ -7,10 +7,15 @@
 # Dependencies are managed by uv. Select one accelerator extra before launching jobs.
 # This file only supplies optional runtime environment settings.
 export UV_NO_SYNC="${UV_NO_SYNC:-1}"
+
 if [ -f "${HOME}/setup_discdiff.sh" ]; then
   # shellcheck source=/dev/null
   source "${HOME}/setup_discdiff.sh"
 fi
+
+# Prefer this checkout over any older e2d2 installation inherited from the image.
+E2D_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYTHONPATH="${E2D_REPO_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"
 
 if [ -d /workspace ]; then
   E2D_STORAGE_ROOT="${E2D_STORAGE_ROOT:-/workspace}"
