@@ -73,3 +73,50 @@ def test_stochastic_training_path_uses_supplied_collator_times():
     supplied = torch.full((1, 8), 0.25)
     _, sampled = model._sample_training_path(clean, supplied)
     assert sampled is supplied
+
+
+class _GreedyTarget(torch.nn.Module):
+    def __init__(self, target_tokens: torch.Tensor):
+        super().__init__()
+        self.target_tokens = target_tokens
+
+    def forward(self, input_ids, use_cache=False):
+        del use_cache
+        logits = torch.full((*input_ids.shape, 16), -10.0)
+        for position, token in enumerate(self.target_tokens[0]):
+            logits[0, position, token] = 10.0
+        return SimpleNamespace(logits=logits)
+
+
+def test_generation_stops_at_eos_inside_fully_accepted_block():
+    model = _bare_model(fixed=False)
+    model.config.eval_block_size = 4
+    model.config.inference_steps = 1
+    model.eos_token_id = 9
+    model.latent_stats_initialized = torch.tensor(True)
+    proposal = torch.tensor([[1, 2, 9, 7]])
+    model.target = _GreedyTarget(proposal)
+    model.extract_clean_latents = lambda input_ids: torch.zeros(
+        input_ids.shape[0], input_ids.shape[1], 2
+    )
+    model.normalize_latents = lambda latents: latents
+    model._draft_latents = lambda context, block_len, num_steps: torch.zeros(
+        context.shape[0], block_len, context.shape[-1]
+    )
+    model.decode_latents = lambda context, block: proposal[:, : block.shape[1]]
+    generation_config = SimpleNamespace(
+        block_size=4,
+        num_steps=1,
+        max_new_tokens=4,
+    )
+
+    generated, stats = model.generate(
+        torch.tensor([[5]]),
+        generation_config,
+        return_speculative_stats=True,
+    )
+
+    assert generated.tolist() == [[5, 1, 2, 9]]
+    assert stats.accepted_tokens == 3
+    assert stats.accepted_lengths == [3]
+    assert stats.committed_tokens == 3

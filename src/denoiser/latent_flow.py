@@ -415,10 +415,20 @@ class LatentFlowE2D(Denoiser):
             accepted = int(longest_matching_prefix(proposal, target_tokens)[0])
             stats.verifier_seconds += time.perf_counter() - verify_started
             stats.verifier_calls += 1
+            reached_eos = False
+            if self.eos_token_id is not None and accepted:
+                accepted_eos = (
+                    proposal[0, :accepted] == self.eos_token_id
+                ).nonzero(as_tuple=False)
+                if accepted_eos.numel():
+                    accepted = int(accepted_eos[0, 0]) + 1
+                    reached_eos = True
             stats.accepted_tokens += accepted
             stats.accepted_lengths.append(accepted)
             if accepted:
                 generated = torch.cat([generated, proposal[:, :accepted]], dim=-1)
+            if reached_eos:
+                break
             if (
                 accepted < proposal_len
                 and generated.shape[1] - inputs.shape[1] < max_new_tokens
