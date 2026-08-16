@@ -6,6 +6,7 @@ cd "$(dirname "$0")/.."
 source setup_env.sh
 
 MODEL_NAME="${MODEL_NAME:-Qwen/Qwen3-1.7B-Base}"
+FLOW_MODEL_CONFIG="${FLOW_MODEL_CONFIG:-latent_flow_e2d}"
 USE_AR_CHECKPOINT="${USE_AR_CHECKPOINT:-false}"
 DATASET_MODE="${DATASET_MODE:-small}"
 NUM_DEVICES="${NUM_DEVICES:-1}"
@@ -35,6 +36,21 @@ AUTORESUME="${AUTORESUME:-false}"
 WANDB_PROJECT="${WANDB_PROJECT:-gsm8k-drafter-study}"
 WANDB_MODE="${WANDB_MODE:-online}"
 export WANDB_PROJECT WANDB_MODE
+
+if [ "${FLOW_MODEL_CONFIG}" = "riemannian_latent_flow_e2d" ]; then
+  SPHERICAL_OVERRIDES=(
+    "+metrics.direction_loss._target_=src.tasks.metrics.DirectionLoss"
+    "+metrics.scalar_loss._target_=src.tasks.metrics.ScalarLoss"
+    "+metrics.angular_error._target_=src.tasks.metrics.AngularError"
+    "+metrics.radius_relative_error._target_=src.tasks.metrics.RadiusRelativeError"
+    "+eval_metrics.direction_loss._target_=src.tasks.metrics.DirectionLoss"
+    "+eval_metrics.scalar_loss._target_=src.tasks.metrics.ScalarLoss"
+    "+eval_metrics.angular_error._target_=src.tasks.metrics.AngularError"
+    "+eval_metrics.radius_relative_error._target_=src.tasks.metrics.RadiusRelativeError"
+  )
+else
+  SPHERICAL_OVERRIDES=()
+fi
 
 if [ "${DATASET_MODE}" = "full" ]; then
   DATASET_OVERRIDES=(
@@ -88,7 +104,8 @@ uv run composer -n "${NUM_DEVICES}" scripts/composer_scripts/train_discrete_deno
   ~eval_metrics.perplexity \
   +metrics.flow_loss._target_=src.tasks.metrics.FlowLoss \
   +eval_metrics.flow_loss._target_=src.tasks.metrics.FlowLoss \
-  model=latent_flow_e2d \
+  "${SPHERICAL_OVERRIDES[@]}" \
+  model="${FLOW_MODEL_CONFIG}" \
   model/backbone@model.config.backbone_config=llm_as_encoder_decoder_share_kv_encoder_gen \
   model.config.length="${MODEL_LENGTH}" \
   model.config.attn_backend=sdpa \

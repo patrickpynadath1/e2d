@@ -20,6 +20,57 @@ from src.denoiser.speculative import (
 )
 
 
+def project_to_tangent(point: torch.Tensor, vector: torch.Tensor) -> torch.Tensor:
+    """Project an ambient vector onto the tangent space at a unit sphere point."""
+    return vector - (point * vector).sum(dim=-1, keepdim=True) * point
+
+
+def spherical_interpolant_and_velocity(
+    clean: torch.Tensor,
+    noise: torch.Tensor,
+    time_value: torch.Tensor,
+    eps: float = 1e-6,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """SLERP from clean at t=0 to noise at t=1 and its tangent velocity."""
+    clean_float = F.normalize(clean.float(), dim=-1)
+    noise_float = F.normalize(noise.float(), dim=-1)
+    time_float = time_value.float()
+    while time_float.ndim < clean_float.ndim:
+        time_float = time_float.unsqueeze(-1)
+    cosine = (clean_float * noise_float).sum(dim=-1, keepdim=True)
+    cosine = cosine.clamp(-1.0 + eps, 1.0 - eps)
+    angle = torch.acos(cosine)
+    sine = torch.sin(angle).clamp_min(eps)
+    clean_weight = torch.sin((1.0 - time_float) * angle) / sine
+    noise_weight = torch.sin(time_float * angle) / sine
+    point = clean_weight * clean_float + noise_weight * noise_float
+    velocity = angle / sine * (
+        -torch.cos((1.0 - time_float) * angle) * clean_float
+        + torch.cos(time_float * angle) * noise_float
+    )
+    point = F.normalize(point, dim=-1)
+    velocity = project_to_tangent(point, velocity)
+    return point.to(clean.dtype), velocity
+
+
+def sphere_expmap(
+    point: torch.Tensor,
+    tangent_velocity: torch.Tensor,
+    step_size: float,
+    eps: float = 1e-7,
+) -> torch.Tensor:
+    """Move along a spherical geodesic using the exponential map."""
+    point_float = F.normalize(point.float(), dim=-1)
+    tangent = project_to_tangent(point_float, tangent_velocity.float())
+    tangent_step = step_size * tangent
+    step_norm = tangent_step.norm(dim=-1, keepdim=True)
+    direction = tangent_step / step_norm.clamp_min(eps)
+    updated = torch.cos(step_norm) * point_float + torch.sin(step_norm) * direction
+    small = step_norm < eps
+    updated = torch.where(small, point_float, updated)
+    return F.normalize(updated, dim=-1).to(point.dtype)
+
+
 class LatentFlowE2DConfig(DenoiserConfig):
     model_type = "latent_flow_e2d"
 
@@ -205,7 +256,7 @@ class LatentFlowE2D(Denoiser):
         ]
         return noise, sampled_time
 
-    def _run_flow_layers(
+    def _run_flow_hidden(
         self,
         clean: torch.Tensor,
         noisy: torch.Tensor,
@@ -240,7 +291,26 @@ class LatentFlowE2D(Denoiser):
                 cache_position=cache_position,
                 position_embeddings=position_embeddings,
             )[0]
-        return self.velocity_head(hidden[:, -noisy_len:])
+        return hidden[:, -noisy_len:]
+
+    def _run_flow_layers(
+        self,
+        clean: torch.Tensor,
+        noisy: torch.Tensor,
+        time_value: torch.Tensor,
+        attention_mask: torch.BoolTensor,
+        clean_position_ids: torch.LongTensor,
+        noisy_position_ids: torch.LongTensor,
+    ) -> torch.Tensor:
+        hidden = self._run_flow_hidden(
+            clean,
+            noisy,
+            time_value,
+            attention_mask,
+            clean_position_ids,
+            noisy_position_ids,
+        )
+        return self.velocity_head(hidden)
 
     def forward(
         self,
@@ -405,6 +475,346 @@ class LatentFlowE2D(Denoiser):
             proposal = self.decode_latents(context_latents, proposed_latents)
             stats.draft_seconds += time.perf_counter() - draft_started
             stats.draft_calls += num_steps
+            stats.proposed_tokens += proposal_len
+
+            verify_started = time.perf_counter()
+            candidate = torch.cat([generated, proposal], dim=-1)
+            verifier_logits = self.target(input_ids=candidate, use_cache=False).logits
+            start = generated.shape[1] - 1
+            target_tokens = verifier_logits[:, start : start + proposal_len].argmax(-1)
+            accepted = int(longest_matching_prefix(proposal, target_tokens)[0])
+            stats.verifier_seconds += time.perf_counter() - verify_started
+            stats.verifier_calls += 1
+            reached_eos = False
+            if self.eos_token_id is not None and accepted:
+                accepted_eos = (
+                    proposal[0, :accepted] == self.eos_token_id
+                ).nonzero(as_tuple=False)
+                if accepted_eos.numel():
+                    accepted = int(accepted_eos[0, 0]) + 1
+                    reached_eos = True
+            stats.accepted_tokens += accepted
+            stats.accepted_lengths.append(accepted)
+            if accepted:
+                generated = torch.cat([generated, proposal[:, :accepted]], dim=-1)
+            if reached_eos:
+                break
+            if (
+                accepted < proposal_len
+                and generated.shape[1] - inputs.shape[1] < max_new_tokens
+            ):
+                generated = torch.cat(
+                    [generated, target_tokens[:, accepted : accepted + 1]], dim=-1
+                )
+                stats.correction_tokens += 1
+            if self.eos_token_id is not None and generated[0, -1] == self.eos_token_id:
+                break
+        stats.committed_tokens = generated.shape[1] - inputs.shape[1]
+        stats.total_seconds = time.perf_counter() - started
+        self.last_speculative_stats = stats
+        return (generated, stats) if return_speculative_stats else generated
+
+
+class RiemannianLatentFlowE2DConfig(LatentFlowE2DConfig):
+    model_type = "riemannian_latent_flow_e2d"
+
+    def __init__(
+        self,
+        scalar_loss_weight: float = 0.1,
+        log_radius_mean: float = 8.02,
+        log_radius_std: float = 0.1,
+        scalar_prediction_clip: float = 5.0,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        if scalar_loss_weight < 0:
+            raise ValueError("scalar_loss_weight must be non-negative")
+        if log_radius_std <= 0:
+            raise ValueError("log_radius_std must be positive")
+        if scalar_prediction_clip <= 0:
+            raise ValueError("scalar_prediction_clip must be positive")
+        self.scalar_loss_weight = scalar_loss_weight
+        self.log_radius_mean = log_radius_mean
+        self.log_radius_std = log_radius_std
+        self.scalar_prediction_clip = scalar_prediction_clip
+
+
+class RiemannianLatentFlowE2D(LatentFlowE2D):
+    """Spherical latent flow with a separate standardized log-radius head."""
+
+    config_class = RiemannianLatentFlowE2DConfig
+
+    def __init__(
+        self, config: RiemannianLatentFlowE2DConfig, **kwargs: Any
+    ) -> None:
+        super().__init__(config, **kwargs)
+        hidden_size = self.target.config.hidden_size
+        scalar_width = max(hidden_size // 4, 1)
+        self.scalar_head = nn.Sequential(
+            nn.LayerNorm(hidden_size),
+            nn.Linear(hidden_size, scalar_width),
+            nn.SiLU(),
+            nn.Linear(scalar_width, 1),
+        )
+        nn.init.zeros_(self.scalar_head[-1].weight)
+        nn.init.zeros_(self.scalar_head[-1].bias)
+        self.register_buffer(
+            "log_radius_mean",
+            torch.tensor(config.log_radius_mean, dtype=torch.float32),
+        )
+        self.register_buffer(
+            "log_radius_std",
+            torch.tensor(config.log_radius_std, dtype=torch.float32),
+        )
+
+    def latent_direction_and_scalar(
+        self, latents: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        radius = latents.float().norm(dim=-1)
+        standardized_log_radius = (
+            torch.log(radius.clamp_min(self.config.stats_epsilon))
+            - self.log_radius_mean
+        ) / self.log_radius_std
+        direction = F.normalize(latents.float(), dim=-1).to(latents.dtype)
+        return direction, standardized_log_radius
+
+    def reconstruct_latents(
+        self, direction: torch.Tensor, standardized_log_radius: torch.Tensor
+    ) -> torch.Tensor:
+        clipped = standardized_log_radius.float().clamp(
+            -self.config.scalar_prediction_clip,
+            self.config.scalar_prediction_clip,
+        )
+        radius = torch.exp(self.log_radius_mean + self.log_radius_std * clipped)
+        return (F.normalize(direction.float(), dim=-1) * radius.unsqueeze(-1)).to(
+            direction.dtype
+        )
+
+    def _run_spherical_heads(
+        self,
+        clean_direction: torch.Tensor,
+        noisy_direction: torch.Tensor,
+        time_value: torch.Tensor,
+        attention_mask: torch.BoolTensor,
+        clean_position_ids: torch.LongTensor,
+        noisy_position_ids: torch.LongTensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        hidden = self._run_flow_hidden(
+            clean_direction,
+            noisy_direction,
+            time_value,
+            attention_mask,
+            clean_position_ids,
+            noisy_position_ids,
+        )
+        ambient_velocity = self.velocity_head(hidden)
+        tangent_velocity = project_to_tangent(
+            noisy_direction.float(), ambient_velocity.float()
+        )
+        scalar_prediction = self.scalar_head(hidden).squeeze(-1).float()
+        return tangent_velocity, scalar_prediction
+
+    def forward(
+        self,
+        input_ids: torch.LongTensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        context_mask: Optional[torch.Tensor] = None,
+        t: Optional[torch.Tensor] = None,
+        compute_loss: bool = True,
+        **kwargs: Any,
+    ) -> DenoiserOutput:
+        del kwargs, compute_loss
+        if attention_mask is None:
+            attention_mask = torch.ones_like(input_ids)
+        if context_mask is None:
+            context_mask = torch.zeros_like(input_ids)
+        valid = attention_mask.bool()
+        loss_mask = valid & ~context_mask.bool()
+        clean_raw = self.extract_clean_latents(input_ids, attention_mask)
+        clean_direction, scalar_target = self.latent_direction_and_scalar(clean_raw)
+        noise, t = self._sample_training_path(clean_direction, t)
+        noise_direction = F.normalize(noise.float(), dim=-1).to(clean_direction.dtype)
+        path, target_velocity = spherical_interpolant_and_velocity(
+            clean_direction, noise_direction, t
+        )
+
+        seq_len = input_ids.shape[1]
+        positions = torch.arange(seq_len, device=input_ids.device)[None].expand(
+            input_ids.shape[0], -1
+        )
+        flow_mask = self._flow_attention_mask(
+            seq_len, self.config.block_size, input_ids.device
+        )
+        padding = torch.cat([valid, valid], dim=-1)
+        flow_mask = flow_mask[None] & padding[:, :, None] & padding[:, None, :]
+        predicted_velocity, scalar_prediction = self._run_spherical_heads(
+            clean_direction,
+            path,
+            t,
+            flow_mask,
+            positions,
+            positions,
+        )
+
+        direction_token_loss = (
+            predicted_velocity.float() - target_velocity.float()
+        ).square().sum(dim=-1)
+        scalar_token_loss = F.smooth_l1_loss(
+            scalar_prediction,
+            scalar_target.float(),
+            reduction="none",
+        )
+        total_token_loss = (
+            direction_token_loss
+            + self.config.scalar_loss_weight * scalar_token_loss
+        )
+        direction_loss = direction_token_loss[loss_mask].mean()
+        scalar_loss = scalar_token_loss[loss_mask].mean()
+        total_loss = total_token_loss[loss_mask].mean()
+        velocity_cosine = F.cosine_similarity(
+            predicted_velocity.float(), target_velocity.float(), dim=-1
+        ).clamp(-1.0, 1.0)
+        angular_error = torch.acos(velocity_cosine)[loss_mask].mean()
+        relative_radius_error = (
+            torch.exp(
+                self.log_radius_std
+                * (scalar_prediction - scalar_target.float()).clamp(-20.0, 20.0)
+            )
+            - 1.0
+        ).abs()[loss_mask].mean()
+
+        return DenoiserOutput(
+            denoiser_output=predicted_velocity,
+            tokens_mask=loss_mask.float(),
+            loss=total_loss,
+            nlls=total_token_loss,
+            other_loss_terms={
+                "flow_loss": total_loss,
+                "direction_loss": direction_loss,
+                "scalar_loss": scalar_loss,
+                "angular_error": angular_error,
+                "radius_relative_error": relative_radius_error,
+            },
+            flow_loss=total_loss,
+            direction_loss=direction_loss,
+            scalar_loss=scalar_loss,
+            angular_error=angular_error,
+            radius_relative_error=relative_radius_error,
+            flow_timesteps=t,
+        )
+
+    def _draft_latents(
+        self, context_direction: torch.Tensor, block_len: int, num_steps: int
+    ) -> torch.Tensor:
+        batch_size = context_direction.shape[0]
+        canvas = F.normalize(
+            torch.randn(
+                batch_size,
+                block_len,
+                context_direction.shape[-1],
+                device=context_direction.device,
+                dtype=context_direction.dtype,
+            ).float(),
+            dim=-1,
+        ).to(context_direction.dtype)
+        context_len = context_direction.shape[1]
+        clean_positions = torch.arange(context_len, device=canvas.device)[None].expand(
+            batch_size, -1
+        )
+        noisy_positions = torch.arange(
+            context_len, context_len + block_len, device=canvas.device
+        )[None].expand(batch_size, -1)
+        mask = self._inference_attention_mask(context_len, block_len, canvas.device)
+        step_size = -1.0 / num_steps
+        for step in range(num_steps):
+            time_value = torch.full(
+                (batch_size, block_len),
+                1.0 - step / num_steps,
+                device=canvas.device,
+                dtype=canvas.dtype,
+            )
+            velocity, _ = self._run_spherical_heads(
+                context_direction,
+                canvas,
+                time_value,
+                mask,
+                clean_positions,
+                noisy_positions,
+            )
+            canvas = sphere_expmap(canvas, velocity, step_size)
+
+        endpoint_time = torch.zeros(
+            (batch_size, block_len), device=canvas.device, dtype=canvas.dtype
+        )
+        _, scalar_prediction = self._run_spherical_heads(
+            context_direction,
+            canvas,
+            endpoint_time,
+            mask,
+            clean_positions,
+            noisy_positions,
+        )
+        return self.reconstruct_latents(canvas, scalar_prediction)
+
+    def decode_latents(
+        self, context_latents: torch.Tensor, block_latents: torch.Tensor
+    ) -> torch.LongTensor:
+        residual = torch.cat([context_latents, block_latents], dim=1)
+        seq_len = residual.shape[1]
+        positions = torch.arange(seq_len, device=residual.device)[None].expand(
+            residual.shape[0], -1
+        )
+        position_embeddings = self.target.model.rotary_emb(residual, positions)
+        causal = torch.tril(
+            torch.ones((seq_len, seq_len), dtype=torch.bool, device=residual.device)
+        )
+        decoded = self.target.model.layers[self.target_layer_idx](
+            residual,
+            attention_mask=self._as_additive_mask(causal, residual.dtype),
+            position_ids=positions,
+            use_cache=False,
+            cache_position=positions[0],
+            position_embeddings=position_embeddings,
+        )[0]
+        logits = self.target.lm_head(self.target.model.norm(decoded))
+        context_len = context_latents.shape[1]
+        block_len = block_latents.shape[1]
+        return logits[:, context_len - 1 : context_len - 1 + block_len].argmax(-1)
+
+    @torch.no_grad()
+    def generate(
+        self,
+        inputs: torch.LongTensor,
+        generation_config: DiffusionGenerationConfig,
+        max_new_tokens: Optional[int] = None,
+        return_speculative_stats: bool = False,
+        **kwargs: Any,
+    ) -> torch.LongTensor | tuple[torch.LongTensor, SpeculativeStats]:
+        del kwargs
+        if inputs.shape[0] != 1:
+            raise NotImplementedError(
+                "latent speculative generation supports batch size one"
+            )
+        block_size = int(generation_config.block_size or self.config.eval_block_size)
+        num_steps = int(
+            getattr(generation_config, "num_steps", self.config.inference_steps)
+        )
+        max_new_tokens = int(max_new_tokens or generation_config.max_new_tokens)
+        generated = inputs
+        stats = SpeculativeStats()
+        started = time.perf_counter()
+        while generated.shape[1] - inputs.shape[1] < max_new_tokens:
+            remaining = max_new_tokens - (generated.shape[1] - inputs.shape[1])
+            proposal_len = min(block_size, remaining)
+            clean_raw = self.extract_clean_latents(generated)
+            context_direction, _ = self.latent_direction_and_scalar(clean_raw)
+            draft_started = time.perf_counter()
+            proposed_latents = self._draft_latents(
+                context_direction, proposal_len, num_steps
+            )
+            proposal = self.decode_latents(clean_raw, proposed_latents)
+            stats.draft_seconds += time.perf_counter() - draft_started
+            stats.draft_calls += num_steps + 1
             stats.proposed_tokens += proposal_len
 
             verify_started = time.perf_counter()

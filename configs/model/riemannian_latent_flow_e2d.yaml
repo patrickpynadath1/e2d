@@ -1,0 +1,19 @@
+defaults:
+  - base@_here_
+  - _self_
+
+_target_: src.denoiser.latent_flow.RiemannianLatentFlowE2D
+config:
+  _target_: src.denoiser.latent_flow.RiemannianLatentFlowE2DConfig
+  block_size: ${block_size}
+  eval_block_size: ${eval_block_size}
+  draft_layer_offsets: [-3, -2]
+  target_layer_offset: -1
+  inference_steps: 4
+  fixed_training_noise: false
+  fixed_training_seed: 17
+  scalar_loss_weight: 0.1
+  # Standardized log-L2 norm, calibrated from Qwen3-1.7B answer-token residuals.
+  log_radius_mean: 8.02
+  log_radius_std: 0.1
+  scalar_prediction_clip: 5.0

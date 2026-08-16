@@ -3,7 +3,12 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from src.denoiser.latent_flow import LatentFlowE2D
+from src.denoiser.latent_flow import (
+    LatentFlowE2D,
+    RiemannianLatentFlowE2D,
+    sphere_expmap,
+    spherical_interpolant_and_velocity,
+)
 
 
 def _bare_model(fixed: bool) -> LatentFlowE2D:
@@ -120,3 +125,40 @@ def test_generation_stops_at_eos_inside_fully_accepted_block():
     assert stats.accepted_tokens == 3
     assert stats.accepted_lengths == [3]
     assert stats.committed_tokens == 3
+
+
+def test_slerp_path_stays_on_sphere_and_velocity_is_tangent():
+    clean = torch.tensor([[1.0, 0.0, 0.0]])
+    noise = torch.tensor([[0.0, 1.0, 0.0]])
+    midpoint, velocity = spherical_interpolant_and_velocity(
+        clean, noise, torch.tensor([0.5])
+    )
+
+    expected = torch.tensor([[2**-0.5, 2**-0.5, 0.0]])
+    assert torch.allclose(midpoint, expected, atol=1e-5)
+    assert torch.allclose(midpoint.norm(dim=-1), torch.ones(1), atol=1e-6)
+    assert torch.allclose((midpoint * velocity).sum(-1), torch.zeros(1), atol=1e-6)
+
+
+def test_sphere_expmap_follows_quarter_circle_and_preserves_norm():
+    point = torch.tensor([[1.0, 0.0, 0.0]])
+    velocity = torch.tensor([[0.0, torch.pi / 2, 0.0]])
+    updated = sphere_expmap(point, velocity, step_size=1.0)
+
+    assert torch.allclose(updated, torch.tensor([[0.0, 1.0, 0.0]]), atol=1e-5)
+    assert torch.allclose(updated.norm(dim=-1), torch.ones(1), atol=1e-6)
+
+
+def test_log_norm_scalar_round_trip_reconstructs_latents():
+    model = RiemannianLatentFlowE2D.__new__(RiemannianLatentFlowE2D)
+    torch.nn.Module.__init__(model)
+    model.config = SimpleNamespace(stats_epsilon=1e-6, scalar_prediction_clip=100.0)
+    model.register_buffer("log_radius_mean", torch.tensor(8.02))
+    model.register_buffer("log_radius_std", torch.tensor(0.1))
+    latents = torch.randn(2, 3, 16) * torch.tensor([2.0, 4.0, 8.0])[None, :, None]
+
+    direction, scalar = model.latent_direction_and_scalar(latents)
+    reconstructed = model.reconstruct_latents(direction, scalar)
+
+    assert torch.allclose(direction.norm(dim=-1), torch.ones(2, 3), atol=1e-6)
+    assert torch.allclose(reconstructed, latents, rtol=1e-5, atol=1e-5)

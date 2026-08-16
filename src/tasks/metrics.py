@@ -64,6 +64,42 @@ class FlowLoss(Loss):
         )
 
 
+class DirectionLoss(Loss):
+    def __init__(self, dist_sync_on_step: bool = False):
+        super().__init__(
+            name="direction_loss",
+            update_key="direction_loss",
+            dist_sync_on_step=dist_sync_on_step,
+        )
+
+
+class ScalarLoss(Loss):
+    def __init__(self, dist_sync_on_step: bool = False):
+        super().__init__(
+            name="scalar_loss",
+            update_key="scalar_loss",
+            dist_sync_on_step=dist_sync_on_step,
+        )
+
+
+class AngularError(Loss):
+    def __init__(self, dist_sync_on_step: bool = False):
+        super().__init__(
+            name="angular_error",
+            update_key="angular_error",
+            dist_sync_on_step=dist_sync_on_step,
+        )
+
+
+class RadiusRelativeError(Loss):
+    def __init__(self, dist_sync_on_step: bool = False):
+        super().__init__(
+            name="radius_relative_error",
+            update_key="radius_relative_error",
+            dist_sync_on_step=dist_sync_on_step,
+        )
+
+
 class NLL(Metric):
     # Make torchmetrics call update only once
     full_state_update = False
