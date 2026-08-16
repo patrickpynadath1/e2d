@@ -28,6 +28,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from src.datasets.tokenize_on_demand import GSM8KDataset
+from scripts.utils import maybe_add_missing_special_tokens
 
 
 def parse_args() -> argparse.Namespace:
@@ -156,6 +157,7 @@ def main() -> None:
         torch.cuda.manual_seed_all(args.seed)
     dtype = getattr(torch, args.dtype)
     tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    tokenizer = maybe_add_missing_special_tokens(tokenizer)
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
         torch_dtype=dtype,
