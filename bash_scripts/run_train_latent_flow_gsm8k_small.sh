@@ -21,6 +21,13 @@ BLOCK_SIZE="${BLOCK_SIZE:-4}"
 EVAL_BLOCK_SIZE="${EVAL_BLOCK_SIZE:-${BLOCK_SIZE}}"
 MODEL_LENGTH="${MODEL_LENGTH:-256}"
 INFERENCE_STEPS="${INFERENCE_STEPS:-1}"
+LATENT_STATS_PATH="${LATENT_STATS_PATH:-${PWD}/outputs/diagnostics/qwen-latent-norms/normalization_stats.pt}"
+PREDICTION_TYPE="${PREDICTION_TYPE:-velocity}"
+ADAPTIVE_TIMESTEP_SAMPLING="${ADAPTIVE_TIMESTEP_SAMPLING:-false}"
+ADAPTIVE_NUM_BINS="${ADAPTIVE_NUM_BINS:-50}"
+ADAPTIVE_EMA_DECAY="${ADAPTIVE_EMA_DECAY:-0.99}"
+ADAPTIVE_UNIFORM_MIX="${ADAPTIVE_UNIFORM_MIX:-0.2}"
+ADAPTIVE_MIN_OBSERVATIONS="${ADAPTIVE_MIN_OBSERVATIONS:-100}"
 SPEC_EVAL_MAX_NEW_TOKENS="${SPEC_EVAL_MAX_NEW_TOKENS:-64}"
 SPEC_EVAL_NUM_PROMPTS="${SPEC_EVAL_NUM_PROMPTS:-8}"
 FIXED_TRAINING_NOISE="${FIXED_TRAINING_NOISE:-false}"
@@ -36,6 +43,34 @@ AUTORESUME="${AUTORESUME:-false}"
 WANDB_PROJECT="${WANDB_PROJECT:-gsm8k-drafter-study}"
 WANDB_MODE="${WANDB_MODE:-online}"
 export WANDB_PROJECT WANDB_MODE
+
+if [ "${PREDICTION_TYPE}" != "velocity" ] && [ "${PREDICTION_TYPE}" != "x0" ]; then
+  echo "PREDICTION_TYPE must be 'velocity' or 'x0'" >&2
+  exit 2
+fi
+
+if [ "${FLOW_MODEL_CONFIG}" = "latent_flow_e2d" ]; then
+  if [ ! -f "${LATENT_STATS_PATH}" ]; then
+    echo "Latent statistics artifact not found: ${LATENT_STATS_PATH}" >&2
+    echo "Run scripts/eval/compare_qwen_latent_gaussian_norms.py first." >&2
+    exit 2
+  fi
+  if [ "${FIXED_TRAINING_NOISE}" = "true" ] && [ "${ADAPTIVE_TIMESTEP_SAMPLING}" = "true" ]; then
+    echo "FIXED_TRAINING_NOISE=true cannot be combined with adaptive timestep sampling." >&2
+    exit 2
+  fi
+  FLOW_OVERRIDES=(
+    "model.config.latent_stats_path=${LATENT_STATS_PATH}"
+    "model.config.prediction_type=${PREDICTION_TYPE}"
+    "model.config.adaptive_timestep_sampling=${ADAPTIVE_TIMESTEP_SAMPLING}"
+    "model.config.adaptive_num_bins=${ADAPTIVE_NUM_BINS}"
+    "model.config.adaptive_ema_decay=${ADAPTIVE_EMA_DECAY}"
+    "model.config.adaptive_uniform_mix=${ADAPTIVE_UNIFORM_MIX}"
+    "model.config.adaptive_min_observations=${ADAPTIVE_MIN_OBSERVATIONS}"
+  )
+else
+  FLOW_OVERRIDES=()
+fi
 
 if [ "${FLOW_MODEL_CONFIG}" = "riemannian_latent_flow_e2d" ]; then
   SPHERICAL_OVERRIDES=(
@@ -110,6 +145,7 @@ uv run composer -n "${NUM_DEVICES}" scripts/composer_scripts/train_discrete_deno
   model.config.length="${MODEL_LENGTH}" \
   model.config.attn_backend=sdpa \
   model.config.inference_steps="${INFERENCE_STEPS}" \
+  "${FLOW_OVERRIDES[@]}" \
   model.config.fixed_training_noise="${FIXED_TRAINING_NOISE}" \
   model.config.fixed_training_seed="${FIXED_TRAINING_SEED}" \
   model.config.backbone_config.num_encoder_layers=28 \
