@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Compare Qwen residual-stream norms with same-dimensional Gaussian noise.
+"""Calibrate per-coordinate Qwen residual statistics and compare with Gaussian noise.
 
 The latent-flow model targets the residual stream entering Qwen's final transformer
-layer. It normalizes those residuals with one scalar mean and standard deviation
-before comparing them with N(0, I) noise. This diagnostic reports both raw and
-scalar-normalized latent norms so it tests the distribution actually seen in training.
+layer. The latent-flow model uses dataset mean and standard deviation for every
+hidden coordinate. This diagnostic saves those reusable statistics and reports the
+held-out distribution actually seen during training.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import Any
 
 import matplotlib
@@ -27,20 +27,20 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from src.datasets.tokenize_on_demand import GSM8KDataset
-from scripts.utils import maybe_add_missing_special_tokens
+from scripts.utils import maybe_add_missing_special_tokens  # noqa: E402
+from src.datasets.tokenize_on_demand import GSM8KDataset  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default="Qwen/Qwen3-1.7B-Base")
     parser.add_argument("--split", choices=["train", "test"], default="train")
-    parser.add_argument("--num-samples", type=int, default=8)
+    parser.add_argument("--num-samples", type=int, default=512)
     parser.add_argument(
         "--stats-samples",
         type=int,
-        default=4,
-        help="Initial samples used to estimate the flow model's scalar mean/std.",
+        default=256,
+        help="Initial samples used to estimate per-hidden-coordinate mean/std.",
     )
     parser.add_argument("--max-length", type=int, default=768)
     parser.add_argument(
@@ -57,7 +57,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("/workspace/outputs/diagnostics/qwen-latent-norms"),
+        default=_REPO_ROOT / "outputs/diagnostics/qwen-latent-norms",
     )
     return parser.parse_args()
 
@@ -99,7 +99,7 @@ def _comparison(
     gaussian_summary = summarize_norms(gaussian)
     return {
         "raw_qwen": raw_summary,
-        "scalar_normalized_qwen": normalized_summary,
+        "coordinate_normalized_qwen": normalized_summary,
         "standard_gaussian": gaussian_summary,
         "raw_to_gaussian_l2_mean_ratio": (
             raw_summary["l2_mean"] / gaussian_summary["l2_mean"]
@@ -128,7 +128,7 @@ def _plot_norms(
         bins=60,
         density=True,
         alpha=0.65,
-        label="scalar-normalized Qwen",
+        label="coordinate-normalized Qwen",
     )
     axes[1].hist(gaussian_l2, bins=60, density=True, alpha=0.65, label="N(0, I)")
     axes[1].set_title("Actual flow target vs Gaussian")
@@ -196,13 +196,17 @@ def main() -> None:
         all_latents.append(latent[valid])
         context_latents.append(latent[valid & context_mask])
         answer_latents.append(latent[valid & ~context_mask])
-        print(f"Processed sample {index + 1}/{len(dataset)} ({int(valid.sum())} tokens)")
+        print(
+            f"Processed sample {index + 1}/{len(dataset)} ({int(valid.sum())} tokens)"
+        )
 
     raw_all = torch.cat(all_latents)
     stats_latents = torch.cat(all_latents[: args.stats_samples])
     heldout_latents = torch.cat(all_latents[args.stats_samples :])
     scalar_mean = stats_latents.mean()
     scalar_std = stats_latents.std().clamp_min(1e-6)
+    feature_mean = stats_latents.mean(dim=0)
+    feature_std = stats_latents.std(dim=0).clamp_min(1e-6)
     generator = torch.Generator(device="cpu").manual_seed(args.seed)
 
     groups = {
@@ -223,17 +227,16 @@ def main() -> None:
         "target_layer_index_zero_based": layer_index,
         "target_layer_number_one_based": layer_index + 1,
         "hidden_dimension": raw_all.shape[-1],
-        "scalar_normalization_mean": scalar_mean.item(),
-        "scalar_normalization_std": scalar_std.item(),
+        "scalar_normalization_mean_diagnostic_only": scalar_mean.item(),
+        "scalar_normalization_std_diagnostic_only": scalar_std.item(),
+        "normalization": "hidden_coordinate",
         "groups": {},
     }
     normalized_groups: dict[str, torch.Tensor] = {}
     gaussian_groups: dict[str, torch.Tensor] = {}
     for name, raw in groups.items():
-        normalized = (raw - scalar_mean) / scalar_std
-        gaussian = torch.randn(
-            raw.shape, dtype=torch.float32, generator=generator
-        )
+        normalized = (raw - feature_mean) / feature_std
+        gaussian = torch.randn(raw.shape, dtype=torch.float32, generator=generator)
         normalized_groups[name] = normalized
         gaussian_groups[name] = gaussian
         results["groups"][name] = _comparison(raw, normalized, gaussian)
@@ -241,6 +244,7 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     json_path = args.output_dir / "summary.json"
     arrays_path = args.output_dir / "norms.npz"
+    stats_path = args.output_dir / "normalization_stats.pt"
     plot_path = args.output_dir / "norm_histograms.png"
     json_path.write_text(json.dumps(results, indent=2) + "\n")
     np.savez_compressed(
@@ -252,11 +256,21 @@ def main() -> None:
         normalized_heldout_l2=normalized_groups["heldout_all_tokens"]
         .norm(dim=-1)
         .numpy(),
-        gaussian_heldout_l2=gaussian_groups["heldout_all_tokens"]
-        .norm(dim=-1)
-        .numpy(),
+        gaussian_heldout_l2=gaussian_groups["heldout_all_tokens"].norm(dim=-1).numpy(),
         raw_context_l2=groups["context_tokens"].norm(dim=-1).numpy(),
         raw_answer_l2=groups["answer_tokens"].norm(dim=-1).numpy(),
+    )
+    torch.save(
+        {
+            "scalar_mean": scalar_mean,
+            "scalar_std": scalar_std,
+            "feature_mean": feature_mean,
+            "feature_std": feature_std,
+            "num_vectors": stats_latents.shape[0],
+            "model": args.model,
+            "target_layer_index": layer_index,
+        },
+        stats_path,
     )
     _plot_norms(
         groups["heldout_all_tokens"],
@@ -268,6 +282,7 @@ def main() -> None:
     print(json.dumps(results, indent=2))
     print(f"Saved summary: {json_path}")
     print(f"Saved norm arrays: {arrays_path}")
+    print(f"Saved reusable statistics: {stats_path}")
     print(f"Saved histogram: {plot_path}")
 
 

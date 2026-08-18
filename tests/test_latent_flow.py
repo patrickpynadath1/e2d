@@ -80,6 +80,66 @@ def test_stochastic_training_path_uses_supplied_collator_times():
     assert sampled is supplied
 
 
+def test_feature_normalization_broadcasts_across_arbitrary_sequence_lengths():
+    model = _bare_model(fixed=False)
+    model.register_buffer("latent_mean", torch.tensor([1.0, 2.0, 3.0]))
+    model.register_buffer("latent_std", torch.tensor([2.0, 4.0, 8.0]))
+    latents = torch.tensor([[[3.0, 6.0, 11.0], [1.0, 2.0, 3.0], [-1.0, -2.0, -5.0]]])
+
+    normalized = model.normalize_latents(latents)
+    reconstructed = model.denormalize_latents(normalized)
+
+    assert normalized.shape == latents.shape
+    assert torch.allclose(normalized[0, 0], torch.ones(3))
+    assert torch.allclose(reconstructed, latents)
+
+
+@pytest.mark.parametrize("prediction_type", ["velocity", "x0"])
+def test_prediction_parameterizations_recover_clean_endpoint(prediction_type):
+    model = _bare_model(fixed=False)
+    model.config.prediction_type = prediction_type
+    clean = torch.randn(2, 4, 3)
+    noise = torch.randn_like(clean)
+    time = torch.rand(2, 4)
+    noisy = (1.0 - time.unsqueeze(-1)) * clean + time.unsqueeze(-1) * noise
+    target_velocity = noise - clean
+    target = model._prediction_target(clean, noisy, target_velocity)
+
+    recovered = model.prediction_to_x0(noisy, target, time)
+
+    assert torch.allclose(recovered, clean, atol=1e-6)
+
+
+def test_unobserved_adaptive_sampler_is_uniform():
+    model = _bare_model(fixed=False)
+    model.config.adaptive_num_bins = 4
+    model.config.adaptive_min_observations = 2
+    model.config.adaptive_uniform_mix = 0.2
+    model.register_buffer("adaptive_kl_ema", torch.zeros(4, dtype=torch.float64))
+    model.register_buffer("adaptive_kl_counts", torch.zeros(4, dtype=torch.long))
+
+    probabilities = model.adaptive_timestep_probabilities()
+
+    assert torch.equal(probabilities, torch.full((4,), 0.25, dtype=torch.float64))
+
+
+def test_adaptive_sampler_uses_monotone_kl_slopes_with_uniform_mix():
+    model = _bare_model(fixed=False)
+    model.config.adaptive_num_bins = 3
+    model.config.adaptive_min_observations = 1
+    model.config.adaptive_uniform_mix = 0.3
+    model.register_buffer(
+        "adaptive_kl_ema", torch.tensor([1.0, 1.0, 3.0], dtype=torch.float64)
+    )
+    model.register_buffer("adaptive_kl_counts", torch.ones(3, dtype=torch.long))
+
+    probabilities = model.adaptive_timestep_probabilities()
+
+    expected_adaptive = torch.tensor([0.0, 0.0, 2.0], dtype=torch.float64) / 2.0
+    expected = 0.7 * expected_adaptive + 0.3 / 3.0
+    assert torch.allclose(probabilities, expected)
+
+
 class _GreedyTarget(torch.nn.Module):
     def __init__(self, target_tokens: torch.Tensor):
         super().__init__()

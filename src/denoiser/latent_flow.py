@@ -5,9 +5,11 @@ from __future__ import annotations
 import copy
 import math
 import time
-from typing import Any, Optional
+from pathlib import Path
+from typing import Any, Literal, Optional
 
 import torch
+import torch.distributed as torch_dist
 import torch.nn.functional as F
 from torch import nn
 
@@ -44,9 +46,13 @@ def spherical_interpolant_and_velocity(
     clean_weight = torch.sin((1.0 - time_float) * angle) / sine
     noise_weight = torch.sin(time_float * angle) / sine
     point = clean_weight * clean_float + noise_weight * noise_float
-    velocity = angle / sine * (
-        -torch.cos((1.0 - time_float) * angle) * clean_float
-        + torch.cos(time_float * angle) * noise_float
+    velocity = (
+        angle
+        / sine
+        * (
+            -torch.cos((1.0 - time_float) * angle) * clean_float
+            + torch.cos(time_float * angle) * noise_float
+        )
     )
     point = F.normalize(point, dim=-1)
     velocity = project_to_tangent(point, velocity)
@@ -82,6 +88,13 @@ class LatentFlowE2DConfig(DenoiserConfig):
         target_layer_offset: int = -1,
         inference_steps: int = 1,
         stats_epsilon: float = 1e-6,
+        latent_stats_path: Optional[str] = None,
+        prediction_type: Literal["velocity", "x0"] = "velocity",
+        adaptive_timestep_sampling: bool = False,
+        adaptive_num_bins: int = 50,
+        adaptive_ema_decay: float = 0.99,
+        adaptive_uniform_mix: float = 0.2,
+        adaptive_min_observations: int = 100,
         fixed_training_noise: bool = False,
         fixed_training_seed: int = 17,
         **kwargs: Any,
@@ -93,6 +106,23 @@ class LatentFlowE2DConfig(DenoiserConfig):
         self.target_layer_offset = target_layer_offset
         self.inference_steps = inference_steps
         self.stats_epsilon = stats_epsilon
+        if prediction_type not in ("velocity", "x0"):
+            raise ValueError("prediction_type must be 'velocity' or 'x0'")
+        if adaptive_num_bins < 2:
+            raise ValueError("adaptive_num_bins must be at least two")
+        if not 0 <= adaptive_ema_decay < 1:
+            raise ValueError("adaptive_ema_decay must be in [0, 1)")
+        if not 0 <= adaptive_uniform_mix <= 1:
+            raise ValueError("adaptive_uniform_mix must be in [0, 1]")
+        if adaptive_min_observations < 0:
+            raise ValueError("adaptive_min_observations must be non-negative")
+        self.latent_stats_path = latent_stats_path
+        self.prediction_type = prediction_type
+        self.adaptive_timestep_sampling = adaptive_timestep_sampling
+        self.adaptive_num_bins = adaptive_num_bins
+        self.adaptive_ema_decay = adaptive_ema_decay
+        self.adaptive_uniform_mix = adaptive_uniform_mix
+        self.adaptive_min_observations = adaptive_min_observations
         self.fixed_training_noise = fixed_training_noise
         self.fixed_training_seed = fixed_training_seed
 
@@ -141,9 +171,49 @@ class LatentFlowE2D(Denoiser):
             parameter.requires_grad = False
         for parameter in self.flow_layers.parameters():
             parameter.requires_grad = True
-        self.register_buffer("latent_mean", torch.tensor(0.0, dtype=torch.float32))
-        self.register_buffer("latent_std", torch.tensor(1.0, dtype=torch.float32))
-        self.register_buffer("latent_stats_initialized", torch.tensor(False))
+        latent_mean = torch.zeros(hidden_size, dtype=torch.float32)
+        latent_std = torch.ones(hidden_size, dtype=torch.float32)
+        stats_are_configured = config.latent_stats_path is not None
+        if stats_are_configured:
+            stats_path = Path(config.latent_stats_path).expanduser()
+            if not stats_path.is_file():
+                raise FileNotFoundError(
+                    f"latent statistics file does not exist: {stats_path}. Run "
+                    "scripts/eval/compare_qwen_latent_gaussian_norms.py first."
+                )
+            stats = torch.load(stats_path, map_location="cpu", weights_only=True)
+            latent_mean = stats["feature_mean"].float()
+            latent_std = stats["feature_std"].float()
+            expected_shape = (hidden_size,)
+            if (
+                latent_mean.shape != expected_shape
+                or latent_std.shape != expected_shape
+            ):
+                raise ValueError(
+                    "latent feature statistics must have shape "
+                    f"{expected_shape}, got {tuple(latent_mean.shape)} and "
+                    f"{tuple(latent_std.shape)}"
+                )
+            latent_std = latent_std.clamp_min(config.stats_epsilon)
+        self.register_buffer(
+            "latent_mean",
+            latent_mean,
+        )
+        self.register_buffer(
+            "latent_std",
+            latent_std,
+        )
+        self.register_buffer(
+            "latent_stats_initialized", torch.tensor(stats_are_configured)
+        )
+        self.register_buffer(
+            "adaptive_kl_ema",
+            torch.zeros(config.adaptive_num_bins, dtype=torch.float64),
+        )
+        self.register_buffer(
+            "adaptive_kl_counts",
+            torch.zeros(config.adaptive_num_bins, dtype=torch.long),
+        )
         self.last_speculative_stats = SpeculativeStats()
 
     @staticmethod
@@ -216,12 +286,11 @@ class LatentFlowE2D(Denoiser):
     def initialize_latent_stats(
         self, clean_latents: torch.Tensor, valid_mask: torch.Tensor
     ) -> None:
-        if bool(self.latent_stats_initialized):
-            return
-        values = clean_latents[valid_mask.bool()].float()
-        self.latent_mean.copy_(values.mean())
-        self.latent_std.copy_(values.std().clamp_min(self.config.stats_epsilon))
-        self.latent_stats_initialized.fill_(True)
+        del clean_latents, valid_mask
+        raise RuntimeError(
+            "first-batch latent normalization has been removed; configure a "
+            "dataset-calibrated latent_stats_path"
+        )
 
     def normalize_latents(self, latents: torch.Tensor) -> torch.Tensor:
         return ((latents - self.latent_mean) / self.latent_std).to(latents.dtype)
@@ -242,6 +311,26 @@ class LatentFlowE2D(Denoiser):
             dtype=clean.dtype,
             generator=generator,
         )
+        if (
+            getattr(self.config, "adaptive_timestep_sampling", False)
+            and not self.config.fixed_training_noise
+        ):
+            block_count = math.ceil(clean.shape[1] / self.config.block_size)
+            probabilities = self.adaptive_timestep_probabilities().to(clean.device)
+            bin_indices = torch.multinomial(
+                probabilities,
+                clean.shape[0] * block_count,
+                replacement=True,
+                generator=generator,
+            ).view(clean.shape[0], block_count)
+            within_bin = torch.rand(
+                clean.shape[0], block_count, device=clean.device, generator=generator
+            )
+            sampled_time = (bin_indices + within_bin) / self.config.adaptive_num_bins
+            sampled_time = sampled_time.repeat_interleave(
+                self.config.block_size, dim=-1
+            )[:, : clean.shape[1]]
+            return noise, sampled_time
         if supplied_time is not None and not self.config.fixed_training_noise:
             return noise, supplied_time
         block_count = math.ceil(clean.shape[1] / self.config.block_size)
@@ -255,6 +344,25 @@ class LatentFlowE2D(Denoiser):
             :, : clean.shape[1]
         ]
         return noise, sampled_time
+
+    def adaptive_timestep_probabilities(self) -> torch.Tensor:
+        """Return a smoothed KL-slope distribution with uniform exploration."""
+        num_bins = self.config.adaptive_num_bins
+        uniform = torch.full_like(self.adaptive_kl_ema, 1.0 / num_bins)
+        sufficiently_observed = bool(
+            (self.adaptive_kl_counts >= self.config.adaptive_min_observations).all()
+        )
+        if not sufficiently_observed:
+            return uniform
+        monotone_kl = torch.cummax(self.adaptive_kl_ema, dim=0).values
+        # Only changes in difficulty matter; an irreducible KL offset at low
+        # noise should not attract extra samples.
+        slopes = torch.diff(monotone_kl, prepend=monotone_kl[:1]).clamp_min(0.0)
+        if not bool(torch.isfinite(slopes).all()) or float(slopes.sum()) <= 0:
+            return uniform
+        adaptive = slopes / slopes.sum()
+        mix = self.config.adaptive_uniform_mix
+        return (1.0 - mix) * adaptive + mix * uniform
 
     def _run_flow_hidden(
         self,
@@ -312,6 +420,119 @@ class LatentFlowE2D(Denoiser):
         )
         return self.velocity_head(hidden)
 
+    @staticmethod
+    def _expand_time(time_value: torch.Tensor, reference: torch.Tensor) -> torch.Tensor:
+        while time_value.ndim < reference.ndim:
+            time_value = time_value.unsqueeze(-1)
+        return time_value.to(reference.dtype)
+
+    def prediction_to_x0(
+        self,
+        noisy: torch.Tensor,
+        prediction: torch.Tensor,
+        time_value: torch.Tensor,
+    ) -> torch.Tensor:
+        """Convert either configured regression target to a clean-latent estimate."""
+        expanded_time = self._expand_time(time_value, noisy)
+        if self.config.prediction_type == "velocity":
+            return noisy - expanded_time * prediction
+        # The x0 head predicts a residual so its zero initialization is an identity
+        # denoiser, while the supervised quantity remains the clean endpoint.
+        return noisy + prediction
+
+    def _prediction_target(
+        self,
+        clean: torch.Tensor,
+        noisy: torch.Tensor,
+        target_velocity: torch.Tensor,
+    ) -> torch.Tensor:
+        if self.config.prediction_type == "velocity":
+            return target_velocity
+        return clean - noisy
+
+    def _decode_logits_from_residual(self, residual: torch.Tensor) -> torch.Tensor:
+        seq_len = residual.shape[1]
+        positions = torch.arange(seq_len, device=residual.device)[None].expand(
+            residual.shape[0], -1
+        )
+        position_embeddings = self.target.model.rotary_emb(residual, positions)
+        causal = torch.tril(
+            torch.ones((seq_len, seq_len), dtype=torch.bool, device=residual.device)
+        )
+        decoded = self.target.model.layers[self.target_layer_idx](
+            residual,
+            attention_mask=self._as_additive_mask(causal, residual.dtype),
+            position_ids=positions,
+            use_cache=False,
+            cache_position=positions[0],
+            position_embeddings=position_embeddings,
+        )[0]
+        return self.target.lm_head(self.target.model.norm(decoded))
+
+    @torch.no_grad()
+    def _decoder_kl_per_position(
+        self,
+        clean: torch.Tensor,
+        predicted_x0: torch.Tensor,
+        predicted_mask: torch.Tensor,
+    ) -> torch.Tensor:
+        """KL from clean-latent logits to predicted-latent logits in float32."""
+        predicted_sequence = torch.where(
+            predicted_mask.unsqueeze(-1), predicted_x0.detach(), clean
+        )
+        clean_raw = self.denormalize_latents(clean)
+        predicted_raw = self.denormalize_latents(predicted_sequence)
+        teacher_logits = self._decode_logits_from_residual(clean_raw).float()
+        predicted_logits = self._decode_logits_from_residual(predicted_raw).float()
+        teacher_log_probs = F.log_softmax(teacher_logits, dim=-1)
+        predicted_log_probs = F.log_softmax(predicted_logits, dim=-1)
+        teacher_probs = teacher_log_probs.exp()
+        return (teacher_probs * (teacher_log_probs - predicted_log_probs)).sum(-1)
+
+    @torch.no_grad()
+    def _update_adaptive_kl(
+        self,
+        kl_per_position: torch.Tensor,
+        time_value: torch.Tensor,
+        valid_mask: torch.Tensor,
+    ) -> None:
+        if not self.config.adaptive_timestep_sampling:
+            return
+        # Logit position i predicts token i+1. The timestep belongs to the latent
+        # at position i, while validity is determined by that next target token.
+        shifted_valid = torch.zeros_like(valid_mask)
+        shifted_valid[:, :-1] = valid_mask[:, 1:]
+        valid = valid_mask & shifted_valid & torch.isfinite(kl_per_position)
+        if not bool(valid.any()):
+            return
+        bins = (
+            torch.floor(
+                time_value[valid].float().clamp(0.0, 1.0)
+                * self.config.adaptive_num_bins
+            )
+            .long()
+            .clamp_max(self.config.adaptive_num_bins - 1)
+        )
+        sums = torch.zeros_like(self.adaptive_kl_ema)
+        counts = torch.zeros_like(self.adaptive_kl_counts)
+        sums.scatter_add_(0, bins, kl_per_position[valid].double())
+        counts.scatter_add_(0, bins, torch.ones_like(bins))
+        if torch_dist.is_available() and torch_dist.is_initialized():
+            torch_dist.all_reduce(sums, op=torch_dist.ReduceOp.SUM)
+            torch_dist.all_reduce(counts, op=torch_dist.ReduceOp.SUM)
+        observed = counts > 0
+        batch_means = sums[observed] / counts[observed].double()
+        decay = self.config.adaptive_ema_decay
+        previously_seen = self.adaptive_kl_counts[observed] > 0
+        old_values = self.adaptive_kl_ema[observed]
+        updated = torch.where(
+            previously_seen,
+            decay * old_values + (1.0 - decay) * batch_means,
+            batch_means,
+        )
+        self.adaptive_kl_ema[observed] = updated
+        self.adaptive_kl_counts.add_(counts)
+
     def forward(
         self,
         input_ids: torch.LongTensor,
@@ -329,7 +550,11 @@ class LatentFlowE2D(Denoiser):
         valid = attention_mask.bool()
         loss_mask = valid & ~context_mask.bool()
         clean_raw = self.extract_clean_latents(input_ids, attention_mask)
-        self.initialize_latent_stats(clean_raw, valid)
+        if not bool(self.latent_stats_initialized):
+            raise RuntimeError(
+                "latent normalization statistics are not configured; set "
+                "latent_stats_path to statistics from a representative dataset"
+            )
         clean = self.normalize_latents(clean_raw)
         noise, t = self._sample_training_path(clean, t)
         noisy, target_velocity = linear_flow_sample(clean, noise, t)
@@ -342,7 +567,7 @@ class LatentFlowE2D(Denoiser):
         )
         padding = torch.cat([valid, valid], dim=-1)
         flow_mask = flow_mask[None] & padding[:, :, None] & padding[:, None, :]
-        predicted_velocity = self._run_flow_layers(
+        prediction = self._run_flow_layers(
             clean,
             noisy,
             t,
@@ -350,16 +575,29 @@ class LatentFlowE2D(Denoiser):
             positions,
             positions,
         )
+        regression_target = self._prediction_target(clean, noisy, target_velocity)
         token_mse = F.mse_loss(
-            predicted_velocity.float(), target_velocity.float(), reduction="none"
+            prediction.float(), regression_target.float(), reduction="none"
         ).mean(-1)
         flow_loss = token_mse[loss_mask].mean()
+        predicted_x0 = self.prediction_to_x0(noisy, prediction, t)
+        decoder_kl = None
+        if self.config.adaptive_timestep_sampling:
+            decoder_kl = self._decoder_kl_per_position(clean, predicted_x0, loss_mask)
+            self._update_adaptive_kl(decoder_kl, t, loss_mask)
         return DenoiserOutput(
-            denoiser_output=predicted_velocity,
+            denoiser_output=prediction,
             tokens_mask=loss_mask.float(),
             loss=flow_loss,
             nlls=token_mse,
-            other_loss_terms={"flow_loss": flow_loss},
+            other_loss_terms={
+                "flow_loss": flow_loss,
+                **(
+                    {"decoder_kl": decoder_kl[loss_mask].mean()}
+                    if decoder_kl is not None
+                    else {}
+                ),
+            },
             flow_loss=flow_loss,
             flow_timesteps=t,
         )
@@ -405,6 +643,11 @@ class LatentFlowE2D(Denoiser):
                 clean_positions,
                 noisy_positions,
             )
+            if self.config.prediction_type == "x0":
+                predicted_x0 = self.prediction_to_x0(canvas, velocity, t_value)
+                velocity = (canvas - predicted_x0) / t_value.unsqueeze(-1).clamp_min(
+                    self.config.stats_epsilon
+                )
             canvas = canvas - dt * velocity
         return canvas
 
@@ -414,23 +657,7 @@ class LatentFlowE2D(Denoiser):
         residual = self.denormalize_latents(
             torch.cat([context_latents, block_latents], 1)
         )
-        seq_len = residual.shape[1]
-        positions = torch.arange(seq_len, device=residual.device)[None].expand(
-            residual.shape[0], -1
-        )
-        position_embeddings = self.target.model.rotary_emb(residual, positions)
-        causal = torch.tril(
-            torch.ones((seq_len, seq_len), dtype=torch.bool, device=residual.device)
-        )
-        decoded = self.target.model.layers[self.target_layer_idx](
-            residual,
-            attention_mask=self._as_additive_mask(causal, residual.dtype),
-            position_ids=positions,
-            use_cache=False,
-            cache_position=positions[0],
-            position_embeddings=position_embeddings,
-        )[0]
-        logits = self.target.lm_head(self.target.model.norm(decoded))
+        logits = self._decode_logits_from_residual(residual)
         context_len = context_latents.shape[1]
         block_len = block_latents.shape[1]
         # Causal LM logits at position i predict token i+1. The final clean
@@ -464,9 +691,7 @@ class LatentFlowE2D(Denoiser):
             proposal_len = min(block_size, remaining)
             clean_raw = self.extract_clean_latents(generated)
             if not bool(self.latent_stats_initialized):
-                self.initialize_latent_stats(
-                    clean_raw, torch.ones(clean_raw.shape[:2], device=clean_raw.device)
-                )
+                raise RuntimeError("latent normalization statistics are not configured")
             context_latents = self.normalize_latents(clean_raw)
             draft_started = time.perf_counter()
             proposed_latents = self._draft_latents(
@@ -487,9 +712,9 @@ class LatentFlowE2D(Denoiser):
             stats.verifier_calls += 1
             reached_eos = False
             if self.eos_token_id is not None and accepted:
-                accepted_eos = (
-                    proposal[0, :accepted] == self.eos_token_id
-                ).nonzero(as_tuple=False)
+                accepted_eos = (proposal[0, :accepted] == self.eos_token_id).nonzero(
+                    as_tuple=False
+                )
                 if accepted_eos.numel():
                     accepted = int(accepted_eos[0, 0]) + 1
                     reached_eos = True
@@ -548,9 +773,7 @@ class RiemannianLatentFlowE2D(LatentFlowE2D):
 
     config_class = RiemannianLatentFlowE2DConfig
 
-    def __init__(
-        self, config: RiemannianLatentFlowE2DConfig, **kwargs: Any
-    ) -> None:
+    def __init__(self, config: RiemannianLatentFlowE2DConfig, **kwargs: Any) -> None:
         super().__init__(config, **kwargs)
         hidden_size = self.target.config.hidden_size
         scalar_width = max(hidden_size // 4, 1)
@@ -613,9 +836,7 @@ class RiemannianLatentFlowE2D(LatentFlowE2D):
         clean_position_ids: torch.LongTensor,
         noisy_position_ids: torch.LongTensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        clean_conditioned = self._condition_context(
-            clean_direction, clean_log_radius
-        )
+        clean_conditioned = self._condition_context(clean_direction, clean_log_radius)
         hidden = self._run_flow_hidden(
             clean_conditioned,
             noisy_direction,
@@ -690,16 +911,15 @@ class RiemannianLatentFlowE2D(LatentFlowE2D):
         )
 
         direction_token_loss = (
-            predicted_velocity.float() - target_velocity.float()
-        ).square().sum(dim=-1)
+            (predicted_velocity.float() - target_velocity.float()).square().sum(dim=-1)
+        )
         scalar_token_loss = F.smooth_l1_loss(
             scalar_prediction,
             scalar_target.float(),
             reduction="none",
         )
         total_token_loss = (
-            direction_token_loss
-            + self.config.scalar_loss_weight * scalar_token_loss
+            direction_token_loss + self.config.scalar_loss_weight * scalar_token_loss
         )
         direction_loss = direction_token_loss[loss_mask].mean()
         scalar_loss = scalar_token_loss[loss_mask].mean()
@@ -709,12 +929,16 @@ class RiemannianLatentFlowE2D(LatentFlowE2D):
         ).clamp(-1.0, 1.0)
         angular_error = torch.acos(velocity_cosine)[loss_mask].mean()
         relative_radius_error = (
-            torch.exp(
-                self.log_radius_std
-                * (scalar_prediction - scalar_target.float()).clamp(-20.0, 20.0)
+            (
+                torch.exp(
+                    self.log_radius_std
+                    * (scalar_prediction - scalar_target.float()).clamp(-20.0, 20.0)
+                )
+                - 1.0
             )
-            - 1.0
-        ).abs()[loss_mask].mean()
+            .abs()[loss_mask]
+            .mean()
+        )
 
         return DenoiserOutput(
             denoiser_output=predicted_velocity,
@@ -868,9 +1092,9 @@ class RiemannianLatentFlowE2D(LatentFlowE2D):
             stats.verifier_calls += 1
             reached_eos = False
             if self.eos_token_id is not None and accepted:
-                accepted_eos = (
-                    proposal[0, :accepted] == self.eos_token_id
-                ).nonzero(as_tuple=False)
+                accepted_eos = (proposal[0, :accepted] == self.eos_token_id).nonzero(
+                    as_tuple=False
+                )
                 if accepted_eos.numel():
                     accepted = int(accepted_eos[0, 0]) + 1
                     reached_eos = True
