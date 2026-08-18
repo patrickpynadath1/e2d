@@ -35,12 +35,17 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default="Qwen/Qwen3-1.7B-Base")
     parser.add_argument("--split", choices=["train", "test"], default="train")
-    parser.add_argument("--num-samples", type=int, default=512)
     parser.add_argument(
-        "--stats-samples",
+        "--max-samples",
+        type=int,
+        default=None,
+        help="Optional calibration cap; by default the entire split is used.",
+    )
+    parser.add_argument(
+        "--diagnostic-samples",
         type=int,
         default=256,
-        help="Initial samples used to estimate per-hidden-coordinate mean/std.",
+        help="Examples retained in memory for plots; all examples still fit stats.",
     )
     parser.add_argument("--max-length", type=int, default=768)
     parser.add_argument(
@@ -89,6 +94,28 @@ def summarize_norms(vectors: torch.Tensor) -> dict[str, float | int]:
         "rms_mean": rms.mean().item(),
         "rms_std": rms.std().item(),
     }
+
+
+def update_running_moments(
+    count: int,
+    mean: torch.Tensor,
+    m2: torch.Tensor,
+    values: torch.Tensor,
+) -> tuple[int, torch.Tensor, torch.Tensor]:
+    """Merge a [N, D] batch into float64 Welford feature moments."""
+    values = values.double()
+    batch_count = values.shape[0]
+    if batch_count == 0:
+        return count, mean, m2
+    batch_mean = values.mean(dim=0)
+    batch_m2 = (values - batch_mean).square().sum(dim=0)
+    if count == 0:
+        return batch_count, batch_mean, batch_m2
+    total = count + batch_count
+    delta = batch_mean - mean
+    merged_mean = mean + delta * (batch_count / total)
+    merged_m2 = m2 + batch_m2 + delta.square() * (count * batch_count / total)
+    return total, merged_mean, merged_m2
 
 
 def _comparison(
@@ -145,10 +172,10 @@ def _plot_norms(
 @torch.inference_mode()
 def main() -> None:
     args = parse_args()
-    if args.num_samples < 1:
-        raise ValueError("--num-samples must be positive")
-    if not 1 <= args.stats_samples < args.num_samples:
-        raise ValueError("--stats-samples must be between 1 and num-samples - 1")
+    if args.max_samples is not None and args.max_samples < 1:
+        raise ValueError("--max-samples must be positive when provided")
+    if args.diagnostic_samples < 1:
+        raise ValueError("--diagnostic-samples must be positive")
     if args.device.startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is not available")
 
@@ -172,10 +199,14 @@ def main() -> None:
         tokenizer=tokenizer,
         split=args.split,
         max_length=args.max_length,
-        max_samples=args.num_samples,
+        max_samples=args.max_samples,
         sampling_seed=args.seed,
     )
-    all_latents: list[torch.Tensor] = []
+    hidden_size = model.config.hidden_size
+    count = 0
+    feature_mean = torch.zeros(hidden_size, dtype=torch.float64)
+    feature_m2 = torch.zeros(hidden_size, dtype=torch.float64)
+    diagnostic_latents: list[torch.Tensor] = []
     context_latents: list[torch.Tensor] = []
     answer_latents: list[torch.Tensor] = []
     for index in range(len(dataset)):
@@ -193,42 +224,42 @@ def main() -> None:
         # hidden_states[i] is the residual stream entering transformer layer i.
         latent = output.hidden_states[layer_index][0].float().cpu()
         valid = example["attention_mask"].bool()
-        all_latents.append(latent[valid])
-        context_latents.append(latent[valid & context_mask])
-        answer_latents.append(latent[valid & ~context_mask])
+        valid_latents = latent[valid]
+        count, feature_mean, feature_m2 = update_running_moments(
+            count, feature_mean, feature_m2, valid_latents
+        )
+        if index < args.diagnostic_samples:
+            diagnostic_latents.append(valid_latents)
+            context_latents.append(latent[valid & context_mask])
+            answer_latents.append(latent[valid & ~context_mask])
         print(
             f"Processed sample {index + 1}/{len(dataset)} ({int(valid.sum())} tokens)"
         )
 
-    raw_all = torch.cat(all_latents)
-    stats_latents = torch.cat(all_latents[: args.stats_samples])
-    heldout_latents = torch.cat(all_latents[args.stats_samples :])
-    scalar_mean = stats_latents.mean()
-    scalar_std = stats_latents.std().clamp_min(1e-6)
-    feature_mean = stats_latents.mean(dim=0)
-    feature_std = stats_latents.std(dim=0).clamp_min(1e-6)
+    if count < 2:
+        raise RuntimeError("calibration requires at least two valid token vectors")
+    feature_std = (feature_m2 / (count - 1)).sqrt().clamp_min(1e-6)
+    feature_mean = feature_mean.float()
+    feature_std = feature_std.float()
+    diagnostic_all = torch.cat(diagnostic_latents)
     generator = torch.Generator(device="cpu").manual_seed(args.seed)
 
     groups = {
-        "all_tokens": raw_all,
-        "normalization_fit_tokens": stats_latents,
-        "heldout_all_tokens": heldout_latents,
+        "diagnostic_all_tokens": diagnostic_all,
         "context_tokens": torch.cat(context_latents),
         "answer_tokens": torch.cat(answer_latents),
     }
     results: dict[str, Any] = {
         "model": args.model,
         "split": args.split,
-        "num_samples": len(dataset),
-        "normalization_stats_samples": args.stats_samples,
-        "heldout_samples": len(dataset) - args.stats_samples,
+        "calibration_examples": len(dataset),
+        "calibration_token_vectors": count,
+        "diagnostic_examples": min(args.diagnostic_samples, len(dataset)),
         "max_length": args.max_length,
         "layer_count": layer_count,
         "target_layer_index_zero_based": layer_index,
         "target_layer_number_one_based": layer_index + 1,
-        "hidden_dimension": raw_all.shape[-1],
-        "scalar_normalization_mean_diagnostic_only": scalar_mean.item(),
-        "scalar_normalization_std_diagnostic_only": scalar_std.item(),
+        "hidden_dimension": hidden_size,
         "normalization": "hidden_coordinate",
         "groups": {},
     }
@@ -249,33 +280,31 @@ def main() -> None:
     json_path.write_text(json.dumps(results, indent=2) + "\n")
     np.savez_compressed(
         arrays_path,
-        raw_all_l2=groups["all_tokens"].norm(dim=-1).numpy(),
-        normalized_all_l2=normalized_groups["all_tokens"].norm(dim=-1).numpy(),
-        gaussian_all_l2=gaussian_groups["all_tokens"].norm(dim=-1).numpy(),
-        raw_heldout_l2=groups["heldout_all_tokens"].norm(dim=-1).numpy(),
-        normalized_heldout_l2=normalized_groups["heldout_all_tokens"]
+        raw_diagnostic_l2=groups["diagnostic_all_tokens"].norm(dim=-1).numpy(),
+        normalized_diagnostic_l2=normalized_groups["diagnostic_all_tokens"]
         .norm(dim=-1)
         .numpy(),
-        gaussian_heldout_l2=gaussian_groups["heldout_all_tokens"].norm(dim=-1).numpy(),
+        gaussian_diagnostic_l2=gaussian_groups["diagnostic_all_tokens"]
+        .norm(dim=-1)
+        .numpy(),
         raw_context_l2=groups["context_tokens"].norm(dim=-1).numpy(),
         raw_answer_l2=groups["answer_tokens"].norm(dim=-1).numpy(),
     )
     torch.save(
         {
-            "scalar_mean": scalar_mean,
-            "scalar_std": scalar_std,
             "feature_mean": feature_mean,
             "feature_std": feature_std,
-            "num_vectors": stats_latents.shape[0],
+            "num_vectors": count,
+            "num_examples": len(dataset),
             "model": args.model,
             "target_layer_index": layer_index,
         },
         stats_path,
     )
     _plot_norms(
-        groups["heldout_all_tokens"],
-        normalized_groups["heldout_all_tokens"],
-        gaussian_groups["heldout_all_tokens"],
+        groups["diagnostic_all_tokens"],
+        normalized_groups["diagnostic_all_tokens"],
+        gaussian_groups["diagnostic_all_tokens"],
         plot_path,
     )
 
