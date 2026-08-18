@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,12 @@ if str(_REPO_ROOT) not in sys.path:
 
 from scripts.utils import maybe_add_missing_special_tokens  # noqa: E402
 from src.datasets.tokenize_on_demand import GSM8KDataset  # noqa: E402
+
+
+def progress(message: str, started_at: float) -> None:
+    """Emit an immediately flushed, timestamped calibration status line."""
+    elapsed = time.monotonic() - started_at
+    print(f"[{elapsed:8.1f}s] {message}", flush=True)
 
 
 def parse_args() -> argparse.Namespace:
@@ -171,30 +178,48 @@ def _plot_norms(
 
 @torch.inference_mode()
 def main() -> None:
+    started_at = time.monotonic()
     args = parse_args()
+    progress(f"Starting calibration with arguments: {vars(args)}", started_at)
     if args.max_samples is not None and args.max_samples < 1:
         raise ValueError("--max-samples must be positive when provided")
     if args.diagnostic_samples < 1:
         raise ValueError("--diagnostic-samples must be positive")
     if args.device.startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is not available")
+    if args.device.startswith("cuda"):
+        progress(
+            f"CUDA available: {torch.cuda.get_device_name(torch.device(args.device))}",
+            started_at,
+        )
 
     torch.manual_seed(args.seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(args.seed)
     dtype = getattr(torch, args.dtype)
+    progress(f"Loading tokenizer for {args.model}", started_at)
     tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
     tokenizer = maybe_add_missing_special_tokens(tokenizer)
+    progress(f"Tokenizer loaded (vocabulary size {len(tokenizer)})", started_at)
+    progress(f"Loading {args.model} weights on CPU", started_at)
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
         torch_dtype=dtype,
         attn_implementation="sdpa",
         trust_remote_code=True,
-    ).to(args.device)
+    )
+    progress("Model weights loaded; moving model to requested device", started_at)
+    model = model.to(args.device)
+    if args.device.startswith("cuda"):
+        allocated_gib = torch.cuda.memory_allocated(args.device) / 1024**3
+        progress(f"Model moved to GPU ({allocated_gib:.2f} GiB allocated)", started_at)
+    else:
+        progress(f"Model moved to {args.device}", started_at)
     model.eval()
     layer_count = len(model.model.layers)
     layer_index = resolve_layer_index(args.target_layer_offset, layer_count)
 
+    progress(f"Loading GSM8K {args.split} split", started_at)
     dataset = GSM8KDataset(
         tokenizer=tokenizer,
         split=args.split,
@@ -202,6 +227,7 @@ def main() -> None:
         max_samples=args.max_samples,
         sampling_seed=args.seed,
     )
+    progress(f"Dataset ready with {len(dataset)} examples", started_at)
     hidden_size = model.config.hidden_size
     count = 0
     feature_mean = torch.zeros(hidden_size, dtype=torch.float64)
@@ -210,10 +236,18 @@ def main() -> None:
     context_latents: list[torch.Tensor] = []
     answer_latents: list[torch.Tensor] = []
     for index in range(len(dataset)):
+        if index == 0:
+            progress("Fetching and tokenizing the first example", started_at)
         example = dataset[index]
         input_ids = example["input_ids"].unsqueeze(0).to(args.device)
         attention_mask = example["attention_mask"].unsqueeze(0).to(args.device)
         context_mask = example["context_mask"].bool()
+        if index == 0:
+            progress(
+                f"First example ready ({input_ids.shape[1]} tokens); "
+                "starting first Qwen forward pass",
+                started_at,
+            )
         output = model.model(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -221,6 +255,8 @@ def main() -> None:
             use_cache=False,
             return_dict=True,
         )
+        if index == 0:
+            progress("First Qwen forward pass completed", started_at)
         # hidden_states[i] is the residual stream entering transformer layer i.
         latent = output.hidden_states[layer_index][0].float().cpu()
         valid = example["attention_mask"].bool()
@@ -232,10 +268,16 @@ def main() -> None:
             diagnostic_latents.append(valid_latents)
             context_latents.append(latent[valid & context_mask])
             answer_latents.append(latent[valid & ~context_mask])
-        print(
-            f"Processed sample {index + 1}/{len(dataset)} ({int(valid.sum())} tokens)"
+        elapsed = max(time.monotonic() - started_at, 1e-6)
+        examples_per_second = (index + 1) / elapsed
+        progress(
+            f"Processed example {index + 1}/{len(dataset)} "
+            f"({int(valid.sum())} valid tokens; "
+            f"{examples_per_second:.2f} examples/s)",
+            started_at,
         )
 
+    progress(f"Finished model pass over {len(dataset)} examples", started_at)
     if count < 2:
         raise RuntimeError("calibration requires at least two valid token vectors")
     feature_std = (feature_m2 / (count - 1)).sqrt().clamp_min(1e-6)
@@ -301,6 +343,7 @@ def main() -> None:
         },
         stats_path,
     )
+    progress(f"Saved normalization artifact to {stats_path}", started_at)
     _plot_norms(
         groups["diagnostic_all_tokens"],
         normalized_groups["diagnostic_all_tokens"],
