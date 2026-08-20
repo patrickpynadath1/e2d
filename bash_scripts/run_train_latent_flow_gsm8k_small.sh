@@ -21,8 +21,10 @@ BLOCK_SIZE="${BLOCK_SIZE:-4}"
 EVAL_BLOCK_SIZE="${EVAL_BLOCK_SIZE:-${BLOCK_SIZE}}"
 MODEL_LENGTH="${MODEL_LENGTH:-256}"
 INFERENCE_STEPS="${INFERENCE_STEPS:-1}"
-LATENT_STATS_PATH="${LATENT_STATS_PATH:-${PWD}/outputs/diagnostics/qwen-latent-norms/normalization_stats.pt}"
+LATENT_STATS_PATH="${LATENT_STATS_PATH:-${E2D_OUTPUT_ROOT}/diagnostics/qwen-latent-norms/normalization_stats.pt}"
 PREDICTION_TYPE="${PREDICTION_TYPE:-velocity}"
+SELF_CONDITIONING="${SELF_CONDITIONING:-false}"
+SELF_CONDITIONING_PROBABILITY="${SELF_CONDITIONING_PROBABILITY:-0.5}"
 ADAPTIVE_TIMESTEP_SAMPLING="${ADAPTIVE_TIMESTEP_SAMPLING:-false}"
 ADAPTIVE_NUM_BINS="${ADAPTIVE_NUM_BINS:-50}"
 ADAPTIVE_EMA_DECAY="${ADAPTIVE_EMA_DECAY:-0.99}"
@@ -44,8 +46,10 @@ WANDB_PROJECT="${WANDB_PROJECT:-gsm8k-drafter-study}"
 WANDB_MODE="${WANDB_MODE:-online}"
 export WANDB_PROJECT WANDB_MODE
 
-if [ "${PREDICTION_TYPE}" != "velocity" ] && [ "${PREDICTION_TYPE}" != "x0" ]; then
-  echo "PREDICTION_TYPE must be 'velocity' or 'x0'" >&2
+if [ "${PREDICTION_TYPE}" != "velocity" ] && \
+  [ "${PREDICTION_TYPE}" != "x0" ] && \
+  [ "${PREDICTION_TYPE}" != "x0_prev_block_residual" ]; then
+  echo "PREDICTION_TYPE must be 'velocity', 'x0', or 'x0_prev_block_residual'" >&2
   exit 2
 fi
 
@@ -62,6 +66,8 @@ if [ "${FLOW_MODEL_CONFIG}" = "latent_flow_e2d" ]; then
   FLOW_OVERRIDES=(
     "model.config.latent_stats_path=${LATENT_STATS_PATH}"
     "model.config.prediction_type=${PREDICTION_TYPE}"
+    "model.config.self_conditioning=${SELF_CONDITIONING}"
+    "model.config.self_conditioning_probability=${SELF_CONDITIONING_PROBABILITY}"
     "model.config.adaptive_timestep_sampling=${ADAPTIVE_TIMESTEP_SAMPLING}"
     "model.config.adaptive_num_bins=${ADAPTIVE_NUM_BINS}"
     "model.config.adaptive_ema_decay=${ADAPTIVE_EMA_DECAY}"

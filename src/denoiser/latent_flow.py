@@ -89,7 +89,11 @@ class LatentFlowE2DConfig(DenoiserConfig):
         inference_steps: int = 1,
         stats_epsilon: float = 1e-6,
         latent_stats_path: Optional[str] = None,
-        prediction_type: Literal["velocity", "x0"] = "velocity",
+        prediction_type: Literal[
+            "velocity", "x0", "x0_prev_block_residual"
+        ] = "velocity",
+        self_conditioning: bool = False,
+        self_conditioning_probability: float = 0.5,
         adaptive_timestep_sampling: bool = False,
         adaptive_num_bins: int = 50,
         adaptive_ema_decay: float = 0.99,
@@ -106,10 +110,19 @@ class LatentFlowE2DConfig(DenoiserConfig):
         self.target_layer_offset = target_layer_offset
         self.inference_steps = inference_steps
         self.stats_epsilon = stats_epsilon
-        if prediction_type not in ("velocity", "x0"):
-            raise ValueError("prediction_type must be 'velocity' or 'x0'")
+        valid_prediction_types = (
+            "velocity",
+            "x0",
+            "x0_prev_block_residual",
+        )
+        if prediction_type not in valid_prediction_types:
+            raise ValueError(
+                "prediction_type must be 'velocity', 'x0', or 'x0_prev_block_residual'"
+            )
         if adaptive_num_bins < 2:
             raise ValueError("adaptive_num_bins must be at least two")
+        if not 0 <= self_conditioning_probability <= 1:
+            raise ValueError("self_conditioning_probability must be in [0, 1]")
         if not 0 <= adaptive_ema_decay < 1:
             raise ValueError("adaptive_ema_decay must be in [0, 1)")
         if not 0 <= adaptive_uniform_mix <= 1:
@@ -118,6 +131,8 @@ class LatentFlowE2DConfig(DenoiserConfig):
             raise ValueError("adaptive_min_observations must be non-negative")
         self.latent_stats_path = latent_stats_path
         self.prediction_type = prediction_type
+        self.self_conditioning = self_conditioning
+        self.self_conditioning_probability = self_conditioning_probability
         self.adaptive_timestep_sampling = adaptive_timestep_sampling
         self.adaptive_num_bins = adaptive_num_bins
         self.adaptive_ema_decay = adaptive_ema_decay
@@ -163,6 +178,14 @@ class LatentFlowE2D(Denoiser):
             nn.Linear(3, hidden_size),
             nn.SiLU(),
             nn.Linear(hidden_size, hidden_size),
+        )
+        self.self_conditioning_head = (
+            nn.Sequential(
+                nn.Linear(2 * hidden_size, hidden_size),
+                nn.SiLU(),
+            )
+            if config.self_conditioning
+            else None
         )
         self.velocity_head = nn.Linear(hidden_size, hidden_size, bias=False)
         nn.init.zeros_(self.velocity_head.weight)
@@ -372,10 +395,22 @@ class LatentFlowE2D(Denoiser):
         attention_mask: torch.BoolTensor,
         clean_position_ids: torch.LongTensor,
         noisy_position_ids: torch.LongTensor,
+        self_conditioning: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         batch_size, noisy_len, _ = noisy.shape
         if time_value.ndim == 1:
             time_value = time_value[:, None].expand(batch_size, noisy_len)
+        if self.self_conditioning_head is not None:
+            if self_conditioning is None:
+                self_conditioning = torch.zeros_like(noisy)
+            if self_conditioning.shape != noisy.shape:
+                raise ValueError(
+                    "self-conditioning estimate must have the same shape as noisy "
+                    f"latents, got {self_conditioning.shape} and {noisy.shape}"
+                )
+            noisy = self.self_conditioning_head(
+                torch.cat([noisy, self_conditioning.detach()], dim=-1)
+            )
         time_features = torch.stack(
             [
                 time_value,
@@ -409,6 +444,7 @@ class LatentFlowE2D(Denoiser):
         attention_mask: torch.BoolTensor,
         clean_position_ids: torch.LongTensor,
         noisy_position_ids: torch.LongTensor,
+        self_conditioning: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         hidden = self._run_flow_hidden(
             clean,
@@ -417,6 +453,7 @@ class LatentFlowE2D(Denoiser):
             attention_mask,
             clean_position_ids,
             noisy_position_ids,
+            self_conditioning,
         )
         return self.velocity_head(hidden)
 
@@ -431,11 +468,19 @@ class LatentFlowE2D(Denoiser):
         noisy: torch.Tensor,
         prediction: torch.Tensor,
         time_value: torch.Tensor,
+        baseline: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """Convert either configured regression target to a clean-latent estimate."""
         expanded_time = self._expand_time(time_value, noisy)
         if self.config.prediction_type == "velocity":
             return noisy - expanded_time * prediction
+        if self.config.prediction_type == "x0_prev_block_residual":
+            if baseline is None:
+                raise ValueError(
+                    "x0_prev_block_residual prediction requires a previous-block "
+                    "baseline"
+                )
+            return baseline + prediction
         # The x0 head predicts a residual so its zero initialization is an identity
         # denoiser, while the supervised quantity remains the clean endpoint.
         return noisy + prediction
@@ -445,10 +490,60 @@ class LatentFlowE2D(Denoiser):
         clean: torch.Tensor,
         noisy: torch.Tensor,
         target_velocity: torch.Tensor,
+        baseline: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         if self.config.prediction_type == "velocity":
             return target_velocity
+        if self.config.prediction_type == "x0_prev_block_residual":
+            if baseline is None:
+                raise ValueError(
+                    "x0_prev_block_residual target requires a previous-block baseline"
+                )
+            return clean - baseline
         return clean - noisy
+
+    @staticmethod
+    def _training_previous_block_baseline(
+        clean: torch.Tensor,
+        valid_mask: torch.BoolTensor,
+        context_mask: torch.BoolTensor,
+        block_size: int,
+    ) -> torch.Tensor:
+        """Mean the prompt tail or preceding completion block for each target block."""
+        baseline = torch.zeros_like(clean)
+        for batch_index in range(clean.shape[0]):
+            valid = valid_mask[batch_index]
+            context_indices = torch.nonzero(
+                valid & context_mask[batch_index], as_tuple=False
+            ).flatten()
+            target_indices = torch.nonzero(
+                valid & ~context_mask[batch_index], as_tuple=False
+            ).flatten()
+            previous_indices = context_indices[-block_size:]
+            for start in range(0, target_indices.numel(), block_size):
+                current_indices = target_indices[start : start + block_size]
+                if previous_indices.numel():
+                    previous_mean = clean[batch_index, previous_indices].mean(
+                        dim=0, keepdim=True
+                    )
+                    baseline[batch_index, current_indices] = previous_mean
+                previous_indices = current_indices
+        return baseline
+
+    @staticmethod
+    def _generation_previous_block_baseline(
+        context_latents: torch.Tensor,
+        block_len: int,
+        previous_block_size: int,
+    ) -> torch.Tensor:
+        if context_latents.shape[1] == 0:
+            return context_latents.new_zeros(
+                context_latents.shape[0], block_len, context_latents.shape[-1]
+            )
+        previous_mean = context_latents[:, -previous_block_size:].mean(
+            dim=1, keepdim=True
+        )
+        return previous_mean.expand(-1, block_len, -1)
 
     def _decode_logits_from_residual(self, residual: torch.Tensor) -> torch.Tensor:
         seq_len = residual.shape[1]
@@ -567,20 +662,50 @@ class LatentFlowE2D(Denoiser):
         )
         padding = torch.cat([valid, valid], dim=-1)
         flow_mask = flow_mask[None] & padding[:, :, None] & padding[:, None, :]
-        prediction = self._run_flow_layers(
-            clean,
-            noisy,
-            t,
-            flow_mask,
-            positions,
-            positions,
+        baseline = None
+        if self.config.prediction_type == "x0_prev_block_residual":
+            baseline = self._training_previous_block_baseline(
+                clean,
+                valid,
+                context_mask.bool(),
+                self.config.block_size,
+            )
+        use_self_conditioning = self.self_conditioning_head is not None and (
+            not self.training
+            or bool(
+                torch.rand((), device=input_ids.device)
+                < self.config.self_conditioning_probability
+            )
         )
-        regression_target = self._prediction_target(clean, noisy, target_velocity)
+        if use_self_conditioning:
+            with torch.no_grad():
+                preliminary_prediction = self._run_flow_layers(
+                    clean, noisy, t, flow_mask, positions, positions
+                )
+                self_conditioning = self.prediction_to_x0(
+                    noisy, preliminary_prediction, t, baseline
+                ).detach()
+            prediction = self._run_flow_layers(
+                clean,
+                noisy,
+                t,
+                flow_mask,
+                positions,
+                positions,
+                self_conditioning,
+            )
+        else:
+            prediction = self._run_flow_layers(
+                clean, noisy, t, flow_mask, positions, positions
+            )
+        regression_target = self._prediction_target(
+            clean, noisy, target_velocity, baseline
+        )
         token_mse = F.mse_loss(
             prediction.float(), regression_target.float(), reduction="none"
         ).mean(-1)
         flow_loss = token_mse[loss_mask].mean()
-        predicted_x0 = self.prediction_to_x0(noisy, prediction, t)
+        predicted_x0 = self.prediction_to_x0(noisy, prediction, t, baseline)
         decoder_kl = None
         if self.config.adaptive_timestep_sampling:
             decoder_kl = self._decoder_kl_per_position(clean, predicted_x0, loss_mask)
@@ -609,7 +734,11 @@ class LatentFlowE2D(Denoiser):
         raise NotImplementedError("LatentFlowE2D implements forward directly")
 
     def _draft_latents(
-        self, context_latents: torch.Tensor, block_len: int, num_steps: int
+        self,
+        context_latents: torch.Tensor,
+        block_len: int,
+        num_steps: int,
+        previous_block_size: Optional[int] = None,
     ) -> torch.Tensor:
         batch_size = context_latents.shape[0]
         canvas = torch.randn(
@@ -627,6 +756,14 @@ class LatentFlowE2D(Denoiser):
             context_len, context_len + block_len, device=canvas.device
         )[None].expand(batch_size, -1)
         mask = self._inference_attention_mask(context_len, block_len, canvas.device)
+        baseline = None
+        if self.config.prediction_type == "x0_prev_block_residual":
+            baseline = self._generation_previous_block_baseline(
+                context_latents,
+                block_len,
+                previous_block_size or block_len,
+            )
+        self_conditioning = None
         dt = 1.0 / num_steps
         for step in range(num_steps):
             t_value = torch.full(
@@ -635,6 +772,18 @@ class LatentFlowE2D(Denoiser):
                 device=canvas.device,
                 dtype=canvas.dtype,
             )
+            if self.self_conditioning_head is not None and self_conditioning is None:
+                preliminary_prediction = self._run_flow_layers(
+                    context_latents,
+                    canvas,
+                    t_value,
+                    mask,
+                    clean_positions,
+                    noisy_positions,
+                )
+                self_conditioning = self.prediction_to_x0(
+                    canvas, preliminary_prediction, t_value, baseline
+                ).detach()
             velocity = self._run_flow_layers(
                 context_latents,
                 canvas,
@@ -642,12 +791,20 @@ class LatentFlowE2D(Denoiser):
                 mask,
                 clean_positions,
                 noisy_positions,
+                self_conditioning,
             )
-            if self.config.prediction_type == "x0":
-                predicted_x0 = self.prediction_to_x0(canvas, velocity, t_value)
+            if self.config.prediction_type in ("x0", "x0_prev_block_residual"):
+                predicted_x0 = self.prediction_to_x0(
+                    canvas, velocity, t_value, baseline
+                )
                 velocity = (canvas - predicted_x0) / t_value.unsqueeze(-1).clamp_min(
                     self.config.stats_epsilon
                 )
+                self_conditioning = predicted_x0.detach()
+            elif self.self_conditioning_head is not None:
+                self_conditioning = self.prediction_to_x0(
+                    canvas, velocity, t_value
+                ).detach()
             canvas = canvas - dt * velocity
         return canvas
 
@@ -695,11 +852,13 @@ class LatentFlowE2D(Denoiser):
             context_latents = self.normalize_latents(clean_raw)
             draft_started = time.perf_counter()
             proposed_latents = self._draft_latents(
-                context_latents, proposal_len, num_steps
+                context_latents, proposal_len, num_steps, block_size
             )
             proposal = self.decode_latents(context_latents, proposed_latents)
             stats.draft_seconds += time.perf_counter() - draft_started
-            stats.draft_calls += num_steps
+            stats.draft_calls += num_steps + int(
+                self.self_conditioning_head is not None
+            )
             stats.proposed_tokens += proposal_len
 
             verify_started = time.perf_counter()

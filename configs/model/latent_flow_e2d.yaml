@@ -12,8 +12,10 @@ config:
   inference_steps: 1
   # Dataset statistics shaped [hidden_size], averaged over examples and valid
   # sequence positions. Recompute when changing the backbone, layer, or dataset.
-  latent_stats_path: ${cwd:}/outputs/diagnostics/qwen-latent-norms/normalization_stats.pt
-  prediction_type: velocity  # velocity | x0
+  latent_stats_path: ${oc.env:E2D_OUTPUT_ROOT,${oc.env:HOME}/.cache/e2d/outputs}/diagnostics/qwen-latent-norms/normalization_stats.pt
+  prediction_type: velocity  # velocity | x0 | x0_prev_block_residual
+  self_conditioning: false
+  self_conditioning_probability: 0.5
   adaptive_timestep_sampling: false
   adaptive_num_bins: 50
   adaptive_ema_decay: 0.99

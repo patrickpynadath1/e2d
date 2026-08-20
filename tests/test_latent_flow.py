@@ -19,6 +19,7 @@ def _bare_model(fixed: bool) -> LatentFlowE2D:
         fixed_training_seed=17,
         block_size=4,
     )
+    model.self_conditioning_head = None
     return model
 
 
@@ -94,7 +95,9 @@ def test_feature_normalization_broadcasts_across_arbitrary_sequence_lengths():
     assert torch.allclose(reconstructed, latents)
 
 
-@pytest.mark.parametrize("prediction_type", ["velocity", "x0"])
+@pytest.mark.parametrize(
+    "prediction_type", ["velocity", "x0", "x0_prev_block_residual"]
+)
 def test_prediction_parameterizations_recover_clean_endpoint(prediction_type):
     model = _bare_model(fixed=False)
     model.config.prediction_type = prediction_type
@@ -103,11 +106,86 @@ def test_prediction_parameterizations_recover_clean_endpoint(prediction_type):
     time = torch.rand(2, 4)
     noisy = (1.0 - time.unsqueeze(-1)) * clean + time.unsqueeze(-1) * noise
     target_velocity = noise - clean
-    target = model._prediction_target(clean, noisy, target_velocity)
+    baseline = torch.randn_like(clean)
+    target = model._prediction_target(clean, noisy, target_velocity, baseline)
 
-    recovered = model.prediction_to_x0(noisy, target, time)
+    recovered = model.prediction_to_x0(noisy, target, time, baseline)
 
     assert torch.allclose(recovered, clean, atol=1e-6)
+
+
+def test_training_residual_baseline_uses_prompt_then_previous_target_block():
+    clean = torch.arange(1, 11, dtype=torch.float32).view(1, 10, 1)
+    valid = torch.ones(1, 10, dtype=torch.bool)
+    context = torch.tensor([[1, 1, 1, 0, 0, 0, 0, 0, 0, 0]], dtype=torch.bool)
+
+    baseline = LatentFlowE2D._training_previous_block_baseline(
+        clean, valid, context, block_size=4
+    )
+
+    # The first target block uses all three prompt positions: mean([1, 2, 3]) = 2.
+    assert torch.equal(baseline[0, 3:7], torch.full((4, 1), 2.0))
+    # The second target block uses the prior target block: mean([4, 5, 6, 7]) = 5.5.
+    assert torch.equal(baseline[0, 7:10], torch.full((3, 1), 5.5))
+
+
+def test_training_residual_baseline_ignores_padding_and_truncates_prompt_tail():
+    clean = torch.arange(1, 9, dtype=torch.float32).view(1, 8, 1)
+    valid = torch.tensor([[0, 1, 1, 1, 1, 1, 1, 0]], dtype=torch.bool)
+    context = torch.tensor([[0, 1, 1, 1, 1, 0, 0, 0]], dtype=torch.bool)
+
+    baseline = LatentFlowE2D._training_previous_block_baseline(
+        clean, valid, context, block_size=3
+    )
+
+    # Only the last three valid prompt positions contribute: mean([3, 4, 5]) = 4.
+    assert torch.equal(baseline[0, 5:7], torch.full((2, 1), 4.0))
+    assert baseline[0, 0].item() == 0.0
+    assert baseline[0, 7].item() == 0.0
+
+
+def test_generation_residual_baseline_uses_last_full_context_block():
+    context = torch.arange(1, 8, dtype=torch.float32).view(1, 7, 1)
+
+    baseline = LatentFlowE2D._generation_previous_block_baseline(
+        context, block_len=2, previous_block_size=4
+    )
+
+    assert torch.equal(baseline, torch.full((1, 2, 1), 5.5))
+
+
+def test_one_step_sampling_bootstraps_self_conditioning_with_preliminary_x0():
+    model = _bare_model(fixed=False)
+    model.config.prediction_type = "x0"
+    model.config.stats_epsilon = 1e-6
+    model.self_conditioning_head = torch.nn.Identity()
+    calls = []
+
+    def run_flow(
+        clean,
+        noisy,
+        time,
+        mask,
+        clean_positions,
+        noisy_positions,
+        self_conditioning=None,
+    ):
+        del clean, time, mask, clean_positions, noisy_positions
+        calls.append((noisy.clone(), self_conditioning))
+        return (
+            torch.ones_like(noisy)
+            if self_conditioning is None
+            else torch.zeros_like(noisy)
+        )
+
+    model._run_flow_layers = run_flow
+    context = torch.zeros(1, 3, 2)
+
+    model._draft_latents(context, block_len=2, num_steps=1, previous_block_size=2)
+
+    assert len(calls) == 2
+    assert calls[0][1] is None
+    assert torch.equal(calls[1][1], calls[0][0] + 1.0)
 
 
 def test_unobserved_adaptive_sampler_is_uniform():
@@ -165,8 +243,10 @@ def test_generation_stops_at_eos_inside_fully_accepted_block():
         input_ids.shape[0], input_ids.shape[1], 2
     )
     model.normalize_latents = lambda latents: latents
-    model._draft_latents = lambda context, block_len, num_steps: torch.zeros(
-        context.shape[0], block_len, context.shape[-1]
+    model._draft_latents = (
+        lambda context, block_len, num_steps, block_size: torch.zeros(
+            context.shape[0], block_len, context.shape[-1]
+        )
     )
     model.decode_latents = lambda context, block: proposal[:, : block.shape[1]]
     generation_config = SimpleNamespace(

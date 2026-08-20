@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -69,7 +70,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=_REPO_ROOT / "outputs/diagnostics/qwen-latent-norms",
+        default=Path(
+            os.environ.get(
+                "E2D_OUTPUT_ROOT",
+                Path.home() / ".cache/e2d/outputs",
+            )
+        )
+        / "diagnostics/qwen-latent-norms",
     )
     return parser.parse_args()
 
