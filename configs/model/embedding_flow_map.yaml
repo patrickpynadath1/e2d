@@ -1,0 +1,26 @@
+defaults:
+  - base@_here_
+  - _self_
+
+_target_: src.denoiser.embedding_flow_map.EmbeddingFlowMap
+config:
+  _target_: src.denoiser.embedding_flow_map.EmbeddingFlowMapConfig
+  noise_config: null
+  time_conditioned_backbone: false
+  block_size: ${block_size}
+  shared_lora_rank: 16
+  ar_lora_rank: 16
+  flow_lora_rank: 32
+  lora_alpha: 32.0
+  lora_dropout: 0.0
+  lora_target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+  ar_loss_weight: 1.0
+  diagonal_loss_weight: 1.0
+  # Start at zero for the easy diagonal phase; set >0 to train all three losses.
+  semigroup_loss_weight: 0.0
+  diagonal_min_time: 0.8
+  max_time_jump: 0.25
+  boundary_probability: 0.0
+  time_epsilon: 1.0e-4
+  generation_mode: verified  # ar | draft | verified
+  inference_steps: 1
