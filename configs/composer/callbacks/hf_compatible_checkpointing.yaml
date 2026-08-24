@@ -8,5 +8,8 @@ hf_compatible_checkpointing:
   overwrite: ${composer.trainer.save_overwrite}
   disable_hf: false
   save_local: true
-  save_to_hub: true
-  hub_repo_id: kuleshov-group/${run_name}
+  # Checkpoints are local-only unless a launcher explicitly opts into a Hub push.
+  # The previous project-namespace default caused unrelated users' runs to fail
+  # at checkpoint time with a 403 after otherwise successful training.
+  save_to_hub: false
+  hub_repo_id: null
