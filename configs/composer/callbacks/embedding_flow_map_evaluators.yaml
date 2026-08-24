@@ -1,0 +1,4 @@
+defaults:
+  - flow_map_curriculum
+  - gsm8k_progress_evaluator
+  - _self_

@@ -4,6 +4,7 @@ import torch
 
 from src.custom_composer.callbacks import (
     SpeculativeGenerationEvaluator,
+    _extract_gsm8k_answer,
     _read_speculative_stats,
     _target_greedy,
 )
@@ -65,6 +66,12 @@ def test_read_speculative_stats_supports_object_and_legacy_dict():
     assert _read_speculative_stats(model)["accepted_tokens"] == 3
     legacy = SimpleNamespace(_last_speculative_stats={"accepted_tokens": 4})
     assert _read_speculative_stats(legacy)["accepted_tokens"] == 4
+
+
+def test_gsm8k_answer_extraction_prefers_boxed_and_normalizes_commas():
+    assert _extract_gsm8k_answer("work 12 then $\\boxed{1,234}$") == "1234"
+    assert _extract_gsm8k_answer("reasoning\n#### -42") == "-42"
+    assert _extract_gsm8k_answer("The final value is 7.5") == "7.5"
 
 
 def test_callback_logs_acceptance_positions_and_exact_match(monkeypatch):

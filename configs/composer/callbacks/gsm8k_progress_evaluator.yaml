@@ -1,0 +1,9 @@
+gsm8k_progress_evaluator:
+  _target_: src.custom_composer.callbacks.GSM8KProgressEvaluator
+  num_samples: 32
+  max_new_tokens: 256
+  block_size: ${block_size}
+  num_steps: 1
+  seed: 17
+  dataset_path: openai/gsm8k
+  config_name: main

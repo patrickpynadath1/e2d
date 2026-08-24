@@ -2,6 +2,7 @@ import glob
 import logging
 import os
 import pathlib
+import re
 import shutil
 import time
 from typing import Any, Literal
@@ -24,9 +25,221 @@ from src.utils import (
 log = logging.getLogger(__name__)
 __all__ = [
     "DataloaderSpeedMonitor",
+    "FlowMapCurriculum",
+    "GSM8KProgressEvaluator",
     "SpeculativeGenerationEvaluator",
     "TimestepLossMonitor",
 ]
+
+
+def _extract_gsm8k_answer(text: str) -> str | None:
+    patterns = (
+        r"\\boxed\{\s*([-+]?\d[\d,]*(?:\.\d+)?)\s*\}",
+        r"####\s*([-+]?\d[\d,]*(?:\.\d+)?)",
+    )
+    for pattern in patterns:
+        matches = re.findall(pattern, text)
+        if matches:
+            return matches[-1].replace(",", "")
+    numbers = re.findall(r"[-+]?\d[\d,]*(?:\.\d+)?", text)
+    return numbers[-1].replace(",", "") if numbers else None
+
+
+class GSM8KProgressEvaluator(Callback):
+    """Periodically measure AR task accuracy and flow draft acceptance length."""
+
+    def __init__(
+        self,
+        num_samples: int = 32,
+        max_new_tokens: int = 256,
+        block_size: int = 8,
+        num_steps: int = 1,
+        seed: int = 17,
+        dataset_path: str = "openai/gsm8k",
+        config_name: str = "main",
+    ) -> None:
+        self.num_samples = num_samples
+        self.max_new_tokens = max_new_tokens
+        self.block_size = block_size
+        self.num_steps = num_steps
+        self.seed = seed
+        self.dataset_path = dataset_path
+        self.config_name = config_name
+        self._examples: list[tuple[torch.Tensor, str]] | None = None
+
+    def fit_start(self, state: State, logger: Logger) -> None:
+        del logger
+        _, tokenizer = _unwrap_huggingface_model(state.model)
+        from src.datasets.tokenize_on_demand import GSM8KDataset
+
+        dataset = GSM8KDataset(
+            tokenizer=tokenizer,
+            split="test",
+            max_length=2 * self.max_new_tokens,
+            dataset_path=self.dataset_path,
+            config_name=self.config_name,
+            max_samples=self.num_samples,
+            sampling_seed=self.seed,
+            padding=False,
+            add_special_tokens=True,
+            num_shot=0,
+            source_key="question",
+            target_key="answer",
+            source_prompt_text=(
+                "Please reason step by step, and put your final answer within "
+                "$\\boxed{}$. "
+            ),
+            target_prompt_text="Answer: ",
+        )
+        examples: list[tuple[torch.Tensor, str]] = []
+        for index in range(len(dataset)):
+            item = dataset[index]
+            context_len = int(item["context_mask"].sum())
+            prompt_ids = item["input_ids"][:context_len]
+            target_text = tokenizer.decode(item["input_ids"][context_len:])
+            answer = _extract_gsm8k_answer(target_text)
+            if answer is not None:
+                examples.append((prompt_ids, answer))
+        self._examples = examples
+
+    def eval_end(self, state: State, logger: Logger) -> None:
+        if self._examples is None:
+            self.fit_start(state, logger)
+        assert self._examples is not None
+        model, tokenizer = _unwrap_huggingface_model(state.model)
+        supports_speculation = hasattr(model, "generate_verified")
+        was_training = model.training
+        device = next(model.parameters()).device
+        ar_correct = 0
+        accepted_lengths: list[int] = []
+        proposed = 0
+        accepted = 0
+        committed = 0
+        elapsed = 0.0
+        model.eval()
+        try:
+            for prompt_ids, expected in self._examples:
+                inputs = prompt_ids[None].to(device)
+                if hasattr(model, "generate_ar"):
+                    ar_output = model.generate_ar(inputs, self.max_new_tokens)
+                else:
+                    ar_output = model.generate(
+                        inputs=inputs, max_new_tokens=self.max_new_tokens
+                    )
+                ar_text = tokenizer.decode(ar_output[0, inputs.shape[1] :])
+                ar_correct += int(_extract_gsm8k_answer(ar_text) == expected)
+
+                if supports_speculation:
+                    verified_output, stats = model.generate_verified(
+                        inputs=inputs,
+                        max_new_tokens=self.max_new_tokens,
+                        block_size=self.block_size,
+                        num_steps=self.num_steps,
+                        return_speculative_stats=True,
+                    )
+                    del verified_output
+                    accepted_lengths.extend(stats.accepted_lengths)
+                    proposed += stats.proposed_tokens
+                    accepted += stats.accepted_tokens
+                    committed += stats.committed_tokens
+                    elapsed += stats.total_seconds
+        finally:
+            model.train(was_training)
+        if dist.get_global_rank() != 0:
+            return
+        count = len(self._examples)
+        metrics = {
+            "gsm8k_progress/ar_exact_match": ar_correct / count if count else 0.0,
+        }
+        if supports_speculation:
+            metrics.update({
+                "gsm8k_progress/expected_accepted_length": (
+                    sum(accepted_lengths) / len(accepted_lengths)
+                    if accepted_lengths
+                    else 0.0
+                ),
+                "gsm8k_progress/acceptance_rate": (
+                    accepted / proposed if proposed else 0.0
+                ),
+                "gsm8k_progress/zero_accept_fraction": (
+                    accepted_lengths.count(0) / len(accepted_lengths)
+                    if accepted_lengths
+                    else 0.0
+                ),
+                "gsm8k_progress/verified_tokens_per_second": (
+                    committed / elapsed if elapsed else 0.0
+                ),
+            })
+        logger.log_metrics(metrics)
+
+
+class FlowMapCurriculum(Callback):
+    """Linearly expand diagonal noise and semigroup difficulty during joint SFT."""
+
+    def __init__(
+        self,
+        start_batch: int = 100,
+        end_batch: int = 1000,
+        final_diagonal_min_time: float = 0.0,
+        final_semigroup_weight: float = 1.0,
+        final_max_time_jump: float = 1.0,
+        final_boundary_probability: float = 0.03125,
+    ) -> None:
+        if start_batch < 0 or end_batch <= start_batch:
+            raise ValueError("curriculum requires 0 <= start_batch < end_batch")
+        self.start_batch = start_batch
+        self.end_batch = end_batch
+        self.final_diagonal_min_time = final_diagonal_min_time
+        self.final_semigroup_weight = final_semigroup_weight
+        self.final_max_time_jump = final_max_time_jump
+        self.final_boundary_probability = final_boundary_probability
+        self._initial: dict[str, float] | None = None
+
+    @staticmethod
+    def _denoiser(state: State):
+        composer_model = (
+            state.model.module if hasattr(state.model, "module") else state.model
+        )
+        return composer_model.model
+
+    def fit_start(self, state: State, logger: Logger) -> None:
+        config = self._denoiser(state).config
+        required = (
+            "diagonal_min_time",
+            "semigroup_loss_weight",
+            "max_time_jump",
+            "boundary_probability",
+        )
+        if not all(hasattr(config, name) for name in required):
+            raise TypeError("FlowMapCurriculum requires an embedding flow-map model")
+        self._initial = {name: float(getattr(config, name)) for name in required}
+
+    def before_train_batch(self, state: State, logger: Logger) -> None:
+        if self._initial is None:
+            self.fit_start(state, logger)
+        batch = int(state.timestamp.batch.value)
+        progress = (batch - self.start_batch) / (self.end_batch - self.start_batch)
+        progress = min(1.0, max(0.0, progress))
+        config = self._denoiser(state).config
+        finals = {
+            "diagonal_min_time": self.final_diagonal_min_time,
+            "semigroup_loss_weight": self.final_semigroup_weight,
+            "max_time_jump": self.final_max_time_jump,
+            "boundary_probability": self.final_boundary_probability,
+        }
+        assert self._initial is not None
+        for name, final in finals.items():
+            initial = self._initial[name]
+            setattr(config, name, initial + progress * (final - initial))
+        logger.log_metrics(
+            {
+                "flow_curriculum/progress": progress,
+                "flow_curriculum/diagonal_min_time": config.diagonal_min_time,
+                "flow_curriculum/semigroup_weight": config.semigroup_loss_weight,
+                "flow_curriculum/max_time_jump": config.max_time_jump,
+                "flow_curriculum/boundary_probability": config.boundary_probability,
+            }
+        )
 
 
 class TimestepLossMonitor(Callback):
@@ -70,7 +283,11 @@ class TimestepLossMonitor(Callback):
             if token_mask is None
             else torch.broadcast_to(token_mask.detach(), token_losses.shape)
         )
-        valid = weights.bool() & torch.isfinite(token_losses) & torch.isfinite(timesteps)
+        valid = (
+            weights.bool()
+            & torch.isfinite(token_losses)
+            & torch.isfinite(timesteps)
+        )
         if not bool(valid.any()):
             return
 
@@ -132,7 +349,9 @@ class TimestepLossMonitor(Callback):
                             table,
                             "timestep",
                             "mean_flow_loss",
-                            title=f"{split.title()} flow loss by timestep at step {step}",
+                            title=(
+                                f"{split.title()} flow loss by timestep at step {step}"
+                            ),
                         ),
                         f"timestep_loss/{split}/table": table,
                     },
