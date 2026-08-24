@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import time
+from fnmatch import fnmatchcase
 from pathlib import Path
 from tempfile import TemporaryDirectory, gettempdir
 from types import MethodType
@@ -14,6 +15,29 @@ from huggingface_hub import HfApi, file_exists, repo_exists
 from transformers import PreTrainedModel, PreTrainedTokenizer
 
 log = logging.getLogger(__name__)
+
+
+def _matches_gitignore_pattern(path: Path, project_root: Path, pattern: str) -> bool:
+    """Return whether ``path`` matches a simple .gitignore glob.
+
+    The snapshotter historically passed .gitignore entries to ``re.search``.
+    Gitignore entries are shell-style globs, not regular expressions, so valid
+    entries such as ``*.egg-info/`` raised ``re.error``.  The repository's
+    ignore file only uses ordinary basename and path globs; matching those with
+    ``fnmatch`` gives the intended behavior without treating them as regexes.
+    """
+    pattern = pattern.strip()
+    if not pattern or pattern.startswith("#") or pattern.startswith("!"):
+        return False
+
+    pattern = pattern.rstrip("/")
+    if not pattern:
+        return False
+
+    relative_path = path.relative_to(project_root).as_posix()
+    if "/" in pattern:
+        return fnmatchcase(relative_path, pattern.lstrip("/"))
+    return any(fnmatchcase(part, pattern) for part in Path(relative_path).parts)
 
 
 def fsspec_exists(filename):
@@ -52,7 +76,10 @@ def snapshot_repo_to_tmp_dir(
         """Helper method that recursively copies files from src_path to dest_path.
         Ignores files matching the patterns in ignore (list).
         """
-        if any([re.search(ignore_file, str(src_path)) for ignore_file in ignore]):
+        if any(
+            _matches_gitignore_pattern(src_path, project_root, ignore_file)
+            for ignore_file in ignore
+        ):
             return
         if os.path.isdir(src_path):
             dest_path.mkdir(parents=True, exist_ok=True)
@@ -68,10 +95,7 @@ def snapshot_repo_to_tmp_dir(
     # Get .gitignore list
     project_root = Path(__file__).resolve().parent.parent
     with open(project_root / ".gitignore", "r", encoding="utf-8") as gf:
-        ignore_list = [line.strip() for line in gf.readlines()]
-    ignore_list.extend(
-        [ignore_file[:-1] for ignore_file in ignore_list if ignore_file.endswith("/")]
-    )
+        ignore_list = [line.strip() for line in gf]
 
     # Construct a unique ID for temporary directory
     root = gettempdir()
