@@ -17,6 +17,11 @@ from transformers.modeling_outputs import (
 from src.backbone.custom_modeling_qwen3 import CustomQwen3ForCausalLM
 
 try:
+    from peft import LoraConfig, TaskType, get_peft_model
+except ImportError:  # pragma: no cover - exercised only in minimal installs
+    LoraConfig = TaskType = get_peft_model = None
+
+try:
     from torch.nn.attention.flex_attention import BlockMask
 except ImportError:
     BlockMask = None
@@ -114,3 +119,37 @@ class AutoModelFromPreTrained(nn.Module):
                     model_output.past_key_values.value_cache[i][..., :cache_len, :]
                 )
         return model_output
+
+
+class AutoModelFromPreTrainedLoRA(AutoModelFromPreTrained):
+    """Standard PEFT LoRA wrapper for an ordinary causal-SFT baseline."""
+
+    def __init__(
+        self,
+        lora_r: int = 16,
+        lora_alpha: int = 32,
+        lora_dropout: float = 0.0,
+        lora_target_modules: tuple[str, ...] = (
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+        ),
+        **kwargs,
+    ) -> None:
+        if get_peft_model is None:
+            raise ImportError("peft is required for AutoModelFromPreTrainedLoRA")
+        super().__init__(**kwargs)
+        peft_config = LoraConfig(
+            task_type=TaskType.CAUSAL_LM,
+            inference_mode=False,
+            r=lora_r,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            target_modules=list(lora_target_modules),
+            bias="none",
+        )
+        self.model = get_peft_model(self.model, peft_config)
