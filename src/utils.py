@@ -120,7 +120,12 @@ def snapshot_repo_to_tmp_dir(
     return tmp_dir
 
 
-def _flatten_and_copy(src_path: Path, dest_path: Path, ignore: list[str]) -> None:
+def _flatten_and_copy(
+    src_path: Path,
+    dest_path: Path,
+    ignore: list[str],
+    ignore_root: Path | None = None,
+) -> None:
     """Copy file contents and flatten relative imports.
 
     Ignores __init__.py files.
@@ -182,8 +187,13 @@ def _flatten_and_copy(src_path: Path, dest_path: Path, ignore: list[str]) -> Non
         ) as f:
             f.writelines(modified_lines)
 
-    if any([re.search(ignore_file, str(src_path)) for ignore_file in ignore]):
-        log.debug("Skipping:", src_path)
+    if ignore_root is None:
+        ignore_root = src_path.parent if src_path.is_file() else src_path
+    if any(
+        _matches_gitignore_pattern(src_path, ignore_root, ignore_file)
+        for ignore_file in ignore
+    ):
+        log.debug("Skipping %s", src_path)
         return
     if os.path.isdir(src_path):
         for sp in fsspec_listdir(src_path):
@@ -191,6 +201,7 @@ def _flatten_and_copy(src_path: Path, dest_path: Path, ignore: list[str]) -> Non
                 src_path / sp,
                 Path(f"{str(dest_path)}_{Path(sp).resolve().name}"),
                 ignore,
+                ignore_root,
             )
     if os.path.isdir(src_path):
         return
@@ -303,9 +314,6 @@ def save_pretrained_or_push_to_hub(
         project_root = Path(project_root).resolve()
     with open(project_root / ".gitignore", "r", encoding="utf-8") as gf:
         ignore = [line.strip() for line in gf.readlines()]
-    ignore.extend(
-        [ignore_file[:-1] for ignore_file in ignore if ignore_file.endswith("/")]
-    )
     ignore.append("__init__.py")
     model_file_path = inspect.getfile(model.__class__).split(
         str(Path(__file__).resolve().parent.parent)
@@ -320,7 +328,7 @@ def save_pretrained_or_push_to_hub(
     for src_path, dest_name in paths_to_copy.items():
         dest = dest_path / dest_name
         dest.parent.mkdir(parents=True, exist_ok=True)
-        _flatten_and_copy(src_path, dest, ignore)
+        _flatten_and_copy(src_path, dest, ignore, project_root)
     # Add __init__.py
     (dest_path / "__init__.py").touch()
     # Upload to hub if not local
