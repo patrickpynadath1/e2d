@@ -56,3 +56,24 @@ def test_position_gated_lora_rejects_incompatible_mask():
         assert "mode mask" in str(error)
     else:
         raise AssertionError("expected incompatible routing mask to fail")
+
+
+def test_position_gated_lora_default_ar_activates_shared_and_ar_branches():
+    base = torch.nn.Linear(2, 2, bias=False)
+    torch.nn.init.zeros_(base.weight)
+    layer = PositionGatedLoRALinear(
+        base,
+        shared_rank=1,
+        ar_rank=1,
+        flow_rank=1,
+        alpha=1.0,
+        dropout=0.0,
+        default_mode="ar",
+    )
+    _nonzero_branch(layer.shared, 1.0)
+    _nonzero_branch(layer.ar, 2.0)
+    _nonzero_branch(layer.flow, 3.0)
+
+    output = layer(torch.ones(1, 3, 2))
+
+    assert torch.equal(output, torch.full((1, 3, 2), 10.0))

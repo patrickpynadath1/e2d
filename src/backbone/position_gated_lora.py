@@ -48,10 +48,14 @@ class PositionGatedLoRALinear(nn.Module):
         flow_rank: int = 32,
         alpha: float = 32.0,
         dropout: float = 0.0,
+        default_mode: Optional[str] = None,
     ) -> None:
         super().__init__()
+        if default_mode not in {None, "ar", "flow"}:
+            raise ValueError("default_mode must be None, 'ar', or 'flow'")
         self.base = base
         self.base.requires_grad_(False)
+        self.default_mode = default_mode
         self.shared = _LoRABranch(
             base.in_features, base.out_features, shared_rank, alpha, dropout
         )
@@ -69,8 +73,13 @@ class PositionGatedLoRALinear(nn.Module):
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         output = self.base(hidden_states)
         if self.mode_mask is None:
-            return output
-        mask = self.mode_mask
+            if self.default_mode is None:
+                return output
+            mode_index = 0 if self.default_mode == "ar" else 1
+            mask = hidden_states.new_zeros(*hidden_states.shape[:-1], 2)
+            mask[..., mode_index] = 1
+        else:
+            mask = self.mode_mask
         if mask.shape[:-1] != hidden_states.shape[:-1] or mask.shape[-1] != 2:
             raise ValueError(
                 "LoRA mode mask must have shape hidden_states.shape[:-1] + (2,), "
@@ -96,6 +105,7 @@ def inject_position_gated_lora(
     flow_rank: int = 32,
     alpha: float = 32.0,
     dropout: float = 0.0,
+    default_mode: Optional[str] = None,
 ) -> list[str]:
     """Replace named linear projections recursively and return their full names."""
     targets = set(target_modules)
@@ -111,6 +121,7 @@ def inject_position_gated_lora(
                 flow_rank=flow_rank,
                 alpha=alpha,
                 dropout=dropout,
+                default_mode=default_mode,
             )
             setattr(parent, child_name, wrapped)
             replaced.append(f"{parent_name}.{child_name}".lstrip("."))

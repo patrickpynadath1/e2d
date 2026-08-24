@@ -22,11 +22,16 @@ export WANDB_MODE="${WANDB_MODE:-online}"
 RUN_BOOTSTRAP="${RUN_BOOTSTRAP:-true}"
 RUN_BASELINE="${RUN_BASELINE:-true}"
 RUN_FLOW="${RUN_FLOW:-true}"
+BASELINE_VARIANT="${BASELINE_VARIANT:-standard}"
 BASELINE_MAX_DURATION="${BASELINE_MAX_DURATION:-3ep}"
 FLOW_MAX_DURATION="${FLOW_MAX_DURATION:-3ep}"
 BASELINE_PROGRESS_EVAL_SAMPLES="${BASELINE_PROGRESS_EVAL_SAMPLES:-16}"
 FLOW_PROGRESS_EVAL_SAMPLES="${FLOW_PROGRESS_EVAL_SAMPLES:-8}"
-BASELINE_RUN_NAME="${BASELINE_RUN_NAME:-gsm8k-ar-lora-${TIMESTAMP}}"
+if [ "${BASELINE_VARIANT}" = "matched_dual" ]; then
+  BASELINE_RUN_NAME="${BASELINE_RUN_NAME:-gsm8k-ar-shared-sft-lora-${TIMESTAMP}}"
+else
+  BASELINE_RUN_NAME="${BASELINE_RUN_NAME:-gsm8k-ar-lora-${TIMESTAMP}}"
+fi
 FLOW_RUN_NAME="${FLOW_RUN_NAME:-gsm8k-embedding-flow-map-${TIMESTAMP}}"
 
 if [ -z "${NUM_DEVICES:-}" ]; then
@@ -58,6 +63,7 @@ echo "  global batch:   ${GLOBAL_BATCH_SIZE}"
 echo "  grad accum:     ${GRAD_ACCUM}"
 echo "  sequence length:${MODEL_LENGTH}"
 echo "  baseline:       ${BASELINE_RUN_NAME} (${BASELINE_MAX_DURATION})"
+echo "  baseline type:  ${BASELINE_VARIANT}"
 echo "  flow:           ${FLOW_RUN_NAME} (${FLOW_MAX_DURATION})"
 echo "  outputs:        ${OUTPUT_ROOT}"
 
@@ -80,13 +86,22 @@ if [ -f "${CREDENTIALS_FILE}" ]; then
 fi
 
 if [ "${RUN_BASELINE}" = "true" ]; then
-  echo "[1/2] Starting standard causal SFT + PEFT LoRA baseline."
+  if [ "${BASELINE_VARIANT}" = "standard" ]; then
+    BASELINE_SCRIPT="${SCRIPT_DIR}/run_train_ar_lora_gsm8k.sh"
+    echo "[1/2] Starting standard causal SFT + PEFT LoRA baseline."
+  elif [ "${BASELINE_VARIANT}" = "matched_dual" ]; then
+    BASELINE_SCRIPT="${SCRIPT_DIR}/run_train_ar_shared_sft_lora_gsm8k.sh"
+    echo "[1/2] Starting matched shared + SFT LoRA causal baseline."
+  else
+    echo "BASELINE_VARIANT must be 'standard' or 'matched_dual'." >&2
+    exit 2
+  fi
   (
     export MAX_DURATION="${BASELINE_MAX_DURATION}"
     export PROGRESS_EVAL_SAMPLES="${BASELINE_PROGRESS_EVAL_SAMPLES}"
     export RUN_NAME="${BASELINE_RUN_NAME}"
     export OUTPUT_ROOT="${OUTPUT_ROOT}/baseline"
-    bash "${SCRIPT_DIR}/run_train_ar_lora_gsm8k.sh"
+    bash "${BASELINE_SCRIPT}"
   )
   echo "[1/2] Baseline completed: ${OUTPUT_ROOT}/baseline/${BASELINE_RUN_NAME}"
 else

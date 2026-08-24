@@ -1,0 +1,17 @@
+defaults:
+  - automodel@_here_
+  - _self_
+
+_target_: src.backbone.automodel.AutoModelFromPreTrainedSharedSFTLoRA
+automodel_cls: AutoModelForCausalLM
+pretrained_model_name_or_path: ${pretrained_model_name_or_path}
+trust_remote_code: true
+num_layers: -1
+keep_top_layers: false
+reinit_model: false
+use_causal_mask: true
+shared_lora_rank: 16
+sft_lora_rank: 16
+lora_alpha: 32.0
+lora_dropout: 0.0
+lora_target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]

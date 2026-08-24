@@ -15,6 +15,7 @@ from transformers.modeling_outputs import (
 )
 
 from src.backbone.custom_modeling_qwen3 import CustomQwen3ForCausalLM
+from src.backbone.position_gated_lora import inject_position_gated_lora
 
 try:
     from peft import LoraConfig, TaskType, get_peft_model
@@ -153,3 +154,39 @@ class AutoModelFromPreTrainedLoRA(AutoModelFromPreTrained):
             bias="none",
         )
         self.model = get_peft_model(self.model, peft_config)
+
+
+class AutoModelFromPreTrainedSharedSFTLoRA(AutoModelFromPreTrained):
+    """Causal-SFT control with the flow model's shared + task LoRA topology."""
+
+    def __init__(
+        self,
+        shared_lora_rank: int = 16,
+        sft_lora_rank: int = 16,
+        lora_alpha: float = 32.0,
+        lora_dropout: float = 0.0,
+        lora_target_modules: tuple[str, ...] = (
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+        ),
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.model.requires_grad_(False)
+        self.lora_module_names = inject_position_gated_lora(
+            self.model.model,
+            lora_target_modules,
+            shared_rank=shared_lora_rank,
+            ar_rank=sft_lora_rank,
+            flow_rank=0,
+            alpha=lora_alpha,
+            dropout=lora_dropout,
+            # Both shared and SFT branches remain active for direct calls to
+            # model.generate(), whose incremental sequence length varies.
+            default_mode="ar",
+        )
