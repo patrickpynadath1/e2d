@@ -5,8 +5,8 @@ cd ../ || exit  # Go to the root directory of the repo
 source setup_env.sh
 
 # Model arch
-BLOCK_SIZE=10
-EVAL_BLOCK_SIZE=10
+BLOCK_SIZE=4
+EVAL_BLOCK_SIZE=4
 N_ENCODER_LAYERS=28
 ENCODER_TOP_LAYERS=false
 N_DECODER_LAYERS=2
@@ -48,10 +48,8 @@ fi
 # get time stamp
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
-RUN_NAME=gsm8k-${NUM_SHOT}shot_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_alphaf${ALPHA_F}_max-dur${MAX_DURATION}_${PRECISION}_${ENC_LAYERS}_${DEC_LAYERS}_${TAG}_${TIMESTAMP}
-if [ "${TIE_WEIGHTS}" == "true" ]; then
-  RUN_NAME="${RUN_NAME}_tie-weights"
-fi
+RUN_NAME=gsm8k_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_max-dur${MAX_DURATION}_${ENC_LAYERS}_${DEC_LAYERS}_${TAG}_${TIMESTAMP}
+
 if [ "${ENCODER_CAUSAL_MASK}" == "true" ]; then
   RUN_NAME="${RUN_NAME}_encoder-causal-mask"
 fi

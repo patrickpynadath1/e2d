@@ -1,0 +1,9 @@
+_target_: src.backbone.seed_lora.LLMasEncoderDecoderFrozenTargetLoRA
+pretrained_model_name_or_path: ${pretrained_model_name_or_path}
+max_length: ${model.config.length}
+attn_backend: ${model.config.attn_backend}
+num_decoder_layers: 2
+lora_rank: 32
+lora_alpha: 64.0
+lora_dropout: 0.0
+torch_dtype: bfloat16

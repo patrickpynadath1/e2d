@@ -230,6 +230,28 @@ def load_model_from_ckpt_dir_path(
         config.model,
         _convert_="all",
     )
+    frozen_target = bool(getattr(getattr(model, "backbone", None), "frozen_target", False))
+    if frozen_target and load_ema_weights:
+        raise ValueError("Frozen-target SEED-LoRA evaluation requires load_ema_weights=False.")
+
+    def _load_checkpoint_weights(state_dict):
+        if frozen_target:
+            # Both encoder names and decoder aliases must match the freshly
+            # loaded original model: a decoder alias could otherwise overwrite
+            # a shared verifier parameter during load_state_dict.
+            for name, parameter in model.backbone.named_parameters(remove_duplicate=False):
+                if parameter.requires_grad:
+                    continue
+                key = f"backbone.{name}"
+                if key in state_dict and not torch.equal(
+                    parameter.detach(), state_dict[key].to(parameter)
+                ):
+                    raise ValueError(
+                        f"Frozen-target checkpoint changed original weight {key}. "
+                        "Use the original verifier revision and an unmodified SEED-LoRA checkpoint."
+                    )
+        # Missing adapters must never silently evaluate an untrained drafter.
+        model.load_state_dict(state_dict, strict=frozen_target)
 
     weights_suffix = "_ema" if load_ema_weights else ""
     base_name = ckpt_file[:-3] if ckpt_file.endswith(".pt") else ckpt_file
@@ -239,7 +261,7 @@ def load_model_from_ckpt_dir_path(
     if os.path.exists(weights_only_path):
         print(f"Loading cached weights-only checkpoint from: {weights_only_path}")
         state_dict = torch.load(weights_only_path, map_location="cpu")
-        model.load_state_dict(state_dict, strict=False)
+        _load_checkpoint_weights(state_dict)
         model.to(device)
         return model
 
@@ -252,6 +274,8 @@ def load_model_from_ckpt_dir_path(
             mmap=True           # Use memory mapping
         )
     except FileNotFoundError:
+        if frozen_target:
+            raise
         print("Checkpoint not found; reinitializing model from scratch")
         return model
     if verbose:
@@ -290,10 +314,10 @@ def load_model_from_ckpt_dir_path(
     torch.nn.modules.utils.consume_prefix_in_state_dict_if_present(state_dict, "model.")
     torch.nn.modules.utils.consume_prefix_in_state_dict_if_present(state_dict, "_fsdp_wrapped_module.")
 
+    _load_checkpoint_weights(state_dict)
+
     print(f"Saving extracted weights to {weights_only_path}")
     torch.save(state_dict, weights_only_path)
-
-    model.load_state_dict(state_dict, strict=False)
 
     del ckpt
     del state_dict

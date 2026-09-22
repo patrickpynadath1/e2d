@@ -1581,6 +1581,412 @@ class E2D(E2D2):
         super().__init__(config, **kwargs)
 
     @staticmethod
+    def _speculative_sample(draft_tokens, draft_probs, target_probs):
+        """Sample an accepted prefix and one residual/bonus token.
+
+        q has shape (batch, draft_length, vocab); p includes one extra position.
+        Implements Algorithm 1 of Leviathan et al. (2023), using fp32 probabilities.
+        """
+        q = draft_probs.float()
+        p = target_probs.float()
+        q_token = q.gather(-1, draft_tokens.unsqueeze(-1)).squeeze(-1)
+        p_token = p[:, :-1].gather(-1, draft_tokens.unsqueeze(-1)).squeeze(-1)
+        # Equivalent to U < min(1, p(x)/q(x)), without division by tiny q(x).
+        accepted = torch.rand_like(q_token) * q_token < p_token
+        lengths = accepted.long().cumprod(dim=1).sum(dim=1)
+        rows = torch.arange(q.shape[0], device=q.device)
+        correction_probs = p[rows, lengths].clone()
+        rejected = lengths < draft_tokens.shape[1]
+        correction_probs[rejected] = (
+            correction_probs[rejected] - q[rows[rejected], lengths[rejected]]
+        ).clamp_min(0)
+        # multinomial normalizes the positive residual; when every proposal is
+        # accepted, this is already the target distribution for the bonus token.
+        correction = torch.multinomial(correction_probs, 1).squeeze(-1)
+        return lengths, correction
+
+    @torch.no_grad()
+    def _generate_stochastic(
+        self,
+        inputs,
+        generation_config,
+        logits_processor,
+        stopping_criteria,
+        max_length,
+        max_new_tokens,
+        batch_size,
+        device,
+        tokenizer,
+        disable_pbar,
+        conf_seg,
+        track_acc_rate,
+        tree_attn,
+        **kwargs,
+    ):
+        """Exact speculative sampling, or greedy verification for a frozen target.
+
+        Tree alternatives may supply the residual token and its target continuation.
+        As in greedy decoding, a reused tree token counts as one accepted draft;
+        the following target token (or an ordinary correction/bonus) does not.
+        """
+        import time
+
+        do_sample = bool(generation_config.do_sample)
+        temperature = (
+            float(getattr(generation_config, "temperature", 1.0))
+            if do_sample
+            else 1.0
+        )
+        if not math.isfinite(temperature) or temperature <= 0:
+            raise ValueError(
+                "Stochastic E2D decoding requires a finite temperature > 0."
+            )
+        if not generation_config.use_cache:
+            raise ValueError(
+                "Exact E2D speculative decoding requires use_cache=True."
+            )
+        if inputs is None:
+            inputs = torch.full(
+                (batch_size or 1, 1), self.bos_token_id, device=device, dtype=torch.long
+            )
+        if inputs.shape[0] != 1 or batch_size not in (None, 1):
+            raise ValueError("Batched E2D speculative decoding is not supported.")
+        if inputs.shape[1] == 0:
+            raise ValueError("E2D speculative decoding requires a nonempty prompt.")
+        device = inputs.device
+        if max_new_tokens is None:
+            max_new_tokens = getattr(generation_config, "max_new_tokens", None)
+        if max_new_tokens is None:
+            max_length = max_length or generation_config.max_length
+            max_new_tokens = max_length - inputs.shape[1]
+        block_size = generation_config.block_size
+        if block_size < 1 or max_new_tokens < 0:
+            raise ValueError(
+                "block_size must be positive and max_new_tokens nonnegative."
+            )
+
+        # Stochastic generation always conditions on the entire supplied prompt.
+        inputs_offset = inputs.shape[1]
+        limit = inputs_offset + max_new_tokens
+        samples = torch.cat(
+            [
+                inputs,
+                torch.full(
+                    (1, max_new_tokens),
+                    self.mask_token_id,
+                    device=device,
+                    dtype=torch.long,
+                ),
+            ],
+            dim=-1,
+        )
+        current_idx = inputs_offset
+        draft_lengths, accepted_lengths = [], []
+        attempts, accepts = [0] * block_size, [0] * block_size
+        total_drafted = total_accepted = 0
+        draft_events = []
+        drafting_time = 0.0
+        use_cuda_events = device.type == "cuda"
+        if use_cuda_events:
+            overall_start = torch.cuda.Event(enable_timing=True)
+            overall_end = torch.cuda.Event(enable_timing=True)
+            overall_start.record()
+        else:
+            overall_start = time.perf_counter()
+
+        cache = {"past_key_values": DynamicCache()}
+        if inputs_offset > 1 and max_new_tokens > 0:
+            cache = self.update_cache(
+                inputs=inputs[:, :-1],
+                cache=cache,
+                enforce_causal_mask=True,
+            )
+
+        def processed_scores(logits, prefix):
+            if logits_processor is not None:
+                logits = logits_processor(input_ids=prefix, scores=logits)
+            return logits
+
+        def probabilities(logits):
+            return (logits.float() / temperature).softmax(dim=-1)
+
+        def should_stop(end):
+            if end >= limit:
+                return True
+            return stopping_criteria is not None and bool(
+                torch.any(
+                    stopping_criteria(
+                        input_ids=samples[:, inputs_offset:end],
+                        scores=None,
+                    )
+                )
+            )
+
+        acc_rate_history = []
+        ema_acc_rate = 0.8
+        current_draft_len = min(block_size, 10)
+        pbar = tqdm(
+            total=max_new_tokens, desc="Tokens", leave=True, disable=disable_pbar
+        )
+        while current_idx < limit:
+            start_idx = current_idx
+            max_draft_len = (
+                current_draft_len
+                if track_acc_rate
+                else (100 if conf_seg else block_size)
+            )
+            max_draft_len = min(max_draft_len, limit - start_idx)
+            if use_cuda_events:
+                draft_start = torch.cuda.Event(enable_timing=True)
+                draft_end = torch.cuda.Event(enable_timing=True)
+                draft_start.record()
+            else:
+                draft_start = time.perf_counter()
+
+            draft_probs, candidates = [], []
+            for step in range(max_draft_len):
+                cur_pos = start_idx + step
+                denoiser_inputs, _ = self._prepare_inputs_inference(
+                    input_ids=samples[:, cur_pos - 1 : cur_pos],
+                    cache=cache,
+                )
+                output = dict(
+                    self._backbone_forward(
+                        denoiser_inputs,
+                        fix_cache_length=True,
+                        truncate_cache=False,
+                        **cache,
+                        **kwargs,
+                    )
+                )
+                logits = output.pop("logits")
+                cache = cache | output
+                logits = logits[:, -1] if logits.ndim == 3 else logits
+                logits = processed_scores(logits, samples[:, :cur_pos])
+                q = probabilities(logits)
+                token = (
+                    torch.multinomial(q, 1)
+                    if do_sample
+                    else logits.argmax(dim=-1, keepdim=True)
+                )
+                samples[:, cur_pos : cur_pos + 1] = token
+                draft_probs.append(q)
+                confidence = q.max().item()
+                if tree_attn:
+                    k = (
+                        1
+                        if confidence > 0.95
+                        else (
+                            3 if confidence > 0.8 else (5 if confidence > 0.5 else 10)
+                        )
+                    )
+                    for token_id in (
+                        q.topk(min(k, q.shape[-1]), dim=-1).indices[0].tolist()
+                    ):
+                        if token_id != token.item():
+                            candidates.append((step, token_id))
+                if should_stop(cur_pos + 1) or (conf_seg and confidence < 0.7):
+                    break
+
+            draft_len = len(draft_probs)
+            total_drafted += draft_len
+            # Remove decoder-only speculative KV entries before target scoring.
+            kv = cache["past_key_values"]
+            for layer in range(len(kv)):
+                if kv.key_cache[layer].numel() == 0:
+                    continue
+                kv.key_cache[layer] = kv.key_cache[layer][..., : start_idx - 1, :]
+                kv.value_cache[layer] = kv.value_cache[layer][..., : start_idx - 1, :]
+            if use_cuda_events:
+                draft_end.record()
+                draft_events.append((draft_start, draft_end))
+            else:
+                drafting_time += time.perf_counter() - draft_start
+
+            main_inputs = samples[:, start_idx - 1 : start_idx + draft_len]
+            main_len = main_inputs.shape[1]
+            encoder_inputs = main_inputs
+            overrides = {}
+            if candidates:
+                encoder_inputs = torch.cat(
+                    [
+                        main_inputs,
+                        torch.tensor(
+                            [[token for _, token in candidates]], device=device
+                        ),
+                    ],
+                    dim=1,
+                )
+                past_len = start_idx - 1
+                positions = list(range(past_len, past_len + main_len))
+                positions.extend(start_idx + step for step, _ in candidates)
+                overrides["encoder_position_ids"] = torch.tensor(
+                    [positions], device=device
+                )
+                total_len = encoder_inputs.shape[1]
+                mask = torch.full(
+                    (1, 1, total_len, past_len + total_len),
+                    float("-inf"),
+                    dtype=self.backbone.encoder.dtype,
+                    device=device,
+                )
+                mask[..., :past_len] = 0
+                mask[:, :, :main_len, past_len : past_len + main_len] = torch.triu(
+                    torch.full((main_len, main_len), float("-inf"), device=device),
+                    diagonal=1,
+                )
+                for i, (step, _) in enumerate(candidates):
+                    row = main_len + i
+                    mask[:, :, row, past_len : past_len + step + 1] = 0
+                    mask[:, :, row, past_len + row] = 0
+                overrides["encoder_attention_mask"] = mask
+
+            verify_kwargs = dict(kwargs)
+            verify_kwargs.update(overrides)
+            verify_kwargs["enforce_causal_mask"] = not candidates
+            verify_kwargs["preserve_encoder_attention_mask"] = bool(candidates)
+            temp_cache = cache.copy()
+            verifier_inputs, _ = self._prepare_inputs_inference(
+                input_ids=encoder_inputs,
+                cache=temp_cache,
+                return_updated_cache=True,
+                **verify_kwargs,
+            )
+            output = self._backbone_forward(
+                verifier_inputs,
+                return_updated_cache=True,
+                return_last_hidden_state=True,
+                **temp_cache,
+            )
+            target_logits = self.backbone.encoder.lm_head(output["last_hidden_state"])
+            target_scores = torch.stack(
+                [
+                    processed_scores(target_logits[:, i], samples[:, : start_idx + i])
+                    for i in range(main_len)
+                ],
+                dim=1,
+            )
+            if do_sample:
+                lengths, correction = self._speculative_sample(
+                    main_inputs[:, 1:],
+                    torch.stack(draft_probs, dim=1),
+                    probabilities(target_scores),
+                )
+            else:
+                target_tokens = target_scores.argmax(dim=-1)
+                lengths = (
+                    (main_inputs[:, 1:] == target_tokens[:, :-1])
+                    .long()
+                    .cumprod(dim=-1)
+                    .sum(dim=-1)
+                )
+                correction = target_tokens.gather(1, lengths[:, None]).squeeze(1)
+            accepted = lengths.item()
+            final_accepted = accepted
+            current_idx = start_idx + accepted
+            finished = accepted > 0 and should_stop(current_idx)
+            branch_index = None
+            if not finished:
+                samples[:, current_idx] = correction
+                current_idx += 1
+                if accepted < draft_len:
+                    branch_index = next(
+                        (
+                            i
+                            for i, (step, token) in enumerate(candidates)
+                            if step == accepted and token == correction.item()
+                        ),
+                        None,
+                    )
+                if branch_index is not None:
+                    # Same tree accounting as greedy: the reused branch token
+                    # is accepted; its target continuation is a bonus.
+                    final_accepted += 1
+                finished = should_stop(current_idx)
+                if branch_index is not None and not finished:
+                    branch_scores = processed_scores(
+                        target_logits[:, main_len + branch_index],
+                        samples[:, :current_idx],
+                    )
+                    samples[:, current_idx : current_idx + 1] = (
+                        torch.multinomial(probabilities(branch_scores), 1)
+                        if do_sample
+                        else branch_scores.argmax(dim=-1, keepdim=True)
+                    )
+                    current_idx += 1
+                    finished = should_stop(current_idx)
+
+            # Include terminal verification rounds, and exclude correction/bonus
+            # tokens from accepted lengths except for the reused tree token above.
+            total_accepted += final_accepted
+            accepted_lengths.append(final_accepted)
+            draft_lengths.append(draft_len)
+            while len(attempts) < draft_len:
+                attempts.append(0)
+                accepts.append(0)
+            for pos in range(draft_len):
+                attempts[pos] += 1
+                accepts[pos] += int(pos < final_accepted)
+
+            # Keep target KV entries for the accepted prefix and any reused tree
+            # branch, excluding the final target continuation and all siblings.
+            kv = output["past_key_values"]
+            indices = list(range(start_idx + accepted))
+            if branch_index is not None:
+                indices.append(start_idx - 1 + main_len + branch_index)
+            indices = torch.tensor(indices, device=device, dtype=torch.long)
+            for layer in range(len(kv)):
+                kv.key_cache[layer] = kv.key_cache[layer].index_select(-2, indices)
+                kv.value_cache[layer] = kv.value_cache[layer].index_select(-2, indices)
+            cache["past_key_values"] = kv
+
+            if track_acc_rate:
+                acc_rate_history.append((accepted, draft_len))
+                window_accepted = window_drafted = 0
+                for hist_accepted, hist_drafted in reversed(acc_rate_history):
+                    window_accepted += hist_accepted
+                    window_drafted += hist_drafted
+                    if window_drafted >= 20:
+                        break
+                ema_acc_rate = (
+                    0.3 * window_accepted / window_drafted + 0.7 * ema_acc_rate
+                )
+                if ema_acc_rate > 0.8:
+                    current_draft_len = min(current_draft_len + 1, 10)
+                elif ema_acc_rate < 0.7:
+                    current_draft_len = max(current_draft_len - 1, 1)
+            pbar.update(current_idx - start_idx)
+            if finished:
+                break
+        pbar.close()
+        self._last_draft_position_acceptance = {
+            "attempt_counts": attempts,
+            "accept_counts": accepts,
+            "draft_lengths": draft_lengths,
+            "acceptance_rates": [
+                acc / att if att else 0.0 for acc, att in zip(accepts, attempts)
+            ],
+        }
+        if use_cuda_events:
+            overall_end.record()
+            torch.cuda.synchronize()
+            total_time = overall_start.elapsed_time(overall_end) / 1000.0
+            drafting_time = (
+                sum(start.elapsed_time(end) for start, end in draft_events) / 1000.0
+            )
+        else:
+            total_time = time.perf_counter() - overall_start
+        if tokenizer is not None:
+            output_text = tokenizer.decode(samples[0, inputs_offset:current_idx])
+            print(f"[{'STOCHASTIC' if do_sample else 'GREEDY'} OUTPUT] {output_text}")
+        return (
+            samples[:, :current_idx],
+            (total_drafted, total_accepted),
+            (accepted_lengths, len(accepted_lengths)),
+            (drafting_time, total_time),
+        )
+
+    @staticmethod
     def _encoder_block_mask(
         b,
         h,
@@ -1773,6 +2179,19 @@ class E2D(E2D2):
         else:
             raise ValueError("Unknown backbone backend")
             
+        if getattr(self.backbone, "frozen_target", False):
+            # The original verifier is causal over the prompt as well as the
+            # response. SEED's legacy bidirectional prompt mask changes its KV
+            # states, so do not use that mask when training a frozen-target draft.
+            seq_len = input_ids.shape[1]
+            causal = torch.ones(
+                seq_len, seq_len, device=input_ids.device, dtype=torch.bool
+            ).tril()
+            encoder_attention_mask = self._preprocess_attention_mask(
+                causal[None, None] & attention_mask[:, None, None, :].bool(),
+                dtype=torch.float,
+            )
+
         position_ids = torch.arange(input_ids.shape[1]).to(input_ids.device)[None, :]
         
         if self.training and self.config.train_on_context:
@@ -1803,8 +2222,11 @@ class E2D(E2D2):
         **kwargs: Any,
     ) -> LossAndNllOutput:
         """Standard autoregressive cross-entropy loss."""
-        decoder_loss_lambda = float(getattr(self.config, "decoder_loss_lambda", 1.0))
-        if decoder_loss_lambda <= -1.0:
+        frozen_target = bool(getattr(self.backbone, "frozen_target", False))
+        decoder_loss_lambda = (
+            1.0 if frozen_target else float(getattr(self.config, "decoder_loss_lambda", 1.0))
+        )
+        if not frozen_target and decoder_loss_lambda <= -1.0:
             raise ValueError(
                 "`decoder_loss_lambda` must be greater than -1.0 when using "
                 "weighted-average loss normalization."
@@ -1827,6 +2249,11 @@ class E2D(E2D2):
         targets = denoiser_inputs.x0[:, 1:]  # Remove first token (typically BOS)
         
         seq_len = denoiser_inputs.x0.shape[1]
+        if frozen_target and model_output.shape[1] != seq_len:
+            raise ValueError(
+                "Frozen-target SEED-LoRA must return only drafter logits; "
+                "the original verifier has no next-token training loss."
+            )
         
         # Check if we have encoder logits as well
         if model_output.shape[1] == 2 * seq_len:
@@ -1939,6 +2366,12 @@ class E2D(E2D2):
         if generation_config is None:
             assert getattr(self, "generation_config", None) is not None, "Generation config must be provided."
             generation_config = self.generation_config
+        if generation_config.do_sample or getattr(self.backbone, "frozen_target", False):
+            return self._generate_stochastic(
+                inputs, generation_config, logits_processor, stopping_criteria,
+                max_length, max_new_tokens, batch_size, device, tokenizer,
+                disable_pbar, conf_seg, track_acc_rate, tree_attn, **kwargs,
+            )
         if inputs is None:
             inputs = torch.ones((batch_size, 1), device=device) * self.bos_token_id
         if max_length is None:
@@ -2232,7 +2665,8 @@ class E2D(E2D2):
                 backbone_args = {
                     "return_updated_cache": True,
                     "return_last_hidden_state": True,
-                    "enforce_causal_mask": (mask is None), 
+                    "enforce_causal_mask": (mask is None),
+                    "preserve_encoder_attention_mask": (mask is not None),
                 }
                 
                 # 5. Forward Pass (Uses temp_cache which no longer has KVs)

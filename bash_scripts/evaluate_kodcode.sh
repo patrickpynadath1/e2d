@@ -59,7 +59,8 @@ KODCODE_NUM_SAMPLES=null      # null for all, or integer to limit
 
 L=1024
 CKPT="best"
-DO_SAMPLE=false
+DO_SAMPLE=${DO_SAMPLE:-false}
+TEMPERATURE=${TEMPERATURE:-1.0}
 SAMPLING_STRATEGY="predict_and_noise"  # "predict_and_noise" or "posterior"
 T=${BLOCK_SIZE}
 FIRST_HITTING=true
@@ -85,6 +86,7 @@ python scripts/eval/kodcode_eval.py \
   max_new_tokens=${L} \
   block_size=${BLOCK_SIZE} \
   generation_config.do_sample=${DO_SAMPLE} \
+  generation_config.temperature=${TEMPERATURE} \
   generation_config.sampling_strategy=${SAMPLING_STRATEGY} \
   generation_config.num_steps=${T} \
   generation_config.first_hitting=${FIRST_HITTING} \

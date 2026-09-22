@@ -3,29 +3,36 @@
 set -euo pipefail
 
 # Setup environment
-cd ../ || exit  # Go to the root directory of the repo
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+cd "${SCRIPT_DIR}/.." || exit
 source setup_env.sh
 
 # -----------------------------
 # Stage 1: Self-distillation
 # -----------------------------
 MODEL_NAME_OR_PATH=Qwen/Qwen3-1.7B-Base
-MAX_SEQ_LEN=1024
-GEN_MAX_SEQ_LEN=${GEN_MAX_SEQ_LEN:-1536}
+MAX_SEQ_LEN=4096 # 1024
+GEN_MAX_SEQ_LEN=${GEN_MAX_SEQ_LEN:-4096} # 1536
 PROMPT_MAX_SEQ_LEN=${PROMPT_MAX_SEQ_LEN:-1024}
 
-ULTRACHAT_DATASET_NAME=HuggingFaceH4/ultrachat_200k
-ULTRACHAT_SPLITS="train_sft train_gen"
+DISTILL_SOURCE_NAME=${DISTILL_SOURCE_NAME:-HuggingFaceH4/ultrachat_200k}
+DISTILL_SOURCE_SPLITS=${DISTILL_SOURCE_SPLITS:-"train_sft train_gen"}
+DISTILL_SOURCE_FORMAT=${DISTILL_SOURCE_FORMAT:-prompt}
+DISTILL_SOURCE_LABEL=${DISTILL_SOURCE_LABEL:-UltraChat}
+DISTILL_SOURCE_SLUG=${DISTILL_SOURCE_SLUG:-ultrachat}
+DISTILL_FILE_STEM=${DISTILL_FILE_STEM:-${DISTILL_SOURCE_SLUG}_qwen3_1p7b_thinking}
+DISTILL_RUN_PREFIX=${DISTILL_RUN_PREFIX:-${DISTILL_SOURCE_SLUG}}
+DISTILL_RUN_TAG=${DISTILL_RUN_TAG:-e2d_${DISTILL_SOURCE_SLUG}}
 
-DISTILL_DATA_ROOT=${DISTILL_DATA_ROOT:-/data/shared_data/hankun/datasets/ultrachat_qwen3_1p7b_thinking_maxlen${MAX_SEQ_LEN}}
-DISTILL_RAW_FILE="${DISTILL_DATA_ROOT}/ultrachat_qwen3_1p7b_thinking.jsonl"
-DISTILL_TRAIN_JSONL="${DISTILL_DATA_ROOT}/ultrachat_qwen3_1p7b_thinking_train.jsonl"
-DISTILL_EVAL_JSONL="${DISTILL_DATA_ROOT}/ultrachat_qwen3_1p7b_thinking_eval.jsonl"
+DISTILL_DATA_ROOT=${DISTILL_DATA_ROOT:-/data/shared_data/hankun/datasets/${DISTILL_FILE_STEM}_maxlen${MAX_SEQ_LEN}}
+DISTILL_RAW_FILE="${DISTILL_DATA_ROOT}/${DISTILL_FILE_STEM}.jsonl"
+DISTILL_TRAIN_JSONL="${DISTILL_DATA_ROOT}/${DISTILL_FILE_STEM}_train.jsonl"
+DISTILL_EVAL_JSONL="${DISTILL_DATA_ROOT}/${DISTILL_FILE_STEM}_eval.jsonl"
 DISTILL_TRAIN_PATH="${DISTILL_DATA_ROOT}/train_preprocessed"
 DISTILL_EVAL_PATH="${DISTILL_DATA_ROOT}/eval_preprocessed"
 
 # Optional controls
-DISTILL_MAX_SAMPLES=${DISTILL_MAX_SAMPLES:-0}  # 0 means all examples from train_sft + train_gen
+DISTILL_MAX_SAMPLES=${DISTILL_MAX_SAMPLES:-0}  # 0 means all examples from the configured source splits
 EVAL_RATIO=${EVAL_RATIO:-0.01}
 SPLIT_SEED=${SPLIT_SEED:-42}
 FORCE_REGENERATE=${FORCE_REGENERATE:-false}
@@ -34,12 +41,13 @@ PROGRESS_EVERY_BATCHES=${PROGRESS_EVERY_BATCHES:-1}
 EMPTY_CACHE_EVERY_BATCHES=${EMPTY_CACHE_EVERY_BATCHES:-20}
 
 if [[ "${FORCE_REGENERATE}" == "true" || ! -d "${DISTILL_TRAIN_PATH}" || ! -d "${DISTILL_EVAL_PATH}" ]]; then
-  echo "[Self-Distill] Building distilled UltraChat dataset at ${DISTILL_DATA_ROOT}"
+  echo "[Self-Distill] Building distilled ${DISTILL_SOURCE_LABEL} dataset at ${DISTILL_DATA_ROOT}"
   mkdir -p "${DISTILL_DATA_ROOT}"
 
     export MODEL_NAME_OR_PATH
-    export ULTRACHAT_DATASET_NAME
-    export ULTRACHAT_SPLITS
+    export DISTILL_SOURCE_NAME
+    export DISTILL_SOURCE_SPLITS
+    export DISTILL_SOURCE_FORMAT
     export MAX_SEQ_LEN
     export GEN_MAX_SEQ_LEN
     export PROMPT_MAX_SEQ_LEN
@@ -64,13 +72,14 @@ from collections import Counter, defaultdict
 from typing import Any
 
 import torch
-from datasets import Dataset, load_dataset
+from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 model_name = os.environ["MODEL_NAME_OR_PATH"]
-dataset_name = os.environ["ULTRACHAT_DATASET_NAME"]
-splits = os.environ["ULTRACHAT_SPLITS"].split()
+dataset_name = os.environ["DISTILL_SOURCE_NAME"]
+splits = os.environ["DISTILL_SOURCE_SPLITS"].split()
+source_format = os.environ["DISTILL_SOURCE_FORMAT"]
 max_seq_len = int(os.environ["MAX_SEQ_LEN"])
 gen_max_seq_len = int(os.environ.get("GEN_MAX_SEQ_LEN", "2048"))
 prompt_max_seq_len = int(os.environ.get("PROMPT_MAX_SEQ_LEN", str(max_seq_len)))
@@ -82,6 +91,10 @@ progress_every_batches = int(os.environ.get("PROGRESS_EVERY_BATCHES", "20"))
 force_regenerate = os.environ.get("FORCE_REGENERATE", "false").lower() == "true"
 empty_cache_every_batches = int(os.environ.get("EMPTY_CACHE_EVERY_BATCHES", "1"))
 
+if source_format not in {"prompt", "messages"}:
+    raise ValueError(
+        f"Unsupported DISTILL_SOURCE_FORMAT {source_format!r}; expected 'prompt' or 'messages'."
+    )
 if gen_max_seq_len < max_seq_len:
     raise ValueError(
         f"GEN_MAX_SEQ_LEN ({gen_max_seq_len}) must be >= MAX_SEQ_LEN ({max_seq_len})."
@@ -128,15 +141,68 @@ if not torch.cuda.is_available():
 model.eval()
 
 
-def apply_chat_template_with_thinking(prompt_text: str) -> str:
-    user_messages: list[dict[str, str]] = [{"role": "user", "content": prompt_text}]
-
+def apply_chat_template_with_thinking(messages: list[dict[str, str]]) -> str:
     return tokenizer.apply_chat_template(
-        user_messages,
+        messages,
         tokenize=False,
         add_generation_prompt=True,
         enable_thinking=False,
     )
+
+
+def normalize_content(content: Any) -> str:
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        chunks: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                chunks.append(item)
+            elif isinstance(item, dict):
+                text = item.get("text", item.get("content", ""))
+                if isinstance(text, str):
+                    chunks.append(text)
+        return "\n".join(chunk.strip() for chunk in chunks if chunk.strip())
+    return ""
+
+
+def extract_prompt_messages(example: dict[str, Any]) -> list[dict[str, str]] | None:
+    if source_format == "prompt":
+        prompt = example.get("prompt")
+        if not isinstance(prompt, str) or not prompt.strip():
+            return None
+        return [{"role": "user", "content": prompt.strip()}]
+
+    raw_messages = example.get("messages")
+    if isinstance(raw_messages, str):
+        try:
+            raw_messages = json.loads(raw_messages)
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(raw_messages, list):
+        return None
+
+    messages: list[dict[str, str]] = []
+    for message in raw_messages:
+        if not isinstance(message, dict):
+            continue
+        role = str(message.get("role", "")).strip().lower()
+        content = normalize_content(message.get("content", ""))
+        if role and content:
+            messages.append({"role": role, "content": content})
+
+    # Chat-style rows end in a reference assistant response. Keep its conversation
+    # prefix as the prompt and let Qwen generate a replacement response.
+    last_assistant_idx = next(
+        (i for i in range(len(messages) - 1, -1, -1) if messages[i]["role"] == "assistant"),
+        -1,
+    )
+    if last_assistant_idx <= 0:
+        return None
+    prompt_messages = messages[:last_assistant_idx]
+    if prompt_messages[-1]["role"] not in {"user", "tool"}:
+        return None
+    return prompt_messages
 
 
 def encode_pair_for_e2d(prompt: str, completion: str, tokenizer_obj: Any, max_len: int) -> dict[str, list[int]]:
@@ -188,7 +254,6 @@ def strip_batched_generation_padding(gen_ids: torch.Tensor) -> list[int]:
     return token_ids
 
 
-rows: list[dict[str, str]] = []
 num_seen = 0
 num_filtered_by_prompt_len = 0
 generate_batch_counter = 0
@@ -196,12 +261,12 @@ generate_batch_counter = 0
 
 def load_existing_rows_for_resume(
     path: str,
-) -> tuple[list[dict[str, str]], dict[str, Counter[str]]]:
+) -> tuple[int, dict[str, Counter[str]]]:
     """Load previously-generated rows and repair truncated trailing JSON if needed."""
     if force_regenerate or not os.path.isfile(path):
-        return [], {}
+        return 0, {}
 
-    loaded_rows: list[dict[str, str]] = []
+    loaded_row_count = 0
     resume_counts: dict[str, Counter[str]] = defaultdict(Counter)
     last_valid_offset = 0
     saw_invalid_tail = False
@@ -224,7 +289,7 @@ def load_existing_rows_for_resume(
                 break
 
             if isinstance(row, dict):
-                loaded_rows.append(row)
+                loaded_row_count += 1
                 split_name = row.get("source_split")
                 prompt = row.get("prompt")
                 if isinstance(split_name, str) and isinstance(prompt, str):
@@ -240,11 +305,10 @@ def load_existing_rows_for_resume(
             f"truncated to {last_valid_offset} bytes before resuming."
         )
 
-    return loaded_rows, resume_counts
+    return loaded_row_count, resume_counts
 
 
-rows, resume_prompt_counts_by_split = load_existing_rows_for_resume(distill_raw_file)
-num_seen = len(rows)
+num_seen, resume_prompt_counts_by_split = load_existing_rows_for_resume(distill_raw_file)
 if num_seen > 0:
     print(
         f"[Self-Distill] Resume mode: loaded {num_seen} existing rows from "
@@ -252,17 +316,15 @@ if num_seen > 0:
     )
 
 
-def generate_batch(prompt_items: list[tuple[str, str]], split_name: str) -> tuple[bool, int]:
+def generate_batch(chat_prompts: list[str], split_name: str) -> tuple[bool, int]:
     """Generate completions for a batch and append prompt/completion rows.
 
     Returns (should_stop, filtered_in_batch).
     """
     global num_seen, num_filtered_by_prompt_len, generate_batch_counter
-    if not prompt_items:
+    if not chat_prompts:
         return False, 0
 
-    prompt_texts = [item[0] for item in prompt_items]
-    chat_prompts = [item[1] for item in prompt_items]
     prompt_lengths = [
         len(ids)
         for ids in tokenizer(
@@ -276,14 +338,13 @@ def generate_batch(prompt_items: list[tuple[str, str]], split_name: str) -> tupl
     keep_indices = [
         i for i, prompt_len in enumerate(prompt_lengths) if prompt_len <= prompt_max_seq_len
     ]
-    filtered_in_batch = len(prompt_items) - len(keep_indices)
+    filtered_in_batch = len(chat_prompts) - len(keep_indices)
     if filtered_in_batch > 0:
         num_filtered_by_prompt_len += filtered_in_batch
 
     if not keep_indices:
         return False, filtered_in_batch
 
-    filtered_prompt_texts = [prompt_texts[i] for i in keep_indices]
     filtered_chat_prompts = [chat_prompts[i] for i in keep_indices]
 
     model_inputs = tokenizer(
@@ -312,7 +373,7 @@ def generate_batch(prompt_items: list[tuple[str, str]], split_name: str) -> tupl
         )
 
     should_stop = False
-    for i, _ in enumerate(filtered_prompt_texts):
+    for i, _ in enumerate(filtered_chat_prompts):
         gen_ids = output_ids[i, input_seq_len:]
         gen_ids = strip_batched_generation_padding(gen_ids)
         if not gen_ids:
@@ -327,7 +388,6 @@ def generate_batch(prompt_items: list[tuple[str, str]], split_name: str) -> tupl
             "completion": completion,
             "source_split": split_name,
         }
-        rows.append(row)
         f_raw.write(json.dumps(row, ensure_ascii=False) + "\n")
 
         num_seen += 1
@@ -372,22 +432,18 @@ with open(distill_raw_file, raw_file_mode, encoding="utf-8") as f_raw:
             f"prompt_max_seq_len={prompt_max_seq_len}, "
             f"resume_pairs_to_skip={sum(split_resume_counts.values())}"
         )
-        prompt_buffer: list[tuple[str, str]] = []
+        prompt_buffer: list[str] = []
         for ex in ds:
-            prompt = ex.get("prompt", None)
-            if not isinstance(prompt, str):
+            prompt_messages = extract_prompt_messages(ex)
+            if prompt_messages is None:
                 continue
-            prompt = prompt.strip()
-            if not prompt:
-                continue
-
-            chat_prompt = apply_chat_template_with_thinking(prompt)
+            chat_prompt = apply_chat_template_with_thinking(prompt_messages)
             if split_resume_counts.get(chat_prompt, 0) > 0:
                 split_resume_counts[chat_prompt] -= 1
                 split_resume_skipped += 1
                 continue
 
-            prompt_buffer.append((prompt, chat_prompt))
+            prompt_buffer.append(chat_prompt)
             if len(prompt_buffer) >= batch_gen_size:
                 prompts_in_batch = len(prompt_buffer)
                 before_seen = num_seen
@@ -458,38 +514,64 @@ with open(distill_raw_file, raw_file_mode, encoding="utf-8") as f_raw:
         if distill_max_samples > 0 and num_seen >= distill_max_samples:
             break
 
-if len(rows) < 2:
+if num_seen < 2:
     raise RuntimeError(
         "Distillation produced fewer than 2 rows; cannot create train/eval split."
     )
 
-random.seed(split_seed)
-random.shuffle(rows)
-eval_size = max(1, int(len(rows) * eval_ratio))
-eval_size = min(eval_size, len(rows) - 1)
+# Reload the generated JSONL as a memory-mapped Arrow dataset. This avoids
+# retaining roughly one million prompts, completions, and token lists as Python
+# objects while preserving the original seeded shuffle and split order.
+del model
+if torch.cuda.is_available():
+    torch.cuda.empty_cache()
 
-eval_rows = rows[:eval_size]
-train_rows = rows[eval_size:]
+preprocess_cache_dir = os.path.join(
+    os.path.dirname(distill_raw_file), ".hf_preprocess_cache"
+)
+raw_ds = load_dataset(
+    "json",
+    data_files=distill_raw_file,
+    split="train",
+    cache_dir=preprocess_cache_dir,
+)
+if len(raw_ds) != num_seen:
+    raise RuntimeError(
+        f"Generated JSONL row count changed while loading: expected {num_seen}, "
+        f"found {len(raw_ds)}."
+    )
 
-with open(distill_train_jsonl, "w", encoding="utf-8") as f_train:
-    for row in train_rows:
-        f_train.write(json.dumps(row, ensure_ascii=False) + "\n")
+shuffled_indices = list(range(num_seen))
+random.Random(split_seed).shuffle(shuffled_indices)
+eval_size = max(1, int(num_seen * eval_ratio))
+eval_size = min(eval_size, num_seen - 1)
 
-with open(distill_eval_jsonl, "w", encoding="utf-8") as f_eval:
-    for row in eval_rows:
-        f_eval.write(json.dumps(row, ensure_ascii=False) + "\n")
+eval_rows = raw_ds.select(shuffled_indices[:eval_size])
+train_rows = raw_ds.select(shuffled_indices[eval_size:])
+train_rows.to_json(distill_train_jsonl, orient="records", lines=True, force_ascii=False)
+eval_rows.to_json(distill_eval_jsonl, orient="records", lines=True, force_ascii=False)
 
-train_tok = [
-    encode_pair_for_e2d(r["prompt"], r["completion"], tokenizer, max_seq_len)
-    for r in train_rows
-]
-eval_tok = [
-    encode_pair_for_e2d(r["prompt"], r["completion"], tokenizer, max_seq_len)
-    for r in eval_rows
-]
 
-train_ds = Dataset.from_list(train_tok)
-eval_ds = Dataset.from_list(eval_tok)
+def tokenize_distilled_row(row: dict[str, str]) -> dict[str, list[int]]:
+    return encode_pair_for_e2d(
+        row["prompt"], row["completion"], tokenizer, max_seq_len
+    )
+
+
+train_ds = train_rows.map(
+    tokenize_distilled_row,
+    remove_columns=train_rows.column_names,
+    keep_in_memory=False,
+    load_from_cache_file=False,
+    desc="Tokenizing distilled train split",
+)
+eval_ds = eval_rows.map(
+    tokenize_distilled_row,
+    remove_columns=eval_rows.column_names,
+    keep_in_memory=False,
+    load_from_cache_file=False,
+    desc="Tokenizing distilled eval split",
+)
 
 if os.path.isdir(distill_train_path):
     import shutil
@@ -509,7 +591,7 @@ print(f"[Self-Distill] Saved eval JSONL: {distill_eval_jsonl}")
 print(f"[Self-Distill] Saved train preprocessed dataset: {distill_train_path}")
 print(f"[Self-Distill] Saved eval preprocessed dataset: {distill_eval_path}")
 print(
-    f"[Self-Distill] Rows: total={len(rows)}, train={len(train_rows)}, eval={len(eval_rows)}, "
+    f"[Self-Distill] Rows: total={num_seen}, train={len(train_rows)}, eval={len(eval_rows)}, "
     f"filtered_by_prompt_len={num_filtered_by_prompt_len}"
 )
 PY
@@ -534,23 +616,23 @@ REINIT_ENCODER=false
 REINIT_DECODER=false
 TIE_WEIGHTS=true
 FREEZE_ENCODER=false
-ENCODER_CAUSAL_MASK=false
+ENCODER_CAUSAL_MASK=causal
 NULLIFY_SELF_ATTN=false
 
 # Hyperparameters (same setup style as run_train_e2d_gsm8k.sh, but 1 epoch)
 LR=3e-5
-WARMUP_DURATION="10ba"
+WARMUP_DURATION="100ba"
 ALPHA_F=0.5
 DECODER_LOSS_LAMBDA=0.5
 BATCH_SIZE=32
-MAX_DURATION="3ep"
+MAX_DURATION=${MAX_DURATION:-"1ep"}
 PRECISION="amp_bf16"
 
 TRAIN_ON_CONTEXT=false
 TRAIN_ON_AR=false
 AR_CHECKPOINT_PATH=""
 
-TAG="e2d_ultrachat"
+TAG="${DISTILL_RUN_TAG}"
 if [ "${ENCODER_TOP_LAYERS}" == "true" ]; then
   ENC_LAYERS="TOPenc${N_ENCODER_LAYERS}"
 else
@@ -565,16 +647,7 @@ fi
 # get time stamp
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
-RUN_NAME=ultrachat_block${BLOCK_SIZE}_lr${LR}_bsz${BATCH_SIZE}_warm${WARMUP_DURATION}_alphaf${ALPHA_F}_max-dur${MAX_DURATION}_${PRECISION}_${ENC_LAYERS}_${DEC_LAYERS}_${TAG}_${TIMESTAMP}
-if [ "${TIE_WEIGHTS}" == "true" ]; then
-  RUN_NAME="${RUN_NAME}_tie-weights"
-fi
-if [ "${ENCODER_CAUSAL_MASK}" == "true" ]; then
-  RUN_NAME="${RUN_NAME}_encoder-causal-mask"
-fi
-if [ "${FREEZE_ENCODER}" == "true" ]; then
-  RUN_NAME="${RUN_NAME}_freeze-enc"
-fi
+RUN_NAME=${DISTILL_RUN_PREFIX}_block${BLOCK_SIZE}_warm${WARMUP_DURATION}_lr${LR}_bsz${BATCH_SIZE}_lambda${DECODER_LOSS_LAMBDA}_max-dur${MAX_DURATION}_${ENC_LAYERS}_${DEC_LAYERS}_${TAG}_${TIMESTAMP}
 
 MICRO_BATCH_SIZE=1
 NUM_WORKERS=0

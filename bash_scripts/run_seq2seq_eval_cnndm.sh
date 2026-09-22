@@ -86,7 +86,8 @@ mkdir -p ${OUTPUT_DIR}
 
 L=256
 T=${BLOCK_SIZE}
-DO_SAMPLE=false
+DO_SAMPLE=${DO_SAMPLE:-false}
+TEMPERATURE=${TEMPERATURE:-1.0}
 SAMPLING_STRATEGY="predict_and_noise"  # "predict_and_noise" "posterior"
 FIRST_HITTING=true
 CONFIDENCE_BASED_NOISING=true
@@ -127,6 +128,7 @@ torchrun --nproc_per_node ${NUM_VISIBLE_DEVICES} --master_port=${PORT} scripts/e
   block_size=${BLOCK_SIZE} \
   generation_config.num_steps=${T} \
   generation_config.do_sample=${DO_SAMPLE} \
+  generation_config.temperature=${TEMPERATURE} \
   generation_config.sampling_strategy=${SAMPLING_STRATEGY} \
   generation_config.first_hitting=${FIRST_HITTING} \
   generation_config.confidence_based_noising=${CONFIDENCE_BASED_NOISING} \

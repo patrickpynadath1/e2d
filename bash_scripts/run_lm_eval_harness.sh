@@ -5,7 +5,6 @@ source setup_env.sh
 
 QWEN_MODEL_BASE="Qwen/Qwen3-1.7B-Base"
 QWEN_MODEL_INSTRUCT="Qwen/Qwen3-1.7B"
-QWEN_MODEL="${QWEN_MODEL_BASE}"
 # QWEN_MODEL="meta-llama/Llama-3.2-1B"
 NUM_FEW_SHOT=0
 
@@ -15,20 +14,34 @@ NUM_FEW_SHOT=0
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers28_ar_20251201_061752"
 # Qwen3-4B-Base, LR=5e-6
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr5e-6_bsz2_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers36_ar_20260322_125401_fsdp"
-# untuned Qwen3-1.7B, acc. 65/87 = 74.71%, 990/1319 = 75.06%, 38 tokens/s
-# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm0ba_alphaf0.5_max-dur0ba_amp_bf16_layers28_ar_20260422_091633"
+# untuned Qwen3-1.7B, acc. , 38.12 tokens/s, acc. 75.06% (78.24%)
+MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur0ba_amp_bf16_layers28_ar_20260921_191711"
 # untuned Qwen3-4B, 83.9%, 
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm0ba_alphaf0.5_max-dur0ba_amp_bf16_layers36_ar_20260423_010658"
-# BLOCK_SIZE=1
-# KV_CACHING=true
-# ALIGN_INPUTS_TO_BLOCKS=true
-# USE_EMA=true
+# Tuned Qwen3-1.7B-Base, 808/1319 = 61.26%, 40.28 tokens/s
+# MODEL_PATH="/data/shared_data/hankun/outputs/ultrachat_lr3e-5_bsz32_warm10ba_alphaf0.5_max-dur3ep_amp_bf16_layers28_ar_20260705_191606"
+BLOCK_SIZE=1
+KV_CACHING=true
+ALIGN_INPUTS_TO_BLOCKS=true
+USE_EMA=true
 
 ######## E2D2
 # Qwen3-1.7B-Base 28(4)
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec4_e2d2_20260310_220501_tie-weights"
 # Qwen3-4B-Base 36(4)
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr5e-6_bsz2_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc36_TOPdec4_e2d2_20260323_111133_tie-weights_fsdp"
+# Qwen3-1.7B-Base 28(2)
+# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block4_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d2_20260724_020211_tie-weights"
+# Qwen3-1.7B-Base 28(6)
+# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k_block4_lr1e-5_bsz1_warm100ba_max-dur30000ba_enc28_TOPdec6_e2d2_20260724_020748_tie-weights"
+# Qwen3-1.7B-Base 28(8)
+# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k_block4_lr1e-5_bsz1_warm100ba_max-dur30000ba_enc28_TOPdec8_e2d2_20260724_022858_tie-weights"
+# Qwen3-1.7B-Base 28(10)
+# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k_block4_lr1e-5_bsz1_warm100ba_max-dur30000ba_enc28_TOPdec10_e2d2_20260724_020845_tie-weights"
+# Qwen3-1.7B-Base 28(12)
+# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k_block4_lr1e-5_bsz1_warm100ba_max-dur30000ba_enc28_TOPdec12_e2d2_20260724_082109_tie-weights"
+# Qwen3-1.7B-Base 28(14)
+# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k_block4_lr1e-5_bsz1_warm100ba_max-dur30000ba_enc28_TOPdec14_e2d2_20260724_082230_tie-weights"
 # BLOCK_SIZE=4
 # KV_CACHING=true
 # ALIGN_INPUTS_TO_BLOCKS=true
@@ -110,18 +123,31 @@ NUM_FEW_SHOT=0
 # fine-tune from AR, block10
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_block10_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_enc28_TOPdec2_e2d_20260514_192750_tie-weights"
 
-# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k_selfdistill_block4_lr1e-5_bsz1_max-dur5ep_enc28_TOPdec2_e2d_gsm8k_self_distill_20260624_230916_tie-weights"
-MODEL_PATH="/data/shared_data/hankun/outputs/"
-BLOCK_SIZE=4
-KV_CACHING=true
-ALIGN_INPUTS_TO_BLOCKS=false
-USE_EMA=true
+# Qwen3-8B-Base
+# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k_block8_lr1.5e-5_bsz8_warm30ba_max-dur5ep_enc36_TOPdec2_e2d_20260726_101124_fsdp"
+
+# E2D
+# MODEL_PATH=${MODEL_PATH:-"/data/shared_data/hankun/outputs/gsm8k-block4_lr2e-5_bsz2_warm100ba_enc28_TOPdec2_seed_full-separate-drafter-copy_20260724_195658_fsdp"}
+
+# bidirectional: acc. 58.3%, 90.24 tokens/s (3.85, 83.11%)
+# causal: acc. 55.57%, 93.22 tokens/s (3.71, 84.48%)
+
+# BLOCK_SIZE=${BLOCK_SIZE:-4}
+# KV_CACHING=${KV_CACHING:-true}
+# ALIGN_INPUTS_TO_BLOCKS=${ALIGN_INPUTS_TO_BLOCKS:-false}
+# USE_EMA=${USE_EMA:-true}
 
 # Uncomment these lines to evaluate an instruction-tuned model
-IS_INSTRUCTION_MODEL=true
-QWEN_MODEL="${QWEN_MODEL_INSTRUCT}"
+IS_INSTRUCTION_MODEL=${IS_INSTRUCTION_MODEL:-true}
 # Uncomment this line to evaluate a fine-tuned base model
 # IS_INSTRUCTION_MODEL=false
+if [ -z "${QWEN_MODEL:-}" ]; then
+  if [ "${IS_INSTRUCTION_MODEL}" == "true" ]; then
+    QWEN_MODEL="${QWEN_MODEL_INSTRUCT}"
+  else
+    QWEN_MODEL="${QWEN_MODEL_BASE}"
+  fi
+fi
 
 NUM_VISIBLE_DEVICES=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
@@ -134,7 +160,10 @@ REVISION=null
 
 mkdir -p ${OUTPUT_DIR}
 L=512
-DO_SAMPLE=false
+# E2D: true enables stochastic speculative sampling; false keeps greedy decoding.
+# Temperature applies to both draft and target distributions when sampling.
+DO_SAMPLE=${DO_SAMPLE:-false}
+TEMPERATURE=${TEMPERATURE:-1.0}
 SAMPLING_STRATEGY="predict_and_noise"  # "predict_and_noise" or "posterior"
 T=${BLOCK_SIZE}
 FIRST_HITTING=true
@@ -172,6 +201,7 @@ accelerate launch scripts/eval/harness_eval.py \
   max_new_tokens=${L} \
   block_size=${BLOCK_SIZE} \
   generation_config.do_sample=${DO_SAMPLE} \
+  generation_config.temperature=${TEMPERATURE} \
   generation_config.sampling_strategy=${SAMPLING_STRATEGY} \
   generation_config.num_steps=${T} \
   generation_config.first_hitting=${FIRST_HITTING} \

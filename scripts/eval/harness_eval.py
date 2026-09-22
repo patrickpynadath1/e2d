@@ -24,6 +24,11 @@ from transformers import (
 )
 
 from datasets import Dataset
+from scripts.eval.gsm8k_metrics import (
+    boxed_answer_accuracy,
+    prepare_gsm8k_response,
+    truncate_response,
+)
 from scripts.utils import (
     load_model_from_ckpt_dir_path,
     maybe_add_missing_special_tokens,
@@ -54,6 +59,8 @@ class LMEvalHarnessModel(LM):
         enable_thinking_for_gsm8k: bool | None = None,
         strip_thinking_for_gsm8k: bool | None = None,
         model_config_overrides: dict[str, Any] | None = None,
+        gsm8k_chat_template_kwargs: dict[str, Any] | None = None,
+        require_frozen_target: bool = False,
     ):
         """
         Args:
@@ -80,6 +87,11 @@ class LMEvalHarnessModel(LM):
                 content from final content before metric extraction. If None,
                 follow `is_instruction_model`.
             model_config_overrides (dict[str, Any]): Model config overrides.
+            gsm8k_chat_template_kwargs (dict[str, Any] | None): Explicit chat
+                template options, e.g. {"enable_thinking": False}. Overrides the
+                historical thinking-flag behavior without changing old scripts.
+            require_frozen_target (bool): Require a trained frozen-target SEED
+                checkpoint, including an existing checkpoint file.
         """
         if "fsdp" in pretrained_model_name_or_path:
             load_ema_weights = False
@@ -105,6 +117,19 @@ class LMEvalHarnessModel(LM):
             {} if model_config_overrides is None else model_config_overrides
         )
         if fsspec_exists(os.path.join(pretrained_model_name_or_path, "config.yaml")):
+            if require_frozen_target:
+                checkpoint_dir = os.path.join(pretrained_model_name_or_path, "checkpoints")
+                base_name = ckpt_file.removesuffix(".pt")
+                ema_suffix = "_ema" if load_ema_weights else ""
+                candidates = [
+                    os.path.join(checkpoint_dir, ckpt_file),
+                    os.path.join(checkpoint_dir, f"{base_name}{ema_suffix}_weights_only.pt"),
+                ]
+                if not any(fsspec_exists(path) for path in candidates):
+                    raise FileNotFoundError(
+                        f"No trained checkpoint found: {candidates}. "
+                        "Frozen-target evaluation requires saved drafter weights."
+                    )
             model = load_model_from_ckpt_dir_path(
                 path_to_ckpt_dir=pretrained_model_name_or_path,
                 load_ema_weights=load_ema_weights,
@@ -127,6 +152,10 @@ class LMEvalHarnessModel(LM):
                     revision=pretrained_model_revision,
                     **model_config_overrides,
                 )
+        if require_frozen_target and not getattr(
+            getattr(model, "backbone", None), "frozen_target", False
+        ):
+            raise ValueError("Expected a frozen-target SEED-LoRA checkpoint.")
         self.model = model.to(self.device)
         print(f"Num. params: {format_number(count_parameters(model, trainable=False))}")
         print(f"Num. trainable params: {format_number(count_parameters(model))}")
@@ -164,6 +193,9 @@ class LMEvalHarnessModel(LM):
         self.use_chat_template_for_gsm8k = _coerce_bool(use_chat_template_for_gsm8k)
         self.enable_thinking_for_gsm8k = _coerce_bool(enable_thinking_for_gsm8k)
         self.strip_thinking_for_gsm8k = _coerce_bool(strip_thinking_for_gsm8k)
+        self.gsm8k_chat_template_kwargs = (
+            None if gsm8k_chat_template_kwargs is None else dict(gsm8k_chat_template_kwargs)
+        )
 
     @property
     def rank(self):
@@ -176,6 +208,15 @@ class LMEvalHarnessModel(LM):
     def _apply_chat_template_for_gsm8k(self, user_prompt: str) -> str:
         messages = [{"role": "user", "content": user_prompt}]
         if hasattr(self.tokenizer, "apply_chat_template"):
+            if self.gsm8k_chat_template_kwargs is not None:
+                return self.tokenizer.apply_chat_template(
+                    messages,
+                    **{
+                        "tokenize": False,
+                        "add_generation_prompt": True,
+                        **self.gsm8k_chat_template_kwargs,
+                    },
+                )
             if self.enable_thinking_for_gsm8k:
                 return self.tokenizer.apply_chat_template(
                     messages,
@@ -254,7 +295,15 @@ class LMEvalHarnessModel(LM):
                     ctx = ctx.replace("\nAnswer:", f"{eos}")
                 else:
                     ctx = ctx.replace("\nAnswer:", f"{eos}Answer:")
-            prefix_tokens = self.tokenizer(ctx)["input_ids"]
+            # Rendered chat templates already contain their special tokens.
+            # Preserve the old tokenizer path unless explicit template options
+            # select the audited SEED-LoRA prompt format.
+            tokenize_kwargs = (
+                {"add_special_tokens": False}
+                if self.is_instruction_model and self.gsm8k_chat_template_kwargs is not None
+                else {}
+            )
+            prefix_tokens = self.tokenizer(ctx, **tokenize_kwargs)["input_ids"]
             return {
                 "prefix_text": ctx,
                 "prefix": prefix_tokens,
@@ -403,11 +452,9 @@ class LMEvalHarnessModel(LM):
                 if i >= self.throughput_warmup:
                     tputs.append(tput)
             result = self.tokenizer.decode(sample[0, len(elem["prefix"]) :])
-            for until in elem["target"]["until"] + [
-                "<|eot_id|>",
-                self.tokenizer.eos_token,
-            ]:
-                result = result.split(until)[0]
+            result = truncate_response(
+                result, elem["target"]["until"], self.tokenizer.eos_token
+            )
 
             if is_code_eval:
                 # For HumanEval: result is code completion after the prompt
@@ -431,11 +478,7 @@ class LMEvalHarnessModel(LM):
             else:
                 # GSM8K / default: extract \boxed{} answer
                 raw_result = result
-                predicted_ans = None
-                if "boxed{" in result:
-                    predicted_ans = result.split("boxed{")[1].split("}")[0]
-                    result = result.split("boxed{")[0] + "#### " + predicted_ans
-                    result = result.replace("$\\", "")
+                result, predicted_ans = prepare_gsm8k_response(result)
                 if self.rank == 0:
                     print("=" * 20)
                     print("Prefix:", elem["prefix_text"])
@@ -445,9 +488,9 @@ class LMEvalHarnessModel(LM):
                 res.append(result)
 
                 # log accuracy
-                ground_truth_ans = requests[i].doc["answer"].split("### ")[1]
-                if predicted_ans is not None and ground_truth_ans == predicted_ans:
-                    correct += 1
+                correct += int(
+                    boxed_answer_accuracy(predicted_ans, requests[i].doc["answer"])
+                )
                 total += 1
                 res_for_json.append(
                     (
