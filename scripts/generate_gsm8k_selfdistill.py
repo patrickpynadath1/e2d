@@ -35,10 +35,13 @@ def validate_token_row(row: dict, tokenizer: Any) -> None:
         ids = row[ids_key]
         if not ids or any(type(token_id) is not int for token_id in ids):
             raise ValueError(f"Invalid {ids_key} at source index {row.get('source_index')}")
-        if tokenizer.decode(ids, skip_special_tokens=False) != row[text_key]:
+        if text_key == "completion" and tokenizer.decode(ids, skip_special_tokens=False) != row[text_key]:
             raise ValueError(f"{text_key} does not decode exactly from the saved token IDs")
-        # Prompt IDs are tokenizer inputs. Generated completion IDs remain the
-        # authority even if decoding/re-encoding chooses a different valid BPE
+        # The tokenizer can normalize prompt text (e.g. Qwen's Unicode NFC), so
+        # decode(encode(prompt)) need not equal the original rendered prompt.
+        # Encoding that original text must still reproduce the exact model
+        # input IDs. Completion text is decoded from the generated IDs; those
+        # IDs remain authoritative even if re-encoding uses a different BPE
         # segmentation of the same text.
         if text_key == "prompt" and tokenizer.encode(row[text_key], add_special_tokens=False) != ids:
             raise ValueError("Prompt does not re-encode exactly to the input token IDs")

@@ -101,6 +101,34 @@ def source_location(source_index: int, sources: dict) -> tuple[str, int]:
     raise ValueError(f"Source index {source_index} is outside the configured UltraChat splits")
 
 
+def source_index_stop(sources: dict, tokenizer: Any, max_samples: int, max_prompt_tokens: int) -> int:
+    """Find the same valid prompt prefix as a serial run before distributing it.
+
+    The sample limit counts usable prompts, not source rows or rows per GPU.
+    Only capped runs need this inexpensive tokenization pass.
+    """
+    total = sum(len(source) for source in sources.values())
+    if not max_samples:
+        return total
+    accepted = 0
+    offset = 0
+    for source in sources.values():
+        for index, example in enumerate(source):
+            prompt = build_prompt(example, tokenizer)
+            if prompt is None:
+                continue
+            ids = tokenizer.encode(prompt, add_special_tokens=False)
+            if not ids:
+                raise ValueError(f"Empty prompt at source index {offset + index}")
+            if len(ids) > max_prompt_tokens:
+                continue
+            accepted += 1
+            if accepted == max_samples:
+                return offset + index + 1
+        offset += len(source)
+    return total
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
@@ -117,11 +145,22 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--progress-every", type=int, default=25)
     parser.add_argument("--local-files-only", action="store_true")
+    parser.add_argument("--num-shards", type=int, default=1,
+                        help="Run independent batch-one workers on this many visible GPUs")
+    parser.add_argument("--shard-index", type=int, default=None,
+                        help="Generate only this zero-based shard (used internally by the launcher)")
     args = parser.parse_args()
     if args.max_length < 2 or args.max_samples < 0 or args.max_samples == 1 or not 0 < args.eval_ratio < 1 or args.progress_every < 1:
         parser.error("Invalid length, sample count (must be zero or >=2), eval ratio, or progress interval")
     if len(set(args.source_splits)) != len(args.source_splits):
         parser.error("Source splits must be unique")
+    if args.num_shards < 1 or (args.shard_index is not None and not 0 <= args.shard_index < args.num_shards):
+        parser.error("Require num_shards >= 1 and 0 <= shard_index < num_shards")
+    if args.num_shards > 1 and args.shard_index is None:
+        from scripts.ultrachat_selfdistill_parallel import launch
+
+        return launch(args, sys.argv[1:])
+    args.shard_index = args.shard_index or 0
 
     import torch
     import transformers
@@ -137,6 +176,8 @@ def main() -> int:
         previous = json.loads(metadata_path.read_text(encoding="utf-8"))
         if previous.get("prompt_format") != "ultrachat" or previous.get("jsonl_stem") != JSONL_STEM:
             raise ValueError(f"Refusing to overwrite a different dataset in {root}; select a new output directory")
+        if previous.get("num_shards", 1) != args.num_shards or previous.get("shard_index", 0) != args.shard_index:
+            raise ValueError("Resume sharding settings differ. Use a new output directory.")
     elif root.exists() and any(root.iterdir()):
         raise ValueError(f"Refusing to use a nonempty directory without generation metadata: {root}")
     if args.device.startswith("cuda") and not torch.cuda.is_available():
@@ -155,6 +196,10 @@ def main() -> int:
         attn_implementation=args.attn_implementation, local_files_only=args.local_files_only,
     ).to(args.device).eval()
     source_rows = sum(len(source) for source in sources.values())
+    stop = (
+        source_index_stop(sources, tokenizer, args.max_samples, args.max_length // 2)
+        if args.num_shards > 1 else source_rows
+    )
     metadata = {
         "schema_version": 1, "jsonl_stem": JSONL_STEM, "prompt_format": "ultrachat",
         "max_length": args.max_length, "max_prompt_tokens": args.max_length // 2,
@@ -177,6 +222,8 @@ def main() -> int:
         "split_seed": args.seed, "eval_ratio": args.eval_ratio,
         "torch_version": torch.__version__, "transformers_version": transformers.__version__,
     }
+    if args.num_shards > 1:
+        metadata.update(num_shards=args.num_shards, shard_index=args.shard_index, source_index_stop=stop)
     if previous is not None:
         changed = [key for key, value in metadata.items() if previous.get(key) != value]
         if changed:
@@ -187,6 +234,8 @@ def main() -> int:
     raw_path = root / f"{JSONL_STEM}.jsonl"
     rows = load_resume_rows(raw_path, metadata, tokenizer)
     for row in rows:
+        if row["source_index"] >= stop or row["source_index"] % args.num_shards != args.shard_index:
+            raise ValueError(f"Resume row {row['source_index']} is outside this shard")
         split, index = source_location(row["source_index"], sources)
         example = sources[split][index]
         if (
@@ -210,14 +259,17 @@ def main() -> int:
             output.write("\n")
         offset = 0
         for split, source in sources.items():
-            for source_row_index, example in enumerate(source):
+            first = (args.shard_index - offset) % args.num_shards
+            for source_row_index in range(first, len(source), args.num_shards):
                 source_index = offset + source_row_index
+                if source_index >= stop:
+                    break
                 if source_index <= resume_through:
                     continue
                 if args.max_samples and len(rows) >= args.max_samples:
                     break
                 row = generate_row(
-                    source_index, example, tokenizer, model,
+                    source_index, source[source_row_index], tokenizer, model,
                     source_split=split, source_row_index=source_row_index,
                     max_prompt_tokens=metadata["max_prompt_tokens"],
                     max_completion_tokens=metadata["max_completion_tokens"], device=args.device,
@@ -235,6 +287,14 @@ def main() -> int:
             offset += len(source)
             if args.max_samples and len(rows) >= args.max_samples:
                 break
+    if args.num_shards > 1:
+        # A shard may have zero or one usable row. Split only the merged data.
+        atomic_json(metadata_path, {
+            **metadata, "status": "complete", "completed_at": datetime.now(timezone.utc).isoformat(),
+            "generated_rows": len(rows),
+        })
+        print(f"[distill] Shard {args.shard_index}/{args.num_shards}: saved {len(rows)} rows to {root}", flush=True)
+        return 0
     sizes = write_dataset(
         root, rows, args.max_length, args.eval_ratio, args.seed, jsonl_stem=JSONL_STEM,
     )
