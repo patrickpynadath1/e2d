@@ -15,15 +15,15 @@ NUM_FEW_SHOT=0
 # Qwen3-4B-Base, LR=5e-6
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr5e-6_bsz2_warm100ba_alphaf0.5_max-dur30000ba_amp_bf16_layers36_ar_20260322_125401_fsdp"
 # untuned Qwen3-1.7B, acc. , 38.12 tokens/s, acc. 75.06% (78.24%)
-MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur0ba_amp_bf16_layers28_ar_20260921_191711"
+# MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm100ba_alphaf0.5_max-dur0ba_amp_bf16_layers28_ar_20260921_191711"
 # untuned Qwen3-4B, 83.9%, 
 # MODEL_PATH="/data/shared_data/hankun/outputs/gsm8k-0shot_lr1e-5_bsz1_warm0ba_alphaf0.5_max-dur0ba_amp_bf16_layers36_ar_20260423_010658"
 # Tuned Qwen3-1.7B-Base, 808/1319 = 61.26%, 40.28 tokens/s
 # MODEL_PATH="/data/shared_data/hankun/outputs/ultrachat_lr3e-5_bsz32_warm10ba_alphaf0.5_max-dur3ep_amp_bf16_layers28_ar_20260705_191606"
-BLOCK_SIZE=1
-KV_CACHING=true
-ALIGN_INPUTS_TO_BLOCKS=true
-USE_EMA=true
+# BLOCK_SIZE=1
+# KV_CACHING=true
+# ALIGN_INPUTS_TO_BLOCKS=true
+# USE_EMA=true
 
 ######## E2D2
 # Qwen3-1.7B-Base 28(4)
@@ -129,18 +129,18 @@ USE_EMA=true
 # E2D
 # MODEL_PATH=${MODEL_PATH:-"/data/shared_data/hankun/outputs/gsm8k-block4_lr2e-5_bsz2_warm100ba_enc28_TOPdec2_seed_full-separate-drafter-copy_20260724_195658_fsdp"}
 
-# bidirectional: acc. 58.3%, 90.24 tokens/s (3.85, 83.11%)
-# causal: acc. 55.57%, 93.22 tokens/s (3.71, 84.48%)
+# gsm8k, bsz32, lr5e-5
+MODEL_PATH=${MODEL_PATH:-"/data/shared_data/hankun/outputs/gsm8k_block4_lr5e-5_bsz32_warm0.01dur_max-dur4ep_enc28_TOPdec2_e2d_20260925_080329"}
 
-# BLOCK_SIZE=${BLOCK_SIZE:-4}
-# KV_CACHING=${KV_CACHING:-true}
-# ALIGN_INPUTS_TO_BLOCKS=${ALIGN_INPUTS_TO_BLOCKS:-false}
-# USE_EMA=${USE_EMA:-true}
+BLOCK_SIZE=${BLOCK_SIZE:-4}
+KV_CACHING=${KV_CACHING:-true}
+ALIGN_INPUTS_TO_BLOCKS=${ALIGN_INPUTS_TO_BLOCKS:-false}
+USE_EMA=${USE_EMA:-true}
 
 # Uncomment these lines to evaluate an instruction-tuned model
-IS_INSTRUCTION_MODEL=${IS_INSTRUCTION_MODEL:-true}
+# IS_INSTRUCTION_MODEL=${IS_INSTRUCTION_MODEL:-true}
 # Uncomment this line to evaluate a fine-tuned base model
-# IS_INSTRUCTION_MODEL=false
+IS_INSTRUCTION_MODEL=false
 if [ -z "${QWEN_MODEL:-}" ]; then
   if [ "${IS_INSTRUCTION_MODEL}" == "true" ]; then
     QWEN_MODEL="${QWEN_MODEL_INSTRUCT}"

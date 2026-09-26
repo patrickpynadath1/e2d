@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate exact-token GSM8K self-distillation with unpadded batch-one decoding."""
+"""Generate exact-token GSM8K self-distillation, optionally batched and sharded."""
 
 from __future__ import annotations
 
@@ -110,6 +110,75 @@ def generate_prompt_row(
     return result
 
 
+def prepare_rows(source: Any, tokenizer: Any, max_prompt_tokens: int, max_samples: int) -> list[dict]:
+    """Select the global usable prefix before distributing it across GPUs."""
+    rows = []
+    for index, example in enumerate(source):
+        question = example.get("question")
+        if not isinstance(question, str) or not question.strip():
+            raise ValueError(f"Invalid question at source index {index}")
+        prompt = build_prompt(question, tokenizer)
+        ids = tokenizer.encode(prompt, add_special_tokens=False)
+        if not ids:
+            raise ValueError(f"Empty prompt at source index {index}")
+        if len(ids) > max_prompt_tokens:
+            continue
+        rows.append({
+            "source_index": index, "question": question.strip(),
+            "prompt": prompt, "prompt_token_ids": ids,
+        })
+        if max_samples and len(rows) == max_samples:
+            break
+    return rows
+
+
+def source_indices_sha256(indices: list[int]) -> str:
+    return hashlib.sha256(json.dumps(indices).encode()).hexdigest()
+
+
+def generate_batch(
+    rows: list[dict], tokenizer: Any, model: Any, *, max_completion_tokens: int, device: str,
+) -> list[dict]:
+    """Left-pad only model inputs; save original prompt IDs and completions through EOS."""
+    import torch
+
+    if not rows:
+        return []
+    kwargs = greedy_generation_kwargs(tokenizer, max_completion_tokens)
+    pad_id = kwargs["pad_token_id"]
+    if pad_id is None:
+        raise ValueError("Batched generation requires a tokenizer pad_token_id or eos_token_id")
+    width = max(len(row["prompt_token_ids"]) for row in rows)
+    input_ids = torch.full((len(rows), width), pad_id, dtype=torch.long, device=device)
+    attention_mask = torch.zeros_like(input_ids)
+    for index, row in enumerate(rows):
+        ids = row["prompt_token_ids"]
+        input_ids[index, -len(ids):] = torch.tensor(ids, dtype=torch.long, device=device)
+        attention_mask[index, -len(ids):] = 1
+    with torch.inference_mode():
+        output = model.generate(input_ids=input_ids, attention_mask=attention_mask, **kwargs)
+    if output.shape[0] != len(rows) or not torch.equal(output[:, :width], input_ids):
+        raise ValueError("Generation did not preserve the padded input prompts")
+    completions = output[:, width:].tolist()
+    generated = []
+    for row, ids in zip(rows, completions):
+        if not ids or len(ids) > max_completion_tokens:
+            raise ValueError("Generation returned an invalid completion length")
+        # Finished sequences receive padding while other batch members continue.
+        # Retain EOS itself, even when EOS and padding share the same ID.
+        if tokenizer.eos_token_id is not None and tokenizer.eos_token_id in ids:
+            ids = ids[:ids.index(tokenizer.eos_token_id) + 1]
+        # Preserve dataset-specific provenance and the existing JSONL field order.
+        result = {key: value for key, value in row.items() if key != "prompt_token_ids"}
+        result.update(
+            completion=tokenizer.decode(ids, skip_special_tokens=False),
+            prompt_token_ids=row["prompt_token_ids"], completion_token_ids=ids,
+        )
+        validate_token_row(result, tokenizer)
+        generated.append(result)
+    return generated
+
+
 def encode_training_row(row: dict, max_length: int) -> dict[str, list[int]]:
     prompt_ids = row["prompt_token_ids"]
     completion_ids = row["completion_token_ids"]
@@ -207,11 +276,39 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--progress-every", type=int, default=25)
     parser.add_argument("--local-files-only", action="store_true")
+    parser.add_argument("--batch-size", "--per-device-batch-size", type=int, default=1,
+                        help="Maximum number of prompts generated together on each GPU")
+    parser.add_argument("--num-shards", type=int, default=1,
+                        help="GPU workers (1-8); 0 automatically uses all visible GPUs")
+    parser.add_argument("--shard-index", type=int, default=None, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.max_length < 2 or args.max_samples < 0 or args.max_samples == 1 or not 0 < args.eval_ratio < 1 or args.progress_every < 1:
         parser.error("Invalid length, sample count (must be zero or >=2), eval ratio, or progress interval")
 
+    if args.batch_size < 1 or not 0 <= args.num_shards <= 8:
+        parser.error("Require batch_size >= 1 and num_shards between 0 (auto) and 8")
+
     import torch
+
+    if args.num_shards == 0:
+        if not args.device.startswith("cuda"):
+            parser.error("Automatic GPU discovery requires --device cuda")
+        args.num_shards = torch.cuda.device_count()
+        if not 1 <= args.num_shards <= 8:
+            parser.error(f"Expected 1-8 visible CUDA devices; found {args.num_shards}")
+    if args.shard_index is not None and not 0 <= args.shard_index < args.num_shards:
+        parser.error("Require 0 <= shard_index < num_shards")
+    if args.num_shards > 1 and args.shard_index is None:
+        from scripts.gsm8k_selfdistill_parallel import launch
+
+        return launch(args, sys.argv[1:])
+    args.shard_index = args.shard_index or 0
+    if args.num_shards == 1:
+        work_root = args.data_root.with_name(args.data_root.name + ".shards")
+        if (work_root / "run_config.json").exists():
+            raise ValueError("This output belongs to a multi-GPU run. Resume with the same GPU count "
+                             "or use a new output directory.")
+
     import transformers
     from datasets import DownloadConfig, load_dataset
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -223,6 +320,9 @@ def main() -> int:
         args.source_dataset, args.source_config, split=args.source_split,
         download_config=DownloadConfig(local_files_only=args.local_files_only),
     )
+    selected = prepare_rows(source, tokenizer, args.max_length // 2, args.max_samples)
+    if len(selected) < 2:
+        raise ValueError("At least two usable prompts are required for the train/eval split")
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name_or_path, torch_dtype=getattr(torch, args.dtype),
         attn_implementation=args.attn_implementation, local_files_only=args.local_files_only,
@@ -235,8 +335,8 @@ def main() -> int:
         "model_commit_hash": getattr(model.config, "_commit_hash", None),
         "dtype": args.dtype, "attn_implementation": args.attn_implementation,
         "device_type": torch.device(args.device).type,
-        "batch_size": 1, "use_cache": True, "do_sample": False, "num_beams": 1,
-        "padding": False, "add_special_tokens": False,
+        "batch_size": args.batch_size, "use_cache": True, "do_sample": False, "num_beams": 1,
+        "padding": args.batch_size > 1, "add_special_tokens": False,
         "chat_template_kwargs": {"enable_thinking": False, "add_generation_prompt": True},
         "chat_template_sha256": hashlib.sha256(tokenizer.chat_template.encode()).hexdigest(),
         "prompt_prefix": PROMPT_PREFIX,
@@ -247,10 +347,24 @@ def main() -> int:
         "split_seed": args.seed, "eval_ratio": args.eval_ratio,
         "torch_version": torch.__version__, "transformers_version": transformers.__version__,
     }
+    if args.batch_size > 1:
+        metadata["padding_side"] = "left"
+    if args.num_shards > 1:
+        metadata.update(
+            num_shards=args.num_shards, shard_index=args.shard_index,
+            generation_num_shards=args.num_shards,
+            selected_source_rows=len(selected),
+            selected_source_indices_sha256=source_indices_sha256([row["source_index"] for row in selected]),
+        )
+    assigned = [row for row in selected if row["source_index"] % args.num_shards == args.shard_index]
     root = args.data_root
     metadata_path = root / "selfdistill_metadata.json"
     if metadata_path.exists():
         previous = json.loads(metadata_path.read_text(encoding="utf-8"))
+        if (previous.get("num_shards", 1) != args.num_shards
+                or previous.get("shard_index", 0) != args.shard_index
+                or previous.get("generation_num_shards", 1) != args.num_shards):
+            raise ValueError("Resume sharding settings differ. Use a new output directory.")
         changed = [key for key, value in metadata.items() if previous.get(key) != value]
         if changed:
             raise ValueError(f"Resume settings differ ({', '.join(changed)}). Use a new output directory.")
@@ -261,13 +375,13 @@ def main() -> int:
         atomic_json(metadata_path, {**metadata, "status": "generating"})
     raw_path = root / f"{JSONL_STEM}.jsonl"
     rows = load_resume_rows(raw_path, metadata, tokenizer)
-    for row in rows:
-        index = row["source_index"]
-        if index >= len(source) or build_prompt(source[index]["question"], tokenizer) != row["prompt"]:
-            raise ValueError(f"Resume prompt no longer matches source example {index}")
-    resume_through = rows[-1]["source_index"] if rows else -1
-    skipped_long = 0
-    print(f"[distill] {len(source)} source rows; resumed {len(rows)}; batch_size=1; "
+    if len(rows) > len(assigned):
+        raise ValueError("Resume rows exceed the selected source rows")
+    for row, expected in zip(rows, assigned):
+        if any(row.get(key) != value for key, value in expected.items()):
+            raise ValueError(f"Resume prompt/provenance no longer matches source example {expected['source_index']}")
+    print(f"[distill] {len(source)} source rows; {len(assigned)} assigned; resumed {len(rows)}; "
+          f"batch_size={args.batch_size}; shard={args.shard_index}/{args.num_shards}; "
           f"completion_budget={args.max_length // 2}; {args.dtype}/{args.attn_implementation}", flush=True)
     needs_newline = False
     if raw_path.exists() and raw_path.stat().st_size:
@@ -277,35 +391,31 @@ def main() -> int:
     with raw_path.open("a", encoding="utf-8") as output:
         if needs_newline:
             output.write("\n")
-        for source_index, example in enumerate(source):
-            if source_index <= resume_through:
-                continue
-            if args.max_samples and len(rows) >= args.max_samples:
-                break
-            question = example.get("question")
-            if not isinstance(question, str) or not question.strip():
-                raise ValueError(f"Invalid question at source index {source_index}")
-            row = generate_row(
-                source_index, question, tokenizer, model,
-                max_prompt_tokens=metadata["max_prompt_tokens"],
+        for start in range(len(rows), len(assigned), args.batch_size):
+            batch = generate_batch(
+                assigned[start:start + args.batch_size], tokenizer, model,
                 max_completion_tokens=metadata["max_completion_tokens"], device=args.device,
             )
-            if row is None:
-                skipped_long += 1
-                continue
-            output.write(json.dumps(row, ensure_ascii=False) + "\n")
+            output.write("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in batch))
             output.flush()
             os.fsync(output.fileno())
-            rows.append(row)
-            if len(rows) % args.progress_every == 0:
-                print(f"[distill] {len(rows)} generated; source {source_index + 1}/{len(source)}", flush=True)
+            previous_count = len(rows)
+            rows.extend(batch)
+            if len(rows) // args.progress_every > previous_count // args.progress_every or len(rows) == len(assigned):
+                print(f"[distill] {len(rows)}/{len(assigned)} generated", flush=True)
+    if args.num_shards > 1:
+        atomic_json(metadata_path, {
+            **metadata, "status": "complete", "completed_at": datetime.now(timezone.utc).isoformat(),
+            "generated_rows": len(rows),
+        })
+        print(f"[distill] Shard {args.shard_index}: saved {len(rows)} rows to {root}", flush=True)
+        return 0
     sizes = write_dataset(root, rows, args.max_length, args.eval_ratio, args.seed)
     atomic_json(metadata_path, {
         **metadata, "status": "complete", "completed_at": datetime.now(timezone.utc).isoformat(),
         "generated_rows": len(rows), "split_rows": sizes,
     })
-    print(f"[distill] Saved {len(rows)} rows ({sizes['train']} train, {sizes['eval']} held out) to {root}; "
-          f"skipped {skipped_long} overlong prompts in this run", flush=True)
+    print(f"[distill] Saved {len(rows)} rows ({sizes['train']} train, {sizes['eval']} held out) to {root}", flush=True)
     return 0
 
 

@@ -1,4 +1,4 @@
-"""Independent GPU workers and lossless merging for batched UltraChat generation."""
+"""Independent GPU workers and lossless merging for batched GSM8K generation."""
 
 from __future__ import annotations
 
@@ -13,12 +13,17 @@ import subprocess
 import sys
 import time
 
-from scripts.generate_gsm8k_selfdistill import atomic_json, load_resume_rows, write_dataset
-from scripts.generate_ultrachat_selfdistill import JSONL_STEM, source_location
+from scripts.generate_gsm8k_selfdistill import (
+    JSONL_STEM,
+    atomic_json,
+    load_resume_rows,
+    source_indices_sha256,
+    write_dataset,
+)
 
 
 RUN_FIELDS = {"status", "completed_at", "generated_rows", "split_rows"}
-SHARD_FIELDS = {"num_shards", "shard_index", "source_index_stop"}
+SHARD_FIELDS = {"num_shards", "shard_index"}
 
 
 def read_output_metadata(root: Path) -> dict | None:
@@ -26,7 +31,7 @@ def read_output_metadata(root: Path) -> dict | None:
     if path.exists():
         metadata = json.loads(path.read_text(encoding="utf-8"))
         if (
-            metadata.get("prompt_format") != "ultrachat"
+            metadata.get("prompt_format", "gsm8k") != "gsm8k"
             or metadata.get("jsonl_stem") != JSONL_STEM
             or metadata.get("num_shards", 1) != 1
         ):
@@ -44,7 +49,6 @@ def merge_shards(root: Path, shard_roots: list[Path], *, local_files_only: bool 
     previous = read_output_metadata(root)
     metadata = None
     tokenizer = None
-    stop = None
     rows = []
     for index, shard_root in enumerate(shard_roots):
         shard = json.loads((shard_root / "selfdistill_metadata.json").read_text(encoding="utf-8"))
@@ -53,17 +57,16 @@ def merge_shards(root: Path, shard_roots: list[Path], *, local_files_only: bool 
             or shard.get("num_shards") != len(shard_roots)
             or shard.get("shard_index") != index
             or shard.get("jsonl_stem") != JSONL_STEM
-            or shard.get("prompt_format") != "ultrachat"
+            or shard.get("prompt_format", "gsm8k") != "gsm8k"
         ):
             raise ValueError(f"Incomplete or incorrectly assigned shard: {shard_root}")
         common = {key: value for key, value in shard.items() if key not in RUN_FIELDS | SHARD_FIELDS}
         if metadata is None:
             metadata = common
-            stop = shard["source_index_stop"]
             tokenizer = AutoTokenizer.from_pretrained(
                 metadata["model_name_or_path"], local_files_only=local_files_only,
             )
-        elif common != metadata or shard["source_index_stop"] != stop:
+        elif common != metadata:
             raise ValueError(f"Generation settings differ across shards: {shard_root}")
         raw_path = shard_root / f"{JSONL_STEM}.jsonl"
         if not raw_path.is_file():
@@ -71,14 +74,10 @@ def merge_shards(root: Path, shard_roots: list[Path], *, local_files_only: bool 
         shard_rows = load_resume_rows(raw_path, metadata, tokenizer)
         if len(shard_rows) != shard.get("generated_rows"):
             raise ValueError(f"Completed shard row count differs: {shard_root}")
-        sources = {split: range(metadata["source_rows_by_split"][split]) for split in metadata["source_splits"]}
         for row in shard_rows:
             source_index = row["source_index"]
-            if source_index >= stop or source_index % len(shard_roots) != index:
+            if source_index >= metadata["source_rows"] or source_index % len(shard_roots) != index:
                 raise ValueError(f"Row {source_index} is outside shard {index}")
-            split, source_row_index = source_location(source_index, sources)
-            if row.get("source_split") != split or row.get("source_row_index") != source_row_index:
-                raise ValueError(f"Row {source_index} has incorrect source provenance")
         rows.extend(shard_rows)
     if metadata is None or len(rows) < 2:
         raise ValueError("At least two generated rows are required for the train/eval split")
@@ -89,6 +88,10 @@ def merge_shards(root: Path, shard_roots: list[Path], *, local_files_only: bool 
         if changed:
             raise ValueError(f"Output settings differ ({', '.join(changed)}). Use a new output directory.")
     rows.sort(key=lambda row: row["source_index"])
+    indices = [row["source_index"] for row in rows]
+    if (len(rows) != metadata["selected_source_rows"]
+            or source_indices_sha256(indices) != metadata["selected_source_indices_sha256"]):
+        raise ValueError("Merged shards do not contain exactly the selected source rows")
     root.mkdir(parents=True, exist_ok=True)
     if previous is None:
         # Record ownership before a potentially long JSONL write so an
@@ -136,42 +139,36 @@ def launch(args: argparse.Namespace, arguments: list[str]) -> int:
                          f"CUDA_VISIBLE_DEVICES={visible!r}, available={torch.cuda.device_count()}")
     root = args.data_root.resolve()
     previous = read_output_metadata(root)
+    requested = {
+        "model_name_or_path": args.model_name_or_path, "max_length": args.max_length,
+        "dtype": args.dtype, "attn_implementation": args.attn_implementation,
+        "source_dataset": args.source_dataset, "source_config": args.source_config,
+        "source_split": args.source_split, "max_samples": args.max_samples,
+        "eval_ratio": args.eval_ratio, "split_seed": args.seed,
+        "batch_size": args.batch_size, "generation_num_shards": args.num_shards,
+    }
     if previous is not None:
         if previous.get("status") == "generating":
             raise ValueError("This output contains an unfinished single-GPU run. "
                              "Select a new DISTILL_DATA_ROOT for parallel generation.")
-        requested = {
-            "model_name_or_path": args.model_name_or_path, "max_length": args.max_length,
-            "dtype": args.dtype, "attn_implementation": args.attn_implementation,
-            "source_dataset": args.source_dataset, "source_config": args.source_config,
-            "source_splits": args.source_splits, "max_samples": args.max_samples,
-            "eval_ratio": args.eval_ratio, "split_seed": args.seed,
-        }
-        requested["batch_size"] = getattr(args, "batch_size", 1)
-        if requested["batch_size"] > 1:
-            requested["generation_num_shards"] = args.num_shards
         changed = [key for key, value in requested.items() if previous.get(key) != value]
         if changed:
             raise ValueError(f"Output settings differ ({', '.join(changed)}). Use a new output directory.")
     work_root = root.with_name(root.name + ".shards")
     work_root.mkdir(parents=True, exist_ok=True)
-    run_settings = {"num_shards": args.num_shards, "batch_size": getattr(args, "batch_size", 1)}
     run_path = work_root / "run_config.json"
     if run_path.exists():
-        if json.loads(run_path.read_text(encoding="utf-8")) != run_settings:
+        if json.loads(run_path.read_text(encoding="utf-8")) != requested:
             raise ValueError("Resume worker settings differ. Use a new output directory.")
     else:
-        # Existing batch-one shard directories predate this launcher manifest.
-        for path in work_root.glob("shard_*/selfdistill_metadata.json"):
-            shard = json.loads(path.read_text(encoding="utf-8"))
-            if any(shard.get(key) != value for key, value in run_settings.items()):
-                raise ValueError("Resume worker settings differ. Use a new output directory.")
-        atomic_json(run_path, run_settings)
+        if any(work_root.iterdir()):
+            raise ValueError(f"Refusing to use shard directory without run metadata: {work_root}")
+        atomic_json(run_path, requested)
     shard_roots = [work_root / f"shard_{index:02d}" for index in range(args.num_shards)]
-    script = Path(__file__).with_name("generate_ultrachat_selfdistill.py")
+    script = Path(__file__).with_name("generate_gsm8k_selfdistill.py")
     workers = []
-    print(f"[distill] UltraChat: {args.num_shards} GPUs; "
-          f"per_device_batch_size={run_settings['batch_size']}; output={root}", flush=True)
+    print(f"[distill] GSM8K: {args.num_shards} GPUs; per_device_batch_size={args.batch_size}; "
+          f"output={root}", flush=True)
 
     def interrupted(signum, frame):
         raise KeyboardInterrupt

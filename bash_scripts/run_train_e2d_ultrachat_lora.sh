@@ -1,5 +1,5 @@
 #!/bin/bash
-# Frozen Qwen3-4B verifier + SEED drafting LoRA on UltraChat self-distillation.
+# Frozen Qwen3-1.7B verifier + SEED drafting LoRA on UltraChat self-distillation.
 # Reuse the existing cache; generate batch-one target responses if it is absent.
 set -eo pipefail
 
@@ -9,24 +9,25 @@ source setup_env.sh
 set -u
 
 PYTHON=${PYTHON:-python}
-MODEL_NAME_OR_PATH=${MODEL_NAME_OR_PATH:-Qwen/Qwen3-4B}
+MODEL_NAME_OR_PATH=${MODEL_NAME_OR_PATH:-Qwen/Qwen3-1.7B}
 MAX_SEQ_LEN=${MAX_SEQ_LEN:-1024}
-DISTILL_DATA_ROOT=${DISTILL_DATA_ROOT:-/data/shared_data/hankun/datasets/ultrachat_qwen3_4b_thinking_maxlen${MAX_SEQ_LEN}}
+DISTILL_DATA_ROOT=${DISTILL_DATA_ROOT:-/data/shared_data/hankun/datasets/ultrachat_qwen3_1.7b_thinking_maxlen${MAX_SEQ_LEN}}
+# DISTILL_DATA_ROOT=${DISTILL_DATA_ROOT:-/data/shared_data/hankun/datasets/ultrachat_qwen3_1p7b_selfdistill_bsz1_maxlen${MAX_SEQ_LEN}}
 OUTPUT_ROOT=${OUTPUT_ROOT:-/data/shared_data/hankun/outputs}
 BLOCK_SIZE=${BLOCK_SIZE:-8}
 N_DECODER_LAYERS=${N_DECODER_LAYERS:-3}
 LORA_RANK=${LORA_RANK:-512}
 LORA_ALPHA=${LORA_ALPHA:-1024}
 LORA_DROPOUT=${LORA_DROPOUT:-0.0}
-LR=${LR:-5e-5}
+LR=${LR:-1e-4}
 WARMUP_DURATION=${WARMUP_DURATION:-0.01dur}
 ALPHA_F=${ALPHA_F:-0.5}
 MAX_DURATION=${MAX_DURATION:-3ep}
 BATCH_SIZE=${BATCH_SIZE:-1}
 MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-1}
 NUM_WORKERS=${NUM_WORKERS:-0}
-SAVE_INTERVAL=${SAVE_INTERVAL:-1000ba}
-EVAL_INTERVAL=${EVAL_INTERVAL:-1000ba}
+SAVE_INTERVAL=${SAVE_INTERVAL:-3000ba}
+EVAL_INTERVAL=${EVAL_INTERVAL:-3000ba}
 VERIFY=${VERIFY:-false}
 VERIFY_ONLY=${VERIFY_ONLY:-false}
 # Regenerate every completion with a KV cache. The faster teacher-forced option
