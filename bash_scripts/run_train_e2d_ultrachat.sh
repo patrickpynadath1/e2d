@@ -10,7 +10,7 @@ source setup_env.sh
 # -----------------------------
 # Stage 1: Self-distillation
 # -----------------------------
-MODEL_NAME_OR_PATH=Qwen/Qwen3-1.7B-Base
+MODEL_NAME_OR_PATH=Qwen/Qwen3-1.7B
 MAX_SEQ_LEN=4096 # 1024
 GEN_MAX_SEQ_LEN=${GEN_MAX_SEQ_LEN:-4096} # 1536
 PROMPT_MAX_SEQ_LEN=${PROMPT_MAX_SEQ_LEN:-1024}

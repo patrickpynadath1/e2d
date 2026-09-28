@@ -452,6 +452,8 @@ def main(cfg: DictConfig) -> None:
     # --- Load tokenizer ---
     tokenizer = hydra.utils.instantiate(cfg.tokenizer)
     tokenizer = maybe_add_missing_special_tokens(tokenizer)
+    use_chat_template = cfg.get("use_chat_template", False)
+    enable_thinking = cfg.get("enable_thinking", False)
 
     # --- Load KodCode test set ---
     test_size = cfg.get("kodcode_test_size", 1000)
@@ -530,16 +532,28 @@ def main(cfg: DictConfig) -> None:
         style = example.get("style", "Instruct")
         ref_solution = example.get("solution", "")
 
-        # Build prompt (same format as KodCodeDataset)
-        prompt_text = (
-            "You are an expert Python programmer. Solve the following problem.\n\n"
-            + question.strip()
-        )
-        prompt_text += "\n[BEGIN]\n"
+        if use_chat_template:
+            prompt_text = question.strip()
+            ctx = tokenizer.apply_chat_template(
+                [{"role": "user", "content": prompt_text}],
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=enable_thinking,
+            )
+        else:
+            # Preserve the training prompt used by the non-chat evaluator.
+            prompt_text = (
+                "You are an expert Python programmer. Solve the following problem.\n\n"
+                + question.strip()
+            )
+            prompt_text += "\n[BEGIN]\n"
+            ctx = (tokenizer.bos_token or "") + prompt_text
 
-        ctx = (tokenizer.bos_token or "") + prompt_text
-
-        prefix_tokens = tokenizer(ctx, return_tensors="pt")["input_ids"].to(device)
+        # Rendered chat templates already contain their special tokens.
+        tokenize_kwargs = {"add_special_tokens": False} if use_chat_template else {}
+        prefix_tokens = tokenizer(ctx, return_tensors="pt", **tokenize_kwargs)[
+            "input_ids"
+        ].to(device)
 
         # Generate
         start_event = torch.cuda.Event(enable_timing=True)
@@ -595,16 +609,15 @@ def main(cfg: DictConfig) -> None:
         # Strip at EOS or common stop sequences.
         # Keep `if __name__ == "__main__"` for Online Judge style tasks,
         # otherwise stdio programs may never execute and produce empty output.
-        stop_sequences = [
-            tokenizer.eos_token,
-            "\n[END]",
-            "\n[DONE]",
-            "\n```",
-            "\nclass ",
-        ]
+        stop_sequences = [tokenizer.eos_token]
         style_normalized = style.strip().lower().replace(" ", "_")
-        if style_normalized != "online_judge":
-            stop_sequences.append("\nif __name__")
+        if use_chat_template:
+            # Preserve fenced code, classes, and main guards for extraction.
+            stop_sequences.append("<|eot_id|>")
+        else:
+            stop_sequences.extend(["\n[END]", "\n[DONE]", "\n```", "\nclass "])
+            if style_normalized != "online_judge":
+                stop_sequences.append("\nif __name__")
 
         for stop_seq in stop_sequences:
             if stop_seq:

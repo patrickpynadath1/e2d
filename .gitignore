@@ -8,7 +8,9 @@ __pycache__/
 outputs/
 experiments/
 pard/
-tests/
-docs/
+tests/*
+!tests/test_tulu3_selfdistill_advanced.py
+docs/*
+!docs/tulu3_selfdistill_advanced.md
 watch_folder
 *.log

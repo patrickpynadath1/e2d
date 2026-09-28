@@ -1,6 +1,8 @@
 #!/bin/bash
-# Frozen Qwen3-1.7B verifier + SEED drafting LoRA on UltraChat self-distillation.
-# Reuse the existing cache; generate batch-one target responses if it is absent.
+# Frozen verifier + SEED drafting LoRA on the available Tulu3 self-distillation.
+# Matches run_train_e2d_ultrachat_lora.sh; preprocess existing responses on CPU.
+# Defaults to length 4096 for the existing dataset and Qwen3-4B for training,
+# matching the current UltraChat LoRA launcher model. Override via environment.
 set -eo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,8 +13,10 @@ set -u
 PYTHON=${PYTHON:-python}
 MODEL_NAME_OR_PATH=${MODEL_NAME_OR_PATH:-Qwen/Qwen3-1.7B}
 MAX_SEQ_LEN=${MAX_SEQ_LEN:-4096}
-DISTILL_DATA_ROOT=${DISTILL_DATA_ROOT:-/data/shared_data/hankun/datasets/ultrachat_qwen3_1p7b_thinking_maxlen${MAX_SEQ_LEN}}
-# DISTILL_DATA_ROOT=${DISTILL_DATA_ROOT:-/data/shared_data/hankun/datasets/ultrachat_qwen3_1p7b_selfdistill_bsz1_maxlen${MAX_SEQ_LEN}}
+DISTILL_DATA_ROOT=${DISTILL_DATA_ROOT:-/data/shared_data/hankun/datasets/tulu3_qwen3_1p7b_thinking_maxlen${MAX_SEQ_LEN}}
+DISTILL_FILE_STEM=${DISTILL_FILE_STEM:-tulu3_qwen3_1p7b_thinking}
+DISTILL_RAW_FILE=${DISTILL_RAW_FILE:-${DISTILL_DATA_ROOT}/${DISTILL_FILE_STEM}.jsonl}
+DISTILL_TOKENIZER_NAME_OR_PATH=${DISTILL_TOKENIZER_NAME_OR_PATH:-Qwen/Qwen3-1.7B}
 OUTPUT_ROOT=${OUTPUT_ROOT:-/data/shared_data/hankun/outputs}
 BLOCK_SIZE=${BLOCK_SIZE:-8}
 N_DECODER_LAYERS=${N_DECODER_LAYERS:-2}
@@ -57,27 +61,33 @@ if [[ "${VERIFY_ONLY}" == true && "${VERIFY}" != true ]]; then
 fi
 
 if [[ ! -d "${DISTILL_DATA_ROOT}/train_preprocessed" || ! -d "${DISTILL_DATA_ROOT}/eval_preprocessed" ]]; then
-  echo "[data] Missing UltraChat cache; generating batch-one target responses in ${DISTILL_DATA_ROOT}."
-  read -r -a SOURCE_SPLITS <<< "${DISTILL_SOURCE_SPLITS:-train_sft train_gen}"
-  "${PYTHON}" scripts/generate_ultrachat_selfdistill.py \
-    --model-name-or-path "${MODEL_NAME_OR_PATH}" \
-    --data-root "${DISTILL_DATA_ROOT}" \
-    --max-length "${MAX_SEQ_LEN}" \
-    --device cuda \
-    --dtype bfloat16 \
-    --attn-implementation sdpa \
-    --source-dataset "${DISTILL_SOURCE_NAME:-HuggingFaceH4/ultrachat_200k}" \
-    --source-splits "${SOURCE_SPLITS[@]}" \
-    --max-samples "${DISTILL_MAX_SAMPLES:-0}" \
-    --eval-ratio "${EVAL_RATIO:-0.02}" \
-    --seed "${SPLIT_SEED:-42}" \
-    --progress-every "${PROGRESS_EVERY:-25}"
-  if [[ ! -d "${DISTILL_DATA_ROOT}/train_preprocessed" || ! -d "${DISTILL_DATA_ROOT}/eval_preprocessed" ]]; then
-    echo "Generation did not produce both preprocessed splits." >&2
+  if [[ ! -f "${DISTILL_RAW_FILE}" ]]; then
+    echo "ERROR: Missing self-distilled Tulu3 JSONL: ${DISTILL_RAW_FILE}" >&2
     exit 1
   fi
+  echo "[data] Preprocessing available Tulu3 responses in ${DISTILL_DATA_ROOT}."
+  "${PYTHON}" scripts/preprocess_distilled_jsonl.py \
+    --input-jsonl "${DISTILL_RAW_FILE}" \
+    --data-root "${DISTILL_DATA_ROOT}" \
+    --tokenizer-name-or-path "${DISTILL_TOKENIZER_NAME_OR_PATH}" \
+    --max-length "${MAX_SEQ_LEN}" \
+    --eval-ratio "${EVAL_RATIO:-0.01}" \
+    --seed "${SPLIT_SEED:-42}" \
+    --num-proc "${PREPROCESS_NUM_PROC:-4}"
 else
-  echo "[data] Reusing UltraChat cache: ${DISTILL_DATA_ROOT}"
+  echo "[data] Reusing Tulu3 cache: ${DISTILL_DATA_ROOT}"
+fi
+
+# Prevent accidentally reusing a cache prepared for a different context length.
+if [[ -f "${DISTILL_DATA_ROOT}/preprocessing_metadata.json" ]]; then
+  "${PYTHON}" - "${DISTILL_DATA_ROOT}/preprocessing_metadata.json" "${MAX_SEQ_LEN}" <<'PY_CHECK'
+import json
+import sys
+with open(sys.argv[1]) as handle:
+    metadata = json.load(handle)
+if metadata["max_length"] != int(sys.argv[2]):
+    raise SystemExit("Cache max_length differs from MAX_SEQ_LEN; use a matching preprocessed dataset.")
+PY_CHECK
 fi
 
 # set model tag if "1.7B" or "4B" is in the model name
@@ -90,7 +100,7 @@ else
 fi
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-RUN_NAME=${RUN_NAME:-ultrachat_${MAX_SEQ_LEN}_seed_lora_block${BLOCK_SIZE}_${MODEL_TAG}_dec${N_DECODER_LAYERS}_rank${LORA_RANK}_lr${LR}_bsz${BATCH_SIZE}_${TIMESTAMP}}
+RUN_NAME=${RUN_NAME:-tulu3_${MAX_SEQ_LEN}_seed_lora_block${BLOCK_SIZE}_${MODEL_TAG}_dec${N_DECODER_LAYERS}_rank${LORA_RANK}_lr${LR}_bsz${BATCH_SIZE}_${TIMESTAMP}}
 RUN_DIR="${OUTPUT_ROOT}/${RUN_NAME}"
 mkdir -p "${RUN_DIR}"
 

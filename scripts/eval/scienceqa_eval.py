@@ -89,6 +89,8 @@ def main(cfg: DictConfig) -> None:
 
     tokenizer = hydra.utils.instantiate(cfg.tokenizer)
     tokenizer = maybe_add_missing_special_tokens(tokenizer)
+    use_chat_template = cfg.get("use_chat_template", False)
+    enable_thinking = cfg.get("enable_thinking", False)
 
     # --- Load ScienceQA test set ---
     test_size = cfg.get("scienceqa_test_size", 1000)
@@ -158,8 +160,21 @@ def main(cfg: DictConfig) -> None:
         q_text = _format_question(question, choices, hint)
 
         is_e2d = "E2D" in type(model).__name__ and "E2D2" not in type(model).__name__
-        # E2D uses bidirectional attention to encode the prompt during training
-        if is_e2d:
+        if use_chat_template:
+            # Keep the answer format required by the stopping rule and scorer.
+            user_prompt = (
+                q_text
+                + '\n\nEnd your response with "The answer is (X).", '
+                + "where X is the correct option letter."
+            )
+            ctx = tokenizer.apply_chat_template(
+                [{"role": "user", "content": user_prompt}],
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=enable_thinking,
+            )
+        # E2D uses bidirectional attention to encode the prompt during training.
+        elif is_e2d:
             ctx = (
                 (tokenizer.bos_token or "")
                 + source_prompt_text

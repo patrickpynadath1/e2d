@@ -9,10 +9,16 @@ cd "${SCRIPT_DIR}/.."
 source setup_env.sh
 set -u
 
-# ultrachat lr 3e-4, b = 4, dec = 2, rank = 512 (unfinished, 12000 steps, eval loss 1.8)
+# old-ultrachat-1024, 1.7b, lr 3e-4, bsz32, b = 4, dec = 2, rank = 512 (unfinished, 12000 steps, eval loss 1.8)
 # 1.62 (82.75%)
-# ultrachat lr 1e-4, b = 8, dec = 2, rank = 512 (unfinished, 15500 steps, eval loss 2.0)
+# old-ultrachat-1024, 1.7b, lr 1e-4, bsz32, b = 8, dec = 2, rank = 512 (unfinished, 15500 steps, eval loss 2.0)
 # 1.49 (80.38%)
+# old-ultrachat-1024, 4b, lr 4e-4, bsz = 16, b = 8, dec = 2, rank = 512 (unfinished, 18500 steps, eval loss 2.0)
+# MODEL_PATH=${MODEL_PATH:-/data/shared_data/hankun/outputs/ultrachat_seed_lora_block8_TOPdec2_rank512_lr4e-4_bsz16_20260925_203459}
+# 1.75 (83.28%)
+# tulu3-4096, 1.7b, lr 6e-4, bsz32, b = 8, dec = 2, rank = 512 (unfinished, 3000 steps, eval loss 1.76)
+MODEL_PATH=${MODEL_PATH:-/data/shared_data/hankun/outputs/tulu3_4096_seed_lora_block8_1.7b_dec2_rank512_lr6e-4_bsz32_20260926_204506}
+# 2.62 (81.84%)
 QWEN_MODEL=${QWEN_MODEL:-Qwen/Qwen3-1.7B}
 CKPT=${CKPT:-best}
 MAX_NEW_TOKENS=${MAX_NEW_TOKENS:-1024}
