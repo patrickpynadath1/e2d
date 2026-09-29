@@ -74,6 +74,22 @@ records the vLLM backend and version; use a fresh `DISTILL_DATA_ROOT` when
 switching from an existing Transformers run to avoid mixing backends. Existing
 outputs from other generators are not adopted or overwritten.
 
+Worker exceptions are printed in both the worker log and the main log with the
+original traceback. A failed worker does not retry initialization for queued
+batches. If engine startup fails around `torch.compile`, try vLLM's eager mode:
+
+```bash
+DISTILL_DATA_ROOT=/path/to/new/output_eager \
+  nohup bash bash_scripts/generate_tulu3_selfdistill_advanced.sh --enforce-eager \
+  > gen-vllm-eager.log 2>&1 &
+```
+
+This disables `torch.compile` and CUDA graphs, while retaining vLLM inference,
+GPU replicas, and the dataset format. It can reduce throughput and does not
+bypass all runtime kernel compilation. The flag is opt-in; use a new output
+directory when switching modes. It is a workaround to isolate compilation
+failures, not a diagnosis of the underlying compiler/toolchain problem.
+
 Extra Python arguments may follow the shell script, for example
 `--num-shards 2`, `--gpu-memory-utilization 0.7`, or `--local-files-only`.
 Reduce the memory fraction when sharing a GPU with other workloads.

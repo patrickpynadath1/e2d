@@ -111,6 +111,32 @@ class ThreadPool:
         return SimpleNamespace(get=get)
 
 
+class UnpicklableWorkerError(RuntimeError):
+    """Reproduce compiler exceptions that retain live Python frames."""
+
+    def __init__(self, message):
+        super().__init__(message)
+        self.frame = sys._getframe()
+
+
+def fail_with_unpicklable_error(*args, **kwargs):
+    raise UnpicklableWorkerError("original engine failure")
+
+
+def init_failing_worker(slots, work_root, stage):
+    args = SimpleNamespace(
+        local_files_only=False, model_name_or_path="unused-model",
+        attn_implementation=None, dtype="bfloat16", gen_max_length=40,
+        batch_size=3, gpu_memory_utilization=0.9, seed=42, enforce_eager=False,
+    )
+    generate.init_worker(slots, work_root, args)
+    sys.modules["vllm"] = SimpleNamespace(LLM=fail_with_unpicklable_error)
+    generate.load_tokenizer = lambda args: None
+    if stage == "generation":
+        generate.WORKER.update(model=object(), tokenizer=None)
+        generate.generate_batch = fail_with_unpicklable_error
+
+
 class TuluGenerationTest(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -313,7 +339,7 @@ class TuluGenerationTest(unittest.TestCase):
         args = SimpleNamespace(
             **vars(self.args), model_name_or_path="cached/tiny", local_files_only=True,
             dtype="bfloat16", gpu_memory_utilization=0.6, attn_implementation=None,
-            empty_cache_every_batches=2,
+            empty_cache_every_batches=2, enforce_eager=False,
         )
         model = TinyVLLM()
         constructor = Mock(return_value=model)
@@ -329,11 +355,26 @@ class TuluGenerationTest(unittest.TestCase):
             model=str(self.root), dtype="bfloat16", trust_remote_code=True,
             tensor_parallel_size=1, distributed_executor_backend="uni",
             max_model_len=40, max_num_seqs=3, gpu_memory_utilization=0.6, seed=42,
-            skip_tokenizer_init=True, generation_config="vllm",
+            skip_tokenizer_init=True, generation_config="vllm", enforce_eager=False,
         )
         snapshot.assert_called_once_with("cached/tiny", local_files_only=True)
         empty_cache.assert_called_once()
         self.assertEqual(len(model.calls), 2)
+
+    def test_eager_mode_is_opt_in_and_forwarded_to_vllm(self):
+        from unittest.mock import Mock
+
+        command = ["generate", "--data-root", str(self.root)]
+        with patch.object(sys, "argv", command):
+            self.assertFalse(generate.parse_args().enforce_eager)
+        with patch.object(sys, "argv", [*command, "--enforce-eager"]):
+            args = generate.parse_args()
+        constructor = Mock(return_value=TinyVLLM())
+        self.vllm.LLM = constructor
+        with patch.dict(generate.WORKER, {"args": args, "batches": 0}, clear=True), \
+                patch.object(generate, "load_tokenizer", return_value=self.tokenizer):
+            generate.worker_generate((0, "train", ["short"]))
+        self.assertTrue(constructor.call_args.kwargs["enforce_eager"])
 
     def test_worker_binds_gpu_before_loading_engine(self):
         from unittest.mock import Mock
@@ -349,6 +390,46 @@ class TuluGenerationTest(unittest.TestCase):
             self.assertEqual(os.environ["TORCHINDUCTOR_COMPILE_THREADS"], "1")
             self.assertEqual(os.environ["HF_HUB_OFFLINE"], "1")
             self.assertNotIn("model", generate.WORKER)
+
+    def test_unpicklable_worker_errors_reach_parent_and_shard_log(self):
+        context = mp.get_context("spawn")
+        for stage in ("initialization", "generation"):
+            with self.subTest(stage=stage):
+                root = self.root / stage
+                root.mkdir()
+                slots = context.Queue()
+                slots.put((0, "GPU-test-device"))
+                try:
+                    with context.Pool(
+                        1, initializer=init_failing_worker,
+                        initargs=(slots, str(root), stage),
+                    ) as pool:
+                        result = pool.apply_async(
+                            generate.worker_generate, ((7, "train", ["prompt"]),),
+                        )
+                        with self.assertRaises(RuntimeError) as caught:
+                            result.get(timeout=30)
+                        # A queued batch must report the same error without
+                        # attempting another engine initialization/generation.
+                        retry = pool.apply_async(
+                            generate.worker_generate, ((8, "train", ["prompt"]),),
+                        )
+                        with self.assertRaises(RuntimeError) as repeated:
+                            retry.get(timeout=30)
+                    message = str(caught.exception)
+                    self.assertEqual(message, str(repeated.exception))
+                    for detail in (
+                        "original engine failure", "UnpicklableWorkerError",
+                        "Traceback", "Batch 7", "GPU-test-device", "shard_00.log",
+                    ):
+                        self.assertIn(detail, message)
+                    log = (root / "shard_00.log").read_text()
+                    self.assertIn("original engine failure", log)
+                    self.assertIn("UnpicklableWorkerError", log)
+                    self.assertEqual(log.count("[distill] Batch 7 failed"), 1)
+                finally:
+                    slots.close()
+                    slots.join_thread()
 
     def test_worker_death_does_not_hang(self):
         pool = ThreadPool(1)

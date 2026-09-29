@@ -23,6 +23,7 @@ import shutil
 import signal
 import sys
 import tempfile
+import traceback
 from typing import Any
 
 if __package__ in (None, ""):
@@ -183,11 +184,33 @@ def init_worker(slots, work_root: str, args):
     with log_path.open("a", buffering=1) as log:
         os.dup2(log.fileno(), 1)
         os.dup2(log.fileno(), 2)
-    WORKER.update(args=args, batches=0)
+    WORKER.update(args=args, batches=0, device=device, log_path=str(log_path))
     print(f"[distill] Worker {index}: GPU {device}, PID {os.getpid()}", flush=True)
 
 
 def worker_generate(task):
+    """Send plain-text failures across the pool, never compiler exception objects."""
+    if "failure" in WORKER:
+        # Speculative batches can reach this worker before the coordinator sees
+        # its first error. Do not retry a failed engine or allocate weights again.
+        raise RuntimeError(WORKER["failure"])
+    try:
+        return _worker_generate(task)
+    except Exception:
+        details = traceback.format_exc()
+        message = (
+            f"[distill] Batch {task[0]} failed on GPU {WORKER.get('device', '?')}; "
+            f"worker log: {WORKER.get('log_path', 'unavailable')}\n{details}"
+        )
+        WORKER["failure"] = message
+        print(message, file=sys.stderr, flush=True)
+        # PyTorch compiler exceptions can contain unpicklable frame objects.
+        # A built-in exception with only a string preserves the original trace
+        # in the coordinator's main log without serializing those objects.
+        raise RuntimeError(message) from None
+
+
+def _worker_generate(task):
     import torch
     from vllm import LLM
 
@@ -213,6 +236,7 @@ def worker_generate(task):
             gpu_memory_utilization=args.gpu_memory_utilization, seed=args.seed,
             # All tokenization/decoding stays with the existing HF tokenizer.
             skip_tokenizer_init=True, generation_config="vllm",
+            enforce_eager=args.enforce_eager,
         )
     result = generate_batch(task, WORKER["tokenizer"], WORKER["model"], args)
     WORKER["batches"] += 1
@@ -376,6 +400,8 @@ def parse_args():
                         help="Deprecated compatibility option; vLLM selects its own attention backend")
     parser.add_argument("--gpu-memory-utilization", type=float, default=0.9,
                         help="Fraction of each GPU's memory reserved for its vLLM replica")
+    parser.add_argument("--enforce-eager", action="store_true",
+                        help="Disable vLLM torch.compile and CUDA graphs for troubleshooting")
     parser.add_argument("--max-samples", type=int, default=0, help="Global generated-row limit; 0 uses all rows")
     parser.add_argument("--eval-ratio", type=float, default=0.01)
     parser.add_argument("--seed", type=int, default=42)
@@ -420,14 +446,16 @@ def main() -> int:
     tokenizer = load_tokenizer(args)
     sources = {
         split: load_dataset(
-            args.source_dataset, split=split, trust_remote_code=True,
+            args.source_dataset, split=split,
             download_config=DownloadConfig(local_files_only=args.local_files_only),
         ) for split in args.source_splits
     }
     settings = {
         **{key: value for key, value in vars(args).items()
            if key not in {"data_root", "num_shards", "local_files_only", "progress_every_batches",
-                          "empty_cache_every_batches"}},
+                          "empty_cache_every_batches", "enforce_eager"}},
+        # Preserve compatibility with existing checkpoints in the default mode.
+        **({"enforce_eager": True} if args.enforce_eager else {}),
         "schema_version": 1, "prompt_format": "tulu3_messages", "num_shards": count,
         "chat_template_sha256": hashlib.sha256(json.dumps(tokenizer.chat_template, sort_keys=True).encode()).hexdigest(),
         "source_fingerprints": {split: getattr(source, "_fingerprint", None) for split, source in sources.items()},
