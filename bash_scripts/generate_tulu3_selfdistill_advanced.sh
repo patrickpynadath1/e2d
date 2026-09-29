@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate only: one model replica per visible GPU (1-8).
+# Generate with vLLM: one model replica per visible GPU (1-8).
 # Example:
 #   CUDA_VISIBLE_DEVICES=0,2,4,6 PER_DEVICE_BATCH_SIZE=32 \
 #     bash bash_scripts/generate_tulu3_selfdistill_advanced.sh
@@ -32,6 +32,7 @@ exec "${PYTHON:-python}" scripts/generate_tulu3_selfdistill.py \
   --prompt-max-length "${PROMPT_MAX_SEQ_LEN:-1024}" \
   --device cuda \
   --dtype "${DTYPE:-bfloat16}" \
+  --gpu-memory-utilization "${VLLM_GPU_MEMORY_UTILIZATION:-0.9}" \
   --source-dataset "${DISTILL_SOURCE_NAME:-allenai/tulu-3-sft-mixture}" \
   --source-splits "${SOURCE_SPLITS[@]}" \
   --max-samples "${DISTILL_MAX_SAMPLES:-0}" \

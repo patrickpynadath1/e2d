@@ -9,6 +9,7 @@ outputs/
 experiments/
 pard/
 tests/*
+!tests/test_math500_eval.py
 !tests/test_tulu3_selfdistill_advanced.py
 docs/*
 !docs/tulu3_selfdistill_advanced.md

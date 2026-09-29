@@ -6,8 +6,8 @@ CUDA_VISIBLE_DEVICES=0,2,4,6 PER_DEVICE_BATCH_SIZE=32 \
 ```
 
 This runs generation and preprocessing only. Each visible GPU gets one complete
-model replica. Whole batches are distributed to available workers, then written
-in source order. `DISTILL_MAX_SAMPLES` is a global generated-row limit; `0` uses
+vLLM model replica (tensor parallel size 1). Whole batches are distributed to
+available workers, then written in source order. `DISTILL_MAX_SAMPLES` is a global generated-row limit; `0` uses
 all source conversations. At most two batches per GPU are queued, so reaching
 the limit may discard a small amount of speculative generation.
 
@@ -24,17 +24,22 @@ Defaults match Stage 1 of `bash_scripts/run_train_e2d_tulu3_distill.sh`:
 | `PROMPT_MAX_SEQ_LEN` | `1024` |
 | `EVAL_RATIO`, `SPLIT_SEED` | `0.01`, `42` |
 | `DTYPE` | `bfloat16` |
+| `VLLM_GPU_MEMORY_UTILIZATION` | `0.9` |
 
 The full conversation prefix before the last reference assistant response is
 kept, including previous assistant turns. The final response is replaced using
 greedy decoding with thinking disabled. Prompts exceeding `PROMPT_MAX_SEQ_LEN`
-are filtered within their original batches. Generation uses left padding and
-`GEN_MAX_SEQ_LEN - padded_input_length` new tokens. Training independently
-re-tokenizes and truncates the prompt and completion to `MAX_SEQ_LEN // 2` tokens.
+are filtered within their original batches. vLLM receives the same prompt token
+IDs without padding. Every prompt in a batch retains the original shared budget
+of `GEN_MAX_SEQ_LEN - longest_input_length` new tokens. Completion token IDs
+are decoded with the original tokenizer, retaining EOS and other special tokens.
+Training independently re-tokenizes and truncates the prompt and completion to `MAX_SEQ_LEN // 2` tokens.
 
 With the same per-device batch size, batch composition and generation budgets
-match a fresh reference run, regardless of GPU count. GPU kernels, hardware,
-library versions, and changing batch size can still change generated tokens.
+match a fresh reference run, regardless of GPU count. The JSONL schema, row
+ordering, split logic, and preprocessing are unchanged. Generated answer text is
+not guaranteed to be identical to Transformers: different inference kernels,
+hardware, library versions, and batch sizes can change greedy token choices.
 
 The default output directory is:
 
@@ -64,14 +69,27 @@ Worker logs live under `${DISTILL_DATA_ROOT}.shards/shard_*.log`. Checkpoints in
 Rerun the same command to resume; an interrupted batch may be generated again.
 Completed batches are retained, including empty batches and duplicate prompts.
 A worker failure stops generation and prevents preprocessing incomplete output.
-Changing generation settings requires a new output directory. Existing outputs
-from other generators are not adopted or overwritten.
+Changing generation settings requires a new output directory. The metadata now
+records the vLLM backend and version; use a fresh `DISTILL_DATA_ROOT` when
+switching from an existing Transformers run to avoid mixing backends. Existing
+outputs from other generators are not adopted or overwritten.
 
 Extra Python arguments may follow the shell script, for example
-`--num-shards 2`, `--attn-implementation sdpa`, or `--local-files-only`.
+`--num-shards 2`, `--gpu-memory-utilization 0.7`, or `--local-files-only`.
+Reduce the memory fraction when sharing a GPU with other workloads.
 `PROGRESS_EVERY_BATCHES`, `EMPTY_CACHE_EVERY_BATCHES`, and `PYTHON` are also
-supported. The default attention implementation follows Transformers, as in the
-reference driver.
+supported. vLLM manages its own KV cache; the existing empty-cache interval only
+releases unused PyTorch allocations. The legacy `--attn-implementation` flag is
+accepted with a warning and ignored because vLLM selects its attention backend.
+Workers run the engine in process and compile kernels serially so they remain
+compatible with the existing multiprocessing pool.
+
+`environment.yml` pins vLLM 0.9.2 to match the existing PyTorch 2.7.0 and
+Transformers 4.52.4 stack. It also uses setuptools 78.1.1 to meet vLLM's Python
+3.12 requirement. Creating `e2d-env` from that file installs vLLM and its
+transitive dependencies. See the pinned release's
+[CUDA requirements](https://github.com/vllm-project/vllm/blob/v0.9.2/requirements/cuda.txt)
+and [common requirements](https://github.com/vllm-project/vllm/blob/v0.9.2/requirements/common.txt).
 
 To train on the generated dataset, pass the same directory to the existing
 training script (its current training length is 4096):

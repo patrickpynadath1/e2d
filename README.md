@@ -133,6 +133,32 @@ Below are the evaluation scripts provided for various tasks:
 - Mathematical reasoning: [`run_lm_eval_harness.sh`](bash_scripts/run_lm_eval_harness.sh), [`run_lm_eval_harness_tput.sh`](bash_scripts/run_lm_eval_harness_tput.sh), [`run_likelihood_eval_gsm8k.sh`](bash_scripts/run_likelihood_eval_gsm8k.sh)
 - Likelihood estimation (trained on OpenWebText): [`run_likelihood_eval_owt.sh`](bash_scripts/run_likelihood_eval_owt.sh)
 
+For MATH-500 with a trained frozen-target SEED-LoRA checkpoint, run:
+
+```bash
+MODEL_PATH=/path/to/training/run bash bash_scripts/evaluate_math500_lora.sh
+```
+
+This evaluates all 500 `HuggingFaceH4/MATH-500` test problems with the GSM8K
+zero-shot, non-thinking chat prompt. It scores the final boxed answer using
+lm-eval's Hendrycks MATH normalized exact match (not symbolic equivalence),
+preserving nested LaTeX such as fractions. Generation stops at EOS or the token
+budget, which defaults to 4096 new tokens. Set `MATH500_NUM_SAMPLES=5` for a short
+run; checkpoint, decoding, and output settings use the same environment variables
+as `run_lm_eval_harness_lora.sh`. Logs include each prompt, completion, ground
+truth, running accuracy, timing, throughput, and draft acceptance statistics.
+Sample JSON, per-position acceptance reports, harness results, and `metrics.txt`
+are saved under `${MODEL_PATH}/math500_output/` (override with `OUTPUT_PATH`).
+
+To evaluate the untuned `Qwen/Qwen3-1.7B` release with the same MATH-500 prompt,
+scoring, and reports, run `bash bash_scripts/evaluate_math500.sh`. It uses standard
+autoregressive generation in bfloat16 with the same 4096-new-token budget and
+greedy decoding defaults. `MATH500_NUM_SAMPLES`, `MAX_NEW_TOKENS`, `DO_SAMPLE`,
+`TEMPERATURE`, and `OUTPUT_PATH` work as above; `QWEN_MODEL` selects the model and
+tokenizer, and `MODEL_PATH` can override the model location. Outputs default to
+`outputs/Qwen3-1.7B/math500_output/`. Autoregressive acceptance statistics count
+one accepted token per decoding step; draft-specific reports apply to LoRA runs.
+
 ## 3. HuggingFace Integration
 We release the following models on HuggingFace:
 - 80M E2D2 for text summarization (trained from scratch):

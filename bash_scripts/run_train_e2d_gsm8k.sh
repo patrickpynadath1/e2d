@@ -5,8 +5,8 @@ cd ../ || exit  # Go to the root directory of the repo
 source setup_env.sh
 
 # Model arch
-BLOCK_SIZE=4
-EVAL_BLOCK_SIZE=4
+BLOCK_SIZE=10
+EVAL_BLOCK_SIZE=10
 N_ENCODER_LAYERS=28
 ENCODER_TOP_LAYERS=false
 N_DECODER_LAYERS=2
@@ -19,7 +19,7 @@ ENCODER_CAUSAL_MASK=false
 NULLIFY_SELF_ATTN=false
 
 # Hyperparameters
-LR=5e-5
+LR=6e-5
 WARMUP_DURATION="0.01dur"
 ALPHA_F=0.5
 DECODER_LOSS_LAMBDA=1.0
@@ -102,7 +102,7 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   train_dataloader.num_workers=${NUM_WORKERS} \
   composer.callbacks.hf_compatible_checkpointing.disable_hf=true \
   composer.callbacks.save_best_checkpointing.save_local=false \
-  eval_dataloader.batch_size=2 \
+  eval_dataloader.batch_size=1 \
   model.config.train_on_context=${TRAIN_ON_CONTEXT} \
   model.config.decoder_loss_lambda=${DECODER_LOSS_LAMBDA} \
   model.config.backbone_config.train_on_ar=${TRAIN_ON_AR} \

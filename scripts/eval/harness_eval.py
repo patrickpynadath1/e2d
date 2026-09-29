@@ -24,6 +24,7 @@ from transformers import (
 )
 
 from datasets import Dataset
+from scripts.eval import math500_metrics
 from scripts.eval.gsm8k_metrics import (
     boxed_answer_accuracy,
     prepare_gsm8k_response,
@@ -116,7 +117,10 @@ class LMEvalHarnessModel(LM):
         model_config_overrides = (
             {} if model_config_overrides is None else model_config_overrides
         )
-        if fsspec_exists(os.path.join(pretrained_model_name_or_path, "config.yaml")):
+        self._is_hf_model = not fsspec_exists(
+            os.path.join(pretrained_model_name_or_path, "config.yaml")
+        )
+        if not self._is_hf_model:
             if require_frozen_target:
                 checkpoint_dir = os.path.join(pretrained_model_name_or_path, "checkpoints")
                 base_name = ckpt_file.removesuffix(".pt")
@@ -255,11 +259,20 @@ class LMEvalHarnessModel(LM):
             )
         )
         is_code_eval = is_humaneval or is_mbpp
+        is_math500 = (
+            len(requests) > 0
+            and hasattr(requests[0], "doc")
+            and "problem" in requests[0].doc
+            and "solution" in requests[0].doc
+            and "answer" in requests[0].doc
+            and not is_code_eval
+        )
         is_gsm8k = (
             len(requests) > 0
             and hasattr(requests[0], "doc")
             and "answer" in requests[0].doc
             and not is_code_eval
+            and not is_math500
         )
 
         # TODO: Move this to utils file / perhaps use chat template
@@ -336,7 +349,8 @@ class LMEvalHarnessModel(LM):
         ds = Dataset.from_list(ds)
         if is_code_eval:
             ds = ds.map(_tokenize_humaneval)
-        elif is_gsm8k:
+        elif is_gsm8k or is_math500:
+            # MATH-500 deliberately uses the same instruction and chat template.
             ds = ds.map(_tokenize_gsm8k)
         else:
             ds = ds.map(_tokenize_default)
@@ -381,12 +395,14 @@ class LMEvalHarnessModel(LM):
                 start_event.record()
             else:
                 start_event, end_event = None, None
-            sample_output = self.model.generate(
-                inputs=elem["prefix"][None, ...].to(self.device),
-                disable_pbar=(self.rank != 0),
-                # tokenizer=self.tokenizer,  # Uncomment for debugging
-                **self.gen_kwargs,
-            )
+            inputs = elem["prefix"][None, ...].to(self.device)
+            generate_kwargs = dict(self.gen_kwargs)
+            if self._is_hf_model:
+                # HF validates model kwargs and does not accept disable_pbar.
+                generate_kwargs["attention_mask"] = torch.ones_like(inputs)
+            else:
+                generate_kwargs["disable_pbar"] = self.rank != 0
+            sample_output = self.model.generate(inputs=inputs, **generate_kwargs)
 
             if (
                 isinstance(sample_output, tuple)
@@ -406,8 +422,9 @@ class LMEvalHarnessModel(LM):
                 sample = sample_output
                 generated_tokens = int(sample.shape[-1] - elem["prefix"].numel())
                 accepted_tokens = generated_tokens
-                accepted_lengths = [generated_tokens]
-                accept_counts = 1
+                # Plain autoregressive generation accepts one token per step.
+                accepted_lengths = [1] * generated_tokens
+                accept_counts = generated_tokens
                 draft_position_stats = None
                 drafting_time_s, all_time_s = 0.0, 0.0
 
@@ -476,9 +493,18 @@ class LMEvalHarnessModel(LM):
                     }
                 )
             else:
-                # GSM8K / default: extract \boxed{} answer
+                # Keep MATH responses intact for nested LaTeX answer extraction.
                 raw_result = result
-                result, predicted_ans = prepare_gsm8k_response(result)
+                if is_math500:
+                    predicted_ans = math500_metrics.extract_boxed_answer(result)
+                    is_correct = math500_metrics.boxed_answer_accuracy(
+                        predicted_ans, requests[i].doc["answer"]
+                    )
+                else:
+                    result, predicted_ans = prepare_gsm8k_response(result)
+                    is_correct = boxed_answer_accuracy(
+                        predicted_ans, requests[i].doc["answer"]
+                    )
                 if self.rank == 0:
                     print("=" * 20)
                     print("Prefix:", elem["prefix_text"])
@@ -488,9 +514,7 @@ class LMEvalHarnessModel(LM):
                 res.append(result)
 
                 # log accuracy
-                correct += int(
-                    boxed_answer_accuracy(predicted_ans, requests[i].doc["answer"])
-                )
+                correct += int(is_correct)
                 total += 1
                 res_for_json.append(
                     (
@@ -499,16 +523,23 @@ class LMEvalHarnessModel(LM):
                             "result": result,
                             "final_content": raw_result,
                         }
-                        if is_gsm8k and self.is_instruction_model
+                        if (is_gsm8k or is_math500) and self.is_instruction_model
                         else {
                             "prefix": elem["prefix_text"],
                             "result": result,
                         }
                     )
                 )
+                if is_math500:
+                    res_for_json[-1].update(
+                        predicted_answer=predicted_ans,
+                        gold_answer=requests[i].doc["answer"],
+                        is_correct=bool(is_correct),
+                        unique_id=requests[i].doc.get("unique_id"),
+                    )
             # torch.cuda.empty_cache()
             if self.rank == 0:
-                if is_gsm8k:
+                if is_gsm8k or is_math500:
                     print(f"\nAccuracy: {correct}/{total} = {correct / total:.2%}\n")
                 else:
                     print(f"\nCompleted: {total}/{len(ds)}\n")
@@ -594,6 +625,21 @@ def main(cfg: DictConfig) -> None:
     accelerator = accelerate.Accelerator() if accelerator.num_processes > 1 else None
     set_seed(cfg.seed)
     model = hydra.utils.instantiate(cfg.task.model, accelerator=accelerator)
+    evaluation_tracker = EvaluationTracker(output_path=cfg.output_path)
+    # A custom LM instance bypasses lm-eval's model_args setup. Without this
+    # metadata the tracker tries to join the output path with a None model name
+    # and silently skips both aggregated and per-sample JSON reports.
+    evaluation_tracker.general_config_tracker.log_experiment_args(
+        model_source=type(model).__name__,
+        model_args=f"pretrained={cfg.pretrained_model_name_or_path}",
+        system_instruction=cfg.task.get("system_instruction"),
+        chat_template=(
+            getattr(model.tokenizer, "chat_template", None)
+            if model.is_instruction_model
+            else None
+        ),
+        fewshot_as_multiturn=False,
+    )
     results = hydra.utils.call(cfg.task, model=model)
     if results is not None and (
         accelerator is None or accelerator.local_process_index == 0
@@ -614,7 +660,6 @@ def main(cfg: DictConfig) -> None:
 
         has_standard_schema = "results" in results and "configs" in results
         if has_standard_schema:
-            evaluation_tracker = EvaluationTracker(output_path=cfg.output_path)
             evaluation_tracker.save_results_aggregated(
                 results=results,
                 samples=samples if samples is not None else {},

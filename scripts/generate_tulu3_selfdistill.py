@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate Tulu 3 distillation data using independent GPU replicas.
+"""Generate Tulu 3 distillation data using independent vLLM GPU replicas.
 
 Matches Stage 1 of run_train_e2d_tulu3_distill.sh, including its batch boundaries,
 text JSONLs, and decode/re-encode training format. A bounded queue distributes
@@ -13,6 +13,7 @@ import argparse
 from collections import deque
 from datetime import datetime, timezone
 import hashlib
+from importlib.metadata import version
 import json
 import multiprocessing as mp
 import os
@@ -112,7 +113,7 @@ def strip_batched_generation_padding(token_ids: list[int], tokenizer: Any) -> li
 
 
 def generate_batch(task, tokenizer: Any, model: Any, args) -> tuple[int, list[dict], int]:
-    import torch
+    from vllm import SamplingParams
 
     batch_index, split, prompts = task
     lengths = [len(ids) for ids in tokenizer(
@@ -123,20 +124,28 @@ def generate_batch(task, tokenizer: Any, model: Any, args) -> tuple[int, list[di
     if not selected:
         return batch_index, [], filtered
     inputs = tokenizer(
-        selected, return_tensors="pt", truncation=True,
-        max_length=args.gen_max_length - 1, padding=True,
+        selected, truncation=True, max_length=args.gen_max_length - 1, padding=False,
     )
-    inputs = {key: value.to(model.device) for key, value in inputs.items()}
-    width = int(inputs["input_ids"].shape[-1])
-    with torch.no_grad():
-        outputs = model.generate(
-            **inputs, max_new_tokens=max(1, args.gen_max_length - width),
-            do_sample=False, num_beams=1,
-            pad_token_id=tokenizer.pad_token_id, eos_token_id=tokenizer.eos_token_id,
-        )
+    # Keep the old padded-batch budget, even though vLLM takes unpadded IDs.
+    # Passing IDs also avoids a second chat template or different BOS handling.
+    width = max(len(ids) for ids in inputs["input_ids"])
+    sampling = SamplingParams(
+        n=1, temperature=0.0, max_tokens=max(1, args.gen_max_length - width),
+        # HF explicitly overrode model EOS defaults with the tokenizer EOS.
+        # Ignore the engine's EOS defaults and stop only at that same token.
+        ignore_eos=True,
+        stop_token_ids=[] if tokenizer.eos_token_id is None else [tokenizer.eos_token_id],
+        detokenize=False, skip_special_tokens=False,
+    )
+    outputs = model.generate(
+        [{"prompt_token_ids": ids} for ids in inputs["input_ids"]],
+        sampling_params=sampling, use_tqdm=False,
+    )
+    if len(outputs) != len(selected):
+        raise ValueError("vLLM returned a different number of outputs than prompts")
     rows = []
     for prompt, output in zip(selected, outputs):
-        ids = strip_batched_generation_padding(output[width:].tolist(), tokenizer)
+        ids = strip_batched_generation_padding(list(output.outputs[0].token_ids), tokenizer)
         if not ids:
             continue
         completion = tokenizer.decode(ids, skip_special_tokens=False)
@@ -162,6 +171,13 @@ def init_worker(slots, work_root: str, args):
     # loading weights, so every replica sees just its assigned physical GPU.
     index, device = slots.get()
     os.environ["CUDA_VISIBLE_DEVICES"] = device
+    # Pool workers are daemonic: keep the single-GPU engine and compilation
+    # in this process instead of launching nested multiprocessing workers.
+    os.environ["VLLM_ENABLE_V1_MULTIPROCESSING"] = "0"
+    os.environ["TORCHINDUCTOR_COMPILE_THREADS"] = "1"
+    if args.local_files_only:
+        os.environ["HF_HUB_OFFLINE"] = "1"
+        os.environ["TRANSFORMERS_OFFLINE"] = "1"
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     log_path = Path(work_root) / f"shard_{index:02d}.log"
     with log_path.open("a", buffering=1) as log:
@@ -173,20 +189,31 @@ def init_worker(slots, work_root: str, args):
 
 def worker_generate(task):
     import torch
-    from transformers import AutoModelForCausalLM
+    from vllm import LLM
 
     args = WORKER["args"]
     # Load inside the task so model-loading exceptions reach the coordinator
     # instead of causing multiprocessing.Pool to repeatedly restart an initializer.
     if "model" not in WORKER:
         WORKER["tokenizer"] = load_tokenizer(args)
-        options = {}
+        model_path = args.model_name_or_path
+        if args.local_files_only and not Path(model_path).is_dir():
+            from huggingface_hub import snapshot_download
+
+            model_path = snapshot_download(model_path, local_files_only=True)
         if args.attn_implementation:
-            options["attn_implementation"] = args.attn_implementation
-        WORKER["model"] = AutoModelForCausalLM.from_pretrained(
-            args.model_name_or_path, torch_dtype=getattr(torch, args.dtype),
-            trust_remote_code=True, local_files_only=args.local_files_only, **options,
-        ).to("cuda:0").eval()
+            print(
+                "[distill] --attn-implementation is ignored; "
+                "vLLM selects its attention backend.", flush=True,
+            )
+        WORKER["model"] = LLM(
+            model=model_path, dtype=args.dtype, trust_remote_code=True,
+            tensor_parallel_size=1, distributed_executor_backend="uni",
+            max_model_len=args.gen_max_length, max_num_seqs=args.batch_size,
+            gpu_memory_utilization=args.gpu_memory_utilization, seed=args.seed,
+            # All tokenization/decoding stays with the existing HF tokenizer.
+            skip_tokenizer_init=True, generation_config="vllm",
+        )
     result = generate_batch(task, WORKER["tokenizer"], WORKER["model"], args)
     WORKER["batches"] += 1
     if WORKER["batches"] % args.empty_cache_every_batches == 0:
@@ -345,7 +372,10 @@ def parse_args():
     parser.add_argument("--num-shards", type=int, default=0, help="GPU replicas (1-8); 0 uses all visible GPUs")
     parser.add_argument("--device", choices=["cuda"], default="cuda")
     parser.add_argument("--dtype", choices=["bfloat16", "float16", "float32"], default="bfloat16")
-    parser.add_argument("--attn-implementation", choices=["sdpa", "eager", "flash_attention_2"])
+    parser.add_argument("--attn-implementation", choices=["sdpa", "eager", "flash_attention_2"],
+                        help="Deprecated compatibility option; vLLM selects its own attention backend")
+    parser.add_argument("--gpu-memory-utilization", type=float, default=0.9,
+                        help="Fraction of each GPU's memory reserved for its vLLM replica")
     parser.add_argument("--max-samples", type=int, default=0, help="Global generated-row limit; 0 uses all rows")
     parser.add_argument("--eval-ratio", type=float, default=0.01)
     parser.add_argument("--seed", type=int, default=42)
@@ -356,8 +386,12 @@ def parse_args():
     if (args.max_length < 2 or args.gen_max_length < args.max_length or args.prompt_max_length < 1
             or args.batch_size < 1 or not 0 <= args.num_shards <= 8
             or args.max_samples < 0 or args.max_samples == 1 or not 0 < args.eval_ratio < 1
-            or args.progress_every_batches < 0 or args.empty_cache_every_batches < 1):
-        parser.error("Invalid lengths, batch/GPU count, sample limit, split ratio, or progress/cache interval")
+            or args.progress_every_batches < 0 or args.empty_cache_every_batches < 1
+            or not 0 < args.gpu_memory_utilization <= 1):
+        parser.error(
+            "Invalid lengths, batch/GPU count, sample limit, split ratio, "
+            "progress/cache interval, or GPU memory fraction"
+        )
     if not args.source_splits or len(set(args.source_splits)) != len(args.source_splits):
         parser.error("Source splits must be nonempty and unique")
     if not args.jsonl_stem or Path(args.jsonl_stem).name != args.jsonl_stem or args.jsonl_stem in {".", ".."}:
@@ -399,6 +433,7 @@ def main() -> int:
         "source_fingerprints": {split: getattr(source, "_fingerprint", None) for split, source in sources.items()},
         "source_rows_by_split": {split: len(source) for split, source in sources.items()},
         "torch_version": torch.__version__, "transformers_version": transformers.__version__,
+        "inference_backend": "vllm", "vllm_version": version("vllm"),
     }
     root = args.data_root.resolve()
     metadata_path = root / "selfdistill_metadata.json"
@@ -414,7 +449,7 @@ def main() -> int:
         work_root.mkdir(parents=True, exist_ok=True)
         tasks = (task for task in iter_batches(sources, tokenizer, args.batch_size)
                  if task[0] >= state["next_batch"])
-        print(f"[distill] Tulu 3: {count} GPUs, batch_size={args.batch_size}, "
+        print(f"[distill] Tulu 3 (vLLM): {count} GPUs, batch_size={args.batch_size}, "
               f"resumed={state['generated_rows']}; logs={work_root}", flush=True)
 
         def interrupted(signum, frame):
