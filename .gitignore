@@ -9,6 +9,7 @@ outputs/
 experiments/
 pard/
 tests/*
+!tests/test_decoder_loss_lambda_warmup.py
 !tests/test_math500_eval.py
 !tests/test_tulu3_selfdistill_advanced.py
 docs/*

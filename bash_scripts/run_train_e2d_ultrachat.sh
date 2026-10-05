@@ -623,7 +623,7 @@ NULLIFY_SELF_ATTN=false
 LR=3e-5
 WARMUP_DURATION="100ba"
 ALPHA_F=0.5
-DECODER_LOSS_LAMBDA=0.5
+DECODER_LOSS_LAMBDA=${DECODER_LOSS_LAMBDA:-0.5}
 BATCH_SIZE=32
 MAX_DURATION=${MAX_DURATION:-"1ep"}
 PRECISION="amp_bf16"
@@ -707,3 +707,4 @@ composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoi
   model.config.backbone_config.train_on_ar=${TRAIN_ON_AR} \
   model.config.backbone_config.ar_checkpoint_path=${AR_CHECKPOINT_PATH} \
   +model.config.nullify_self_attn=${NULLIFY_SELF_ATTN} \
+  "$@"

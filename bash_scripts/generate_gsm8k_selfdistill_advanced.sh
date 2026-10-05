@@ -39,4 +39,5 @@ exec "${PYTHON:-python}" scripts/generate_gsm8k_selfdistill.py \
   --progress-every "${PROGRESS_EVERY:-25}" \
   --batch-size "${PER_DEVICE_BATCH_SIZE}" \
   --num-shards 0 \
+  --enforce-eager \
   "$@"

@@ -12,6 +12,9 @@ set -u
 # Match the checkpoint/tokenizer defaults in run_lm_eval_harness_lora.sh.
 MODEL_PATH=${MODEL_PATH:-/data/shared_data/hankun/outputs/tulu3_4096_seed_lora_block8_1.7b_dec2_rank512_lr6e-4_bsz32_20260926_204506}
 # 5000 steps, 60.70 tokens/s (2.66, 84.36%)
+# 140000 steps, 70.11 tokens/s (3.16, 85.21%)
+# 21000 steps, 73.06 tokens/s (3.56, 82.17%)
+# 30000 steps, 78.55 tokens/s (3.70, 83.88%)
 QWEN_MODEL=${QWEN_MODEL:-Qwen/Qwen3-1.7B}
 CKPT=${CKPT:-best}
 MAX_NEW_TOKENS=${MAX_NEW_TOKENS:-4096}

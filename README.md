@@ -127,6 +127,32 @@ checkpoints, and uncomment the relevant section for a given denoiser class.
 We also provide scripts that will produce the generation throughput numbers we report.
 These files contain a `_tput` at the end of the script name.
 
+For UltraChat E2D training with a gradually increasing drafting-loss weight, run:
+
+```bash
+DECODER_LOSS_LAMBDA_START=0.0 DECODER_LOSS_LAMBDA=0.5 \
+  DECODER_LOSS_LAMBDA_KEEP_FIRST_RATIO=0.3 \
+  DECODER_LOSS_LAMBDA_WARMUP_RATIO=0.7 \
+  bash bash_scripts/run_train_e2d_ultrachat_warmup_lambda.sh
+```
+
+These settings can also be edited in the new script. Lambda stays at the starting
+value until `KEEP_FIRST_RATIO` of `MAX_DURATION`, ramps linearly until
+`WARMUP_RATIO`, then stays at the final value. The example above holds for the
+first 30%, ramps from 30% to 70%, and holds the final lambda for the last 30%.
+`WARMUP_RATIO` marks the end of the ramp, not its duration. The default
+`KEEP_FIRST_RATIO=0.0` preserves the original warmup behavior. Require
+`0 <= KEEP_FIRST_RATIO <= WARMUP_RATIO <= 1`; equal ratios switch directly at
+that point, and both ratios set to `0` use the final lambda throughout.
+The schedule advances per training batch, including within a single epoch,
+independently of learning-rate warmup. It preserves
+`(next_token_loss + lambda * draft_loss) / (1 + lambda)` and
+logs the training coefficient as `loss/train/decoder_loss_lambda`. Evaluation
+uses lambda at the completed training progress. To resume, pass
+`training.load_path=/path/to/checkpoint.pt` with the same schedule and total
+`MAX_DURATION`. The original UltraChat launcher keeps its fixed-lambda defaults;
+the new launcher reuses its data preparation and other training settings.
+
 Below are the evaluation scripts provided for various tasks:
 - Text summarization: [`run_seq2seq_eval_cnndm.sh`](bash_scripts/run_seq2seq_eval_cnndm.sh),[`run_seq2seq_eval_cnndm_tput.sh`](bash_scripts/run_seq2seq_eval_cnndm_tput.sh)
 - Machine translation: [`run_seq2seq_eval_wmt.sh`](bash_scripts/run_seq2seq_eval_wmt.sh), [`run_seq2seq_eval_wmt_tput.sh`](bash_scripts/run_seq2seq_eval_wmt_tput.sh).

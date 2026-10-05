@@ -128,7 +128,7 @@ NUM_FEW_SHOT=0
 
 # E2D
 # MODEL_PATH=${MODEL_PATH:-"/data/shared_data/hankun/outputs/gsm8k-block4_lr2e-5_bsz2_warm100ba_enc28_TOPdec2_seed_full-separate-drafter-copy_20260724_195658_fsdp"}
-MODEL_PATH=${MODEL_PATH:-"/data/shared_data/hankun/outputs/gsm8k_block10_lr6e-5_bsz32_warm0.01dur_max-dur4ep_enc28_TOPdec2_e2d_20260928_101421"}
+
 BLOCK_SIZE=${BLOCK_SIZE:-4}
 KV_CACHING=${KV_CACHING:-true}
 ALIGN_INPUTS_TO_BLOCKS=${ALIGN_INPUTS_TO_BLOCKS:-false}

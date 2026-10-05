@@ -1,0 +1,6 @@
+decoder_loss_lambda_warmup:
+  _target_: src.custom_composer.decoder_loss_lambda_warmup.DecoderLossLambdaWarmup
+  start_lambda: 0.0
+  final_lambda: ${model.config.decoder_loss_lambda}
+  keep_first_ratio: 0.0
+  warmup_ratio: 0.5
