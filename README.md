@@ -153,6 +153,17 @@ uses lambda at the completed training progress. To resume, pass
 `MAX_DURATION`. The original UltraChat launcher keeps its fixed-lambda defaults;
 the new launcher reuses its data preparation and other training settings.
 
+For completed lambda-warmup runs, evaluate the latest checkpoint with
+`CKPT=latest bash run_lm_eval_harness.sh` from `bash_scripts/`, using your usual
+`MODEL_PATH` and tokenizer settings. The evaluation launcher defaults to `best`
+for compatibility with existing runs. During warmup, `metrics/eval/Loss` uses a
+changing lambda, so its values across stages are not directly comparable:
+`best-rank0.pt` can remain a checkpoint from the initial lambda-zero stage,
+before any drafting-loss training. The latest checkpoint includes the later
+drafting-loss updates. For selecting a best checkpoint during future warmup
+experiments, use a fixed evaluation objective or compare checkpoints only after
+lambda reaches its final value.
+
 Below are the evaluation scripts provided for various tasks:
 - Text summarization: [`run_seq2seq_eval_cnndm.sh`](bash_scripts/run_seq2seq_eval_cnndm.sh),[`run_seq2seq_eval_cnndm_tput.sh`](bash_scripts/run_seq2seq_eval_cnndm_tput.sh)
 - Machine translation: [`run_seq2seq_eval_wmt.sh`](bash_scripts/run_seq2seq_eval_wmt.sh), [`run_seq2seq_eval_wmt_tput.sh`](bash_scripts/run_seq2seq_eval_wmt_tput.sh).

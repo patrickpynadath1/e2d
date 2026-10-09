@@ -335,6 +335,24 @@ class LMEvalHarnessModel(LM):
                 "target": e["target"],
             }
 
+        def _tokenize_mbpp(e):
+            if not self.is_instruction_model:
+                return _tokenize_humaneval(e)
+            # Instruction models answer the zero-shot MBPP prompt as one chat turn,
+            # using the same template options as GSM8K/MATH-500.
+            ctx = self._apply_chat_template_for_gsm8k(e["prefix"].strip())
+            tokenize_kwargs = (
+                {"add_special_tokens": False}
+                if self.gsm8k_chat_template_kwargs is not None
+                else {}
+            )
+            prefix_tokens = self.tokenizer(ctx, **tokenize_kwargs)["input_ids"]
+            return {
+                "prefix_text": ctx,
+                "prefix": prefix_tokens,
+                "target": e["target"],
+            }
+
         def _tokenize_default(e):
             ctx = e["prefix"]
             ctx = self.tokenizer.bos_token + ctx
@@ -347,7 +365,9 @@ class LMEvalHarnessModel(LM):
 
         ds = [{"prefix": req.args[0], "target": req.args[1]} for req in requests]
         ds = Dataset.from_list(ds)
-        if is_code_eval:
+        if is_mbpp:
+            ds = ds.map(_tokenize_mbpp)
+        elif is_code_eval:
             ds = ds.map(_tokenize_humaneval)
         elif is_gsm8k or is_math500:
             # MATH-500 deliberately uses the same instruction and chat template.
@@ -607,6 +627,40 @@ class LMEvalHarnessModel(LM):
                         f"position={row['position']}, acceptance_rate={row['acceptance_rate']:.6f}, "
                         f"accept_count={row['accept_count']}, attempt_count={row['attempt_count']}\n"
                     )
+
+        if self.rank == 0:
+            # Persist the running stdout report: throughput plus drafting stats.
+            generation_stats = {
+                "num_samples": total,
+                "throughput_warmup": self.throughput_warmup,
+                "num_throughput_samples": len(tputs),
+                "throughput_mean_tok_s": float(np.mean(tputs)) if tputs else None,
+                "throughput_std_tok_s": float(np.std(tputs)) if tputs else None,
+                "total_generated_tokens": int(total_generated_tokens),
+                "total_accepted_tokens": int(total_accepted_tokens),
+                "acceptance_rate": (
+                    total_accepted_tokens / total_generated_tokens
+                    if total_generated_tokens > 0
+                    else 0.0
+                ),
+                "average_accepted_length": (
+                    float(np.sum(total_accepted_lengths) / total_accept_counts)
+                    if total_accept_counts > 0
+                    else 0.0
+                ),
+                "average_draft_length": (
+                    float(np.mean(total_draft_lengths))
+                    if len(total_draft_lengths) > 0
+                    else None
+                ),
+                "total_drafting_time_s": total_drafting_time_s,
+                "total_all_time_s": total_all_time_s,
+            }
+            stats_path = (
+                f"{self.generated_samples_output_path}/generation_stats-rank{self.rank}.json"
+            )
+            with open(stats_path, "w") as f:
+                json.dump(generation_stats, f, indent=2)
 
         samples_path = f"{self.generated_samples_output_path}/rank{self.rank}"
         with open(f"{samples_path}.json", "w") as f:

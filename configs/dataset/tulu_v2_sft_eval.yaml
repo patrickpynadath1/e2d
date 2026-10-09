@@ -1,3 +1,0 @@
-defaults:
-  - tulu_v2_sft_train
-split: "test"

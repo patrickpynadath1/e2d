@@ -135,16 +135,16 @@ ALIGN_INPUTS_TO_BLOCKS=${ALIGN_INPUTS_TO_BLOCKS:-false}
 USE_EMA=${USE_EMA:-true}
 
 # Uncomment these lines to evaluate an instruction-tuned model
-# IS_INSTRUCTION_MODEL=${IS_INSTRUCTION_MODEL:-true}
+IS_INSTRUCTION_MODEL=${IS_INSTRUCTION_MODEL:-true}
 # Uncomment this line to evaluate a fine-tuned base model
-IS_INSTRUCTION_MODEL=false
-if [ -z "${QWEN_MODEL:-}" ]; then
-  if [ "${IS_INSTRUCTION_MODEL}" == "true" ]; then
-    QWEN_MODEL="${QWEN_MODEL_INSTRUCT}"
-  else
-    QWEN_MODEL="${QWEN_MODEL_BASE}"
-  fi
-fi
+# IS_INSTRUCTION_MODEL=false
+# if [ -z "${QWEN_MODEL:-}" ]; then
+#   if [ "${IS_INSTRUCTION_MODEL}" == "true" ]; then
+#     QWEN_MODEL="${QWEN_MODEL_INSTRUCT}"
+#   else
+#     QWEN_MODEL="${QWEN_MODEL_BASE}"
+#   fi
+# fi
 
 NUM_VISIBLE_DEVICES=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 

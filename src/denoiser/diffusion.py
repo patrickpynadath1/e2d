@@ -2247,6 +2247,7 @@ class E2D(E2D2):
 
         # Shift targets: predict next token
         targets = denoiser_inputs.x0[:, 1:]  # Remove first token (typically BOS)
+        other_loss_terms = {}
         
         seq_len = denoiser_inputs.x0.shape[1]
         if frozen_target and model_output.shape[1] != seq_len:
@@ -2297,6 +2298,11 @@ class E2D(E2D2):
             loss = (encoder_loss + decoder_loss_lambda * decoder_loss) / (
                 1.0 + decoder_loss_lambda
             )
+            # Report the raw components, including draft loss when lambda is zero.
+            other_loss_terms = {
+                "next_token_loss": encoder_loss.detach(),
+                "draft_loss": decoder_loss.detach(),
+            }
 
             logits = torch.cat([enc_logits, dec_logits], dim=1)
             targets = torch.cat([targets, targets], dim=1)
@@ -2331,7 +2337,7 @@ class E2D(E2D2):
         return LossAndNllOutput(
             loss=loss,
             nlls=token_nlls,
-            other_loss_terms={},
+            other_loss_terms=other_loss_terms,
         )
 
     def _forward(

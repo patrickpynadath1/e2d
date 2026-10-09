@@ -31,6 +31,34 @@ class Loss(Metric):
         return self.sum_loss / self.total_batches
 
 
+class NextTokenLoss(Loss):
+    """Unweighted E2D encoder loss, averaged like the combined Loss metric."""
+
+    def __init__(self, dist_sync_on_step=False):
+        super().__init__(
+            name="next_token_loss",
+            update_key="next_token_loss",
+            dist_sync_on_step=dist_sync_on_step,
+        )
+
+    def update(self, output: Mapping, target: Tensor) -> None:
+        super().update(output["other_loss_terms"], target)
+
+
+class DraftLoss(Loss):
+    """Unweighted E2D decoder loss, averaged like the combined Loss metric."""
+
+    def __init__(self, dist_sync_on_step=False):
+        super().__init__(
+            name="draft_loss",
+            update_key="draft_loss",
+            dist_sync_on_step=dist_sync_on_step,
+        )
+
+    def update(self, output: Mapping, target: Tensor) -> None:
+        super().update(output["other_loss_terms"], target)
+
+
 class NLL(Metric):
     # Make torchmetrics call update only once
     full_state_update = False

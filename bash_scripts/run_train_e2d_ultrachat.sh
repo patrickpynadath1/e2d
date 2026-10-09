@@ -10,7 +10,7 @@ source setup_env.sh
 # -----------------------------
 # Stage 1: Self-distillation
 # -----------------------------
-MODEL_NAME_OR_PATH=Qwen/Qwen3-1.7B
+MODEL_NAME_OR_PATH=Qwen/Qwen3-1.7B-Base
 MAX_SEQ_LEN=4096 # 1024
 GEN_MAX_SEQ_LEN=${GEN_MAX_SEQ_LEN:-4096} # 1536
 PROMPT_MAX_SEQ_LEN=${PROMPT_MAX_SEQ_LEN:-1024}
@@ -647,7 +647,7 @@ fi
 # get time stamp
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
-RUN_NAME=${DISTILL_RUN_PREFIX}_block${BLOCK_SIZE}_warm${WARMUP_DURATION}_lr${LR}_bsz${BATCH_SIZE}_lambda${DECODER_LOSS_LAMBDA}_max-dur${MAX_DURATION}_${ENC_LAYERS}_${DEC_LAYERS}_${TAG}_${TIMESTAMP}
+RUN_NAME=${DISTILL_RUN_PREFIX}_b${BLOCK_SIZE}_warm${WARMUP_DURATION}_lr${LR}_bsz${BATCH_SIZE}_lambda${DECODER_LOSS_LAMBDA}_dur${MAX_DURATION}_${DEC_LAYERS}_${TAG}_${TIMESTAMP}
 
 MICRO_BATCH_SIZE=1
 NUM_WORKERS=0
@@ -660,6 +660,7 @@ fi
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
+# Keep the final "$@": the warmup launcher passes its callback and schedule here.
 composer -n ${NUM_VISIBLE_DEVICES} scripts/composer_scripts/train_discrete_denoiser.py \
   run_name=${RUN_NAME} \
     pretrained_model_name_or_path=${MODEL_NAME_OR_PATH} \

@@ -15,8 +15,23 @@ from scripts.utils import (
     print_and_save_config,
     register_useful_resolvers,
 )
+from src.backbone.encoder_decoder import LLMasEncoderDecoderShareKVEncoderGen
+from src.denoiser.diffusion import E2D
+from src.tasks.metrics import DraftLoss, NextTokenLoss
 
 log = logging.getLogger(__name__)
+
+
+def build_eval_metrics(model, metrics_config):
+    """Instantiate configured metrics and add raw loss components for joint E2D."""
+    metrics = list(hydra.utils.instantiate(metrics_config).values())
+    # Only joint E2D backbones produce both next-token and drafting losses.
+    # Separate metric classes keep Composer's class-based metric names distinct.
+    if isinstance(model, E2D) and isinstance(
+        model.backbone, LLMasEncoderDecoderShareKVEncoderGen
+    ):
+        metrics.extend([NextTokenLoss(), DraftLoss()])
+    return metrics
 
 
 @hydra.main(version_base=None, config_path="../../configs", config_name="config")
@@ -35,6 +50,7 @@ def main(cfg: DictConfig) -> None:
         _convert_="all",  # required to enable json-serialization when saving checkpoint
     )
     print(model)
+    eval_metrics = build_eval_metrics(model, cfg.eval_metrics)
     if getattr(cfg.training, "compile_backbone", False):
         log.info("Compiling model backbone")
         model.backbone = torch.compile(
@@ -44,7 +60,7 @@ def main(cfg: DictConfig) -> None:
         model,
         tokenizer=tokenizer,
         metrics=list(hydra.utils.instantiate(cfg.metrics).values()),
-        eval_metrics=list(hydra.utils.instantiate(cfg.eval_metrics).values()),
+        eval_metrics=eval_metrics,
     )
     log.info(
         f"Num. parameters: {format_number(count_parameters(model, trainable=False))}"

@@ -1,0 +1,33 @@
+defaults:
+  - base@_here_
+  - _self_
+
+# Pass a custom Task object to lm-eval; no installed task registry changes needed.
+# Generation-only: `bypass` skips pass@1, so no model-generated code is executed.
+_convert_: all
+tasks:
+  - _target_: lm_eval.api.task.ConfigurableTask
+    config:
+      task: mbpp
+      dataset_path: google-research-datasets/mbpp
+      dataset_name: full
+      test_split: test
+      output_type: generate_until
+      # lm-eval's zero-shot mbpp_instruct prompt; the adapter wraps it in the
+      # same non-thinking chat template as GSM8K/MATH-500.
+      doc_to_text: "You are an expert Python programmer, and here is your task:\n{{text}}\nYour code should pass these tests:\n{{test_list[0]}}\n{{test_list[1]}}\n{{test_list[2]}}"
+      doc_to_target: "{{test_list[0]}}\n{{test_list[1]}}\n{{test_list[2]}}"
+      target_delimiter: ""
+      num_fewshot: 0
+      generation_kwargs:
+        until: []
+        do_sample: false
+      metric_list:
+        - metric: bypass
+          aggregation: bypass
+          higher_is_better: true
+      metadata:
+        version: 1.0
+limit: null
+model:
+  gen_kwargs: ${gen_kwargs}
